@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon combiné</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:ital,wght@0,500;0,700;0,800;1,700;1,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f4f8;
+    --panel: #ffffff;
+    --panel-border: #e2e4ee;
+    --text: #15172b;
+    --text-dim: #5c5f74;
+    --accent: #1646b5;
+    --accent-2: #caa24a;
+    --input-bg: #f7f8fc;
+    --danger: #c23b3b;
+    --danger-bg: #fdeaea;
+    --shadow: 0 8px 24px rgba(20, 24, 50, 0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0c16;
+      --panel: #15172a;
+      --panel-border: #272a45;
+      --text: #f2f3fb;
+      --text-dim: #a2a5c0;
+      --accent: #5588ff;
+      --accent-2: #e0bb66;
+      --input-bg: #1d2038;
+      --danger: #ff6b6b;
+      --danger-bg: #351c1f;
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0c16;
+    --panel: #15172a;
+    --panel-border: #272a45;
+    --text: #f2f3fb;
+    --text-dim: #a2a5c0;
+    --accent: #5588ff;
+    --accent-2: #e0bb66;
+    --input-bg: #1d2038;
+    --danger: #ff6b6b;
+    --danger-bg: #351c1f;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Figtree', sans-serif;
+  }
+  body {
+    display: flex;
+    justify-content: center;
+    padding: 20px 14px 60px;
+  }
+  main {
+    width: 100%;
+    max-width: 640px;
+  }
+  h1 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    margin: 6px 0 12px;
+    letter-spacing: -0.02em;
+  }
+  .demo-banner {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 18px;
+    line-height: 1.4;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 18px;
+    padding: 18px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  input[type="text"] {
+    width: 100%;
+    padding: 11px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: 'Figtree', sans-serif;
+    font-size: 15px;
+  }
+  input[type="text"]:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .bet-item {
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: var(--input-bg);
+    position: relative;
+  }
+  .bet-item:last-child { margin-bottom: 0; }
+  .bet-row {
+    display: grid;
+    grid-template-columns: 1fr 70px;
+    gap: 10px;
+  }
+  .bet-row .field { margin-bottom: 10px; }
+  .bet-number {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+  }
+  .remove-btn {
+    width: 100%;
+    background: none;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    border-radius: 10px;
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Figtree', sans-serif;
+  }
+  .remove-btn:hover { background: var(--danger-bg); }
+  .add-btn {
+    width: 100%;
+    background: none;
+    border: 1.5px dashed var(--accent);
+    color: var(--accent);
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Figtree', sans-serif;
+    margin-top: 4px;
+  }
+  .add-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 14px 4px 4px;
+    font-family: 'Bricolage Grotesque', sans-serif;
+  }
+  .total-row span:first-child {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .total-row span:last-child {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--accent-2);
+  }
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .checkbox-row input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+  }
+  .checkbox-row label {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .generate-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #1646b5, #0b2a6e);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Bricolage Grotesque', sans-serif;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(22, 70, 181, 0.35);
+  }
+  .generate-btn:active { transform: translateY(1px); }
+  .result-card {
+    display: none;
+  }
+  .result-card.visible { display: block; }
+  #resultCanvas {
+    width: 100%;
+    border-radius: 14px;
+    display: block;
+    margin-bottom: 10px;
+  }
+  .result-hint {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+  footer {
+    margin-top: 26px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 0 8px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mon combiné</h1>
+  <div class="demo-banner">Démo : version de test, rien n'est vérifié ni enregistré.</div>
+
+  <div class="card">
+    <div class="field">
+      <label for="imageTitle">Titre de l'image</label>
+      <input type="text" id="imageTitle" value="Combiné tennis">
+    </div>
+  </div>
+
+  <div class="card">
+    <div id="betsList"></div>
+    <button class="add-btn" id="addBetBtn" type="button">+ Ajouter un pari</button>
+    <div class="total-row">
+      <span>Cote totale</span>
+      <span id="totalOdds">3,01</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label for="displayName">Nom affiché en bas de l'image</label>
+      <input type="text" id="displayName" value="BET.PRONO">
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="demoBadge" checked>
+      <label for="demoBadge">Ajouter Démo sur l'image</label>
+    </div>
+  </div>
+
+  <button class="generate-btn" id="generateBtn" type="button">Créer l'image</button>
+
+  <div class="card result-card" id="resultCard">
+    <canvas id="resultCanvas" width="1280" height="720"></canvas>
+    <div class="result-hint" id="resultHint">Appuie longuement pour l'enregistrer</div>
+  </div>
+
+  <footer>
+    Jeu interdit aux mineurs. Cette page est fournie à titre informatif uniquement, aucun résultat n'est garanti. Jouer comporte des risques : endettement, dépendance, isolement. Joueurs Info Service : 09 74 75 13 13 (appel non surtaxé).
+  </footer>
+</main>
+
+<script>
+(function () {
+  var defaultBets = [
+    { match: 'Alex de Minaur – Andrey Rublev', pick: 'Alex de Minaur gagne', odds: '1,70' },
+    { match: 'Daniil Medvedev – Francisco Cerundolo', pick: 'Daniil Medvedev gagne', odds: '1,33' },
+    { match: 'Jiri Lehecka – Adolfo Daniel Vallejo', pick: 'Jiri Lehecka gagne', odds: '1,33' }
+  ];
+  var MAX_BETS = 6;
+  var betsList = document.getElementById('betsList');
+  var addBetBtn = document.getElementById('addBetBtn');
+  var totalOddsEl = document.getElementById('totalOdds');
+
+  function parseOdds(str) {
+    var n = parseFloat(String(str).replace(',', '.').trim());
+    return isNaN(n) ? 0 : n;
+  }
+
+  function formatOdds(n) {
+    return n.toFixed(2).replace('.', ',');
+  }
+
+  function renderBets() {
+    betsList.innerHTML = '';
+    defaultBets.forEach(function (bet, idx) {
+      var item = document.createElement('div');
+      item.className = 'bet-item';
+
+      var number = document.createElement('div');
+      number.className = 'bet-number';
+      number.textContent = 'Pari ' + (idx + 1);
+      item.appendChild(number);
+
+      var matchField = document.createElement('div');
+      matchField.className = 'field';
+      matchField.innerHTML = '<label>Match</label>';
+      var matchInput = document.createElement('input');
+      matchInput.type = 'text';
+      matchInput.value = bet.match;
+      matchInput.addEventListener('input', function () {
+        bet.match = matchInput.value;
+        updateTotal();
+      });
+      matchField.appendChild(matchInput);
+      item.appendChild(matchField);
+
+      var pickField = document.createElement('div');
+      pickField.className = 'field';
+      pickField.innerHTML = '<label>Pari</label>';
+      var pickInput = document.createElement('input');
+      pickInput.type = 'text';
+      pickInput.value = bet.pick;
+      pickInput.addEventListener('input', function () {
+        bet.pick = pickInput.value;
+        updateTotal();
+      });
+      pickField.appendChild(pickInput);
+      item.appendChild(pickField);
+
+      var row = document.createElement('div');
+      row.className = 'bet-row';
+      var oddsField = document.createElement('div');
+      oddsField.className = 'field';
+      oddsField.innerHTML = '<label>Cote</label>';
+      var oddsInput = document.createElement('input');
+      oddsInput.type = 'text';
+      oddsInput.value = bet.odds;
+      oddsInput.inputMode = 'decimal';
+      oddsInput.addEventListener('input', function () {
+        bet.odds = oddsInput.value;
+        updateTotal();
+      });
+      oddsField.appendChild(oddsInput);
+      row.appendChild(oddsField);
+
+      var removeWrap = document.createElement('div');
+      removeWrap.style.display = 'flex';
+      removeWrap.style.alignItems = 'flex-end';
+      removeWrap.style.marginBottom = '10px';
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'remove-btn';
+      removeBtn.type = 'button';
+      removeBtn.textContent = 'Retirer';
+      removeBtn.title = 'Retirer ce pari';
+      removeBtn.addEventListener('click', function () {
+        if (defaultBets.length <= 1) return;
+        defaultBets.splice(idx, 1);
+        renderBets();
+        updateTotal();
+      });
+      removeWrap.appendChild(removeBtn);
+      row.appendChild(removeWrap);
+
+      item.appendChild(row);
+      betsList.appendChild(item);
+    });
+    addBetBtn.disabled = defaultBets.length >= MAX_BETS;
+  }
+
+  function updateTotal() {
+    var total = 1;
+    defaultBets.forEach(function (bet) {
+      var o = parseOdds(bet.odds);
+      if (o > 0) total *= o;
+    });
+    totalOddsEl.textContent = formatOdds(total);
+  }
+
+  addBetBtn.addEventListener('click', function () {
+    if (defaultBets.length >= MAX_BETS) return;
+    defaultBets.push({ match: '', pick: '', odds: '' });
+    renderBets();
+    updateTotal();
+  });
+
+  renderBets();
+  updateTotal();
+
+  // ---- Image generation ----
+  var generateBtn = document.getElementById('generateBtn');
+  var resultCard = document.getElementById('resultCard');
+  var resultHint = document.getElementById('resultHint');
+  var canvas = document.getElementById('resultCanvas');
+  var ctx = canvas.getContext('2d');
+
+  function fitFont(ctx, text, maxWidth, startSize, family, minSize) {
+    var size = startSize;
+    minSize = minSize || 14;
+    while (size > minSize) {
+      ctx.font = size + 'px ' + family;
+      if (ctx.measureText(text).width <= maxWidth) break;
+      size -= 1;
+    }
+    ctx.font = size + 'px ' + family;
+    return size;
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    if (w < 2 * r) r = w / 2;
+    if (h < 2 * r) r = h / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function isMobile() {
+    return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  }
+
+  function drawImage() {
+    var W = canvas.width, H = canvas.height;
+    var title = (document.getElementById('imageTitle').value || 'Combiné').trim();
+    var displayName = (document.getElementById('displayName').value || 'BET.PRONO').trim();
+    var showDemo = document.getElementById('demoBadge').checked;
+
+    var bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#040A22');
+    bg.addColorStop(1, '#1646B5');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    function halo(x, y, r, color) {
+      var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, color);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    halo(180, 100, 260, 'rgba(90,150,255,0.35)');
+    halo(W - 200, 60, 300, 'rgba(240,200,120,0.22)');
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 3;
+    for (var i = 0; i < 4; i++) {
+      var y0 = H - 40 - i * 22;
+      ctx.beginPath();
+      ctx.moveTo(0, y0);
+      ctx.lineTo(W, y0 - 14);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if (showDemo) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(194,59,59,0.9)';
+      roundRect(ctx, 32, 28, 108, 36, 10);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '700 17px Bricolage Grotesque, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('DÉMO', 32 + 54, 28 + 19);
+      ctx.restore();
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    var words = title.split(' ');
+    var firstWord = words.shift() || title;
+    var rest = words.join(' ');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    var titleGrad = ctx.createLinearGradient(W / 2 - 300, 0, W / 2 + 300, 0);
+    titleGrad.addColorStop(0, '#f6d98a');
+    titleGrad.addColorStop(0.5, '#caa24a');
+    titleGrad.addColorStop(1, '#f6d98a');
+
+    var titleTop = 100;
+    var size1 = fitFont(ctx, firstWord, W - 120, 64, 'italic 800 64px Bricolage Grotesque', 36);
+    ctx.font = 'italic 800 ' + size1 + 'px Bricolage Grotesque, sans-serif';
+    ctx.fillStyle = titleGrad;
+    ctx.fillText(firstWord, W / 2, titleTop);
+
+    if (rest) {
+      var size2 = fitFont(ctx, rest, W - 120, 56, 'italic 800 56px Bricolage Grotesque', 28);
+      ctx.font = 'italic 800 ' + size2 + 'px Bricolage Grotesque, sans-serif';
+      ctx.fillStyle = titleGrad;
+      ctx.fillText(rest, W / 2, titleTop + 60);
+    }
+
+    var bets = defaultBets.filter(function (b) { return b.match || b.pick || b.odds; });
+    if (bets.length === 0) bets = [{ match: '', pick: '', odds: '' }];
+    var startY = 220;
+    var itemH = Math.min(84, (H - startY - 150) / bets.length);
+    var itemGap = 12;
+    var boxW = W - 120;
+    var boxX = 60;
+
+    bets.forEach(function (bet, idx) {
+      var y = startY + idx * (itemH + itemGap);
+      ctx.save();
+      ctx.fillStyle = 'rgba(8,16,40,0.7)';
+      roundRect(ctx, boxX, y, boxW, itemH, 16);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#caa24a';
+      roundRect(ctx, boxX, y, boxW, itemH, 16);
+      ctx.stroke();
+      ctx.restore();
+
+      var dotX = boxX + 34;
+      var dotY = y + itemH / 2;
+      ctx.beginPath();
+      ctx.fillStyle = '#caa24a';
+      ctx.arc(dotX, dotY, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      var textX = boxX + 64;
+      var maxTextWidth = boxW - 64 - 180;
+
+      ctx.textAlign = 'left';
+      var matchText = (bet.match || 'Match').toUpperCase();
+      var matchSize = fitFont(ctx, matchText, maxTextWidth, 17, 'Figtree', 11);
+      ctx.font = '600 ' + matchSize + 'px Figtree, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillText(matchText, textX, y + itemH * 0.38);
+
+      var pickText = bet.pick || 'Sélection';
+      var pickSize = fitFont(ctx, pickText, maxTextWidth, 24, 'Figtree', 14);
+      ctx.font = '700 ' + pickSize + 'px Figtree, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(pickText, textX, y + itemH * 0.75);
+
+      ctx.textAlign = 'right';
+      var oddsVal = bet.odds ? formatOdds(parseOdds(bet.odds)) : '-';
+      ctx.fillStyle = '#f6d98a';
+      ctx.font = '800 30px Bricolage Grotesque, sans-serif';
+      ctx.fillText(oddsVal, boxX + boxW - 28, y + itemH / 2 + 10);
+    });
+
+    var total = 1;
+    bets.forEach(function (b) {
+      var o = parseOdds(b.odds);
+      if (o > 0) total *= o;
+    });
+    var totalText = 'COTE TOTALE ' + formatOdds(total);
+    var pillY = startY + bets.length * (itemH + itemGap) + 10;
+    ctx.font = '800 26px Bricolage Grotesque, sans-serif';
+    var pillTextW = ctx.measureText(totalText).width;
+    var pillW = pillTextW + 70;
+    var pillH = 54;
+    var pillX = W / 2 - pillW / 2;
+    ctx.save();
+    var pillGrad = ctx.createLinearGradient(pillX, 0, pillX + pillW, 0);
+    pillGrad.addColorStop(0, '#f6d98a');
+    pillGrad.addColorStop(1, '#caa24a');
+    ctx.fillStyle = pillGrad;
+    roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#1a1200';
+    ctx.textAlign = 'center';
+    ctx.font = '800 26px Bricolage Grotesque, sans-serif';
+    ctx.fillText(totalText, W / 2, pillY + pillH / 2 + 9);
+
+    var nameY = H - 70;
+    ctx.save();
+    ctx.shadowColor = 'rgba(80,220,255,0.9)';
+    ctx.shadowBlur = 24;
+    ctx.fillStyle = '#ffffff';
+    var nameSize = fitFont(ctx, displayName, W - 160, 52, 'italic 800 52px Bricolage Grotesque', 28);
+    ctx.font = 'italic 800 ' + nameSize + 'px Bricolage Grotesque, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(displayName, W / 2, nameY);
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = '500 15px Figtree, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('18+ · Jouer comporte des risques : endettement, dépendance, isolement · Joueurs Info Service 09 74 75 13 13', W / 2, H - 24);
+  }
+
+  generateBtn.addEventListener('click', function () {
+    function render() {
+      drawImage();
+      resultCard.classList.add('visible');
+      resultHint.textContent = isMobile()
+        ? "Appuie longuement pour l'enregistrer"
+        : "Clic droit sur l'image pour l'enregistrer";
+      resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(render);
+    } else {
+      render();
+    }
+  });
+})();
+</script>
+</body>
+</html>

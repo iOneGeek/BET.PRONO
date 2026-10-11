@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BET.PRONO - Suivi de bankroll</title>
+<meta name="theme-color" content="#353839">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/static/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#f1efec;--panel:#fff;--line:#ded8d2;--text:#353839;--mute:#6b6f70;--gain:#0a8f65;--loss:#d1415a;--field:#f6f4f1;--accent:#ff7518;--on-accent:#1c1100;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#202223;--panel:#353839;--line:#484c4d;--text:#f3efe9;--mute:#aeb2b3;--gain:#19e6a0;--loss:#ff7a8a;--field:#2b2d2e}}
+:root[data-theme="dark"]{--bg:#202223;--panel:#353839;--line:#484c4d;--text:#f3efe9;--mute:#aeb2b3;--gain:#19e6a0;--loss:#ff7a8a;--field:#2b2d2e}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+h1{margin:0;font-size:1.7rem;font-weight:800;line-height:1.2}
+.sub{margin:0;color:var(--mute);font-size:.9rem}
+.who{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--mute)}
+.who b{color:var(--text)}
+#logout{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--field);color:var(--text);padding:6px 10px;font-size:.82rem}
+label{display:grid;gap:4px;font-size:.85rem;color:var(--mute)}
+input,select{font:inherit;color:var(--text);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chart{background:linear-gradient(160deg,#353839,#4a4d4e);border-radius:18px;padding:12px 8px 4px}
+.chart svg{width:100%;height:auto;display:block}
+.chart text{fill:rgba(255,255,255,.88);font-size:11px}
+.chart .hint{font-size:14px}
+.gl{stroke:rgba(255,255,255,.22)}.gl.z{stroke:rgba(255,255,255,.65)}
+.ln{stroke:#fff;stroke-width:3;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:2px}
+.card span{color:var(--mute);font-size:.85rem}.card b{font-size:1.45rem;font-weight:800}
+.g{color:var(--gain)}.l{color:var(--loss)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+h2{margin:0 0 12px;font-size:1.1rem}
+summary{cursor:pointer;font-weight:600}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end;margin-top:12px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--field);color:var(--text);padding:8px 12px}
+.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.primary:disabled{opacity:.6;cursor:wait}
+.wrap{overflow-x:auto;max-height:520px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:.92rem}
+th{text-align:left;color:var(--mute);font-weight:400;font-size:.82rem;position:sticky;top:0;background:var(--panel)}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line)}
+.x{display:none}.edit .x{display:inline-block}.edit .v{display:none}.per{display:flex;gap:6px;justify-content:center;padding:8px 0}.per button{background:transparent;color:#fff;border-color:rgba(255,255,255,.5);padding:4px 12px;border-radius:999px;font-size:.85rem}.per button[aria-pressed=true]{background:#fff;color:#353839;font-weight:600}.plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.plan div{display:grid}.plan span{color:var(--mute);font-size:.85rem}.plan b{font-size:1.15rem}.warn{color:var(--loss);margin:8px 0 0;font-size:.88rem}
+.row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+textarea{width:100%;height:90px;margin-top:8px;font:12px monospace;background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:8px}
+footer{color:var(--mute);font-size:.82rem}
+.loading{color:var(--mute);text-align:center;padding:30px 0}
+.nav{display:flex;gap:6px;background:var(--field);border-radius:10px;padding:4px}
+.nav button{flex:1;border:none;background:transparent;color:var(--mute);font-weight:600;padding:9px;border-radius:8px}
+.nav button[aria-pressed=true]{background:var(--accent);color:var(--on-accent)}
+.view{display:none}
+.view.active{display:grid;gap:16px}
+.share-form{display:grid;gap:14px}
+.bet-item{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--field);display:grid;gap:8px}
+.bet-item .grid3{display:grid;grid-template-columns:1fr 1fr 80px;gap:8px}
+.bet-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.bet-actions select{max-width:220px}
+.remove-bet{border-color:var(--loss);color:var(--loss)}
+.total-pill{display:flex;justify-content:space-between;align-items:baseline;padding:4px 2px}
+.total-pill span:first-child{color:var(--mute);font-size:.85rem}
+.total-pill b{font-size:1.3rem;color:var(--accent)}
+.checkrow{display:flex;align-items:center;gap:8px}
+.checkrow input{width:18px;height:18px;accent-color:var(--accent)}
+.admin-badge{display:inline-block;background:var(--accent);color:var(--on-accent);font-size:.72rem;font-weight:700;border-radius:999px;padding:2px 8px;margin-left:8px;vertical-align:middle}
+.pick-card{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel);display:grid;gap:10px}
+.pick-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.pick-head h3{margin:0;font-size:1.05rem}
+.pick-head .sub{margin:0}
+.result-badge{font-size:.78rem;font-weight:700;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.result-badge.pending{background:var(--field);color:var(--mute)}
+.result-badge.won{background:rgba(10,143,101,.15);color:var(--gain)}
+.result-badge.lost{background:rgba(209,65,90,.15);color:var(--loss)}
+.result-badge.void{background:var(--field);color:var(--mute)}
+.pick-legs{display:grid;gap:6px}
+.pick-leg{display:flex;justify-content:space-between;gap:10px;font-size:.9rem;border-bottom:1px dashed var(--line);padding-bottom:6px}
+.pick-leg:last-child{border-bottom:none;padding-bottom:0}
+.pick-leg .m{color:var(--mute);font-size:.78rem;text-transform:uppercase}
+.pick-leg .p{font-weight:600}
+.pick-leg .o{color:var(--accent);font-weight:700}
+.pick-foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.pick-image{width:100%;border-radius:10px;display:block;max-height:360px;object-fit:cover}
+#pickImagePreview{width:100%;border-radius:10px;max-height:240px;object-fit:cover}
+.follow-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.follow-form input{width:110px}
+.followed-badge{color:var(--accent);font-weight:700;font-size:.9rem}
+.admin-actions{display:flex;gap:6px;flex-wrap:wrap}
+.admin-actions button{font-size:.82rem;padding:6px 10px}
+.empty{color:var(--mute);text-align:center;padding:20px 0}
+</style>
+</head>
+<body>
+<main>
+<header class="topbar">
+  <div><h1>BET.PRONO</h1><p class="sub">Suivi de ma bankroll, pari après pari</p></div>
+  <div class="who"><span>Connecté : <b id="whoami">…</b></span><button id="logout" type="button">Déconnexion</button></div>
+</header>
+
+<div id="loading" class="loading">Chargement de vos données…</div>
+
+<nav class="nav" id="mainNav" hidden>
+  <button type="button" data-view="home" aria-pressed="true">Accueil</button>
+  <button type="button" data-view="bankroll" aria-pressed="false">Bankroll</button>
+</nav>
+
+<div id="viewHome" class="view">
+  <section class="panel" id="adminPanel" hidden>
+    <h2>Publier un prono <span class="admin-badge">Admin</span></h2>
+    <p class="sub">Ce prono sera visible par tous les comptes, qui pourront le suivre et l'ajouter à leur bankroll.</p>
+    <div class="share-form">
+      <label>Titre du prono<input id="pickTitle" type="text" value="Combiné du jour"></label>
+      <div id="pickBetsList"></div>
+      <button id="addPickBet" type="button">+ Ajouter un pari</button>
+      <div class="total-pill"><span>Cote totale</span><b id="pickTotalOdds">1,00</b></div>
+      <label>Image (capture d'écran, affiche, etc. - optionnel)<input id="pickImage" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+      <img id="pickImagePreview" alt="Aperçu de l'image" hidden>
+      <button class="primary" id="publishPickBtn" type="button">Publier le prono</button>
+      <p class="sub" id="pickMsg"></p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Pronostics</h2>
+    <p class="sub">Suis un prono pour l'ajouter automatiquement à ta bankroll avec ta propre mise.</p>
+    <div id="picksList" class="share-form"></div>
+  </section>
+</div>
+
+<div id="viewBankroll" class="view">
+<section class="chart"><svg id="svg" viewBox="0 0 640 300" role="img" aria-label="Évolution du bénéfice pari après pari"></svg>
+<div class="per" id="per"><button data-p="d">1 j</button><button data-p="w">1 sem.</button><button data-p="m">1 mois</button><button data-p="all" aria-pressed="true">Tout</button></div></section>
+<section class="stats" id="stats"></section>
+<section class="panel"><h2>Mises conseillées</h2><div class="plan" id="plan"></div></section>
+<section class="panel"><h2>Par sport</h2><div class="wrap"><table id="bs"></table></div></section>
+<section class="panel"><h2>Par type de pari</h2><div class="wrap"><table id="bt"></table></div></section>
+
+<section class="panel">
+  <h2>Mes paris</h2>
+  <div class="wrap"><table id="t"></table></div>
+</section>
+
+<section class="panel">
+  <details id="ed"><summary>Modifier les données</summary>
+  <form id="f" class="form">
+    <label>Date<input id="d" type="date" required></label>
+    <label>Sport<select id="sp"><option>Foot</option><option>Mixte</option><option>Tennis</option><option>MLB</option><option>NFL</option><option>NHL</option></select></label>
+    <label>Type<select id="ty"><option>Simple</option><option selected>Combiné</option><option>Combiné FUN</option><option>Combiné x4</option><option>Combiné x5</option></select></label>
+    <label>Mise ou retrait (€)<input id="s" type="number" min="0.01" step="0.01" required></label>
+    <label>Cote<input id="o" type="number" min="1.01" step="0.01"></label>
+    <label>Bonus (€)<input id="bo" type="number" min="0" step="0.01"></label>
+    <label>Résultat<select id="r"><option value="won">Gagné</option><option value="lost">Perdu</option><option value="void">Remboursé</option><option value="pending">En cours</option><option value="wd">Retrait</option></select></label>
+    <button class="primary" id="addBtn">Ajouter</button>
+  </form>
+  <p class="warn" id="warn" hidden></p>
+  <div class="form" style="margin-top:16px">
+    <label>Bankroll de départ (€)<input id="initBk" type="number" min="0" step="0.01"></label>
+    <button id="saveInit" type="button">Mettre à jour</button>
+  </div>
+  <div class="row"><button id="ex" type="button">Exporter mes données</button><button id="im" type="button">Importer</button><button id="rs" type="button">Effacer tous mes paris</button></div>
+  <p class="sub" id="msg"></p><textarea id="out" hidden aria-label="Données"></textarea>
+  </details>
+</section>
+</div>
+
+<footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).</footer>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
