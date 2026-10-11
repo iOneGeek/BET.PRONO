@@ -272,8 +272,12 @@ def google_callback():
         
         db = get_db()
         user = db.execute("SELECT id, is_admin FROM users WHERE email = ?", (email,)).fetchone()
-        
-        if not user:
+
+        admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+        admin_username = os.getenv("ADMIN_USERNAME", "").strip().lower()
+        if not user and admin_email and email.lower() == admin_email:
+            is_admin = 1
+        elif not user:
             user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
             is_admin = 1 if user_count == 0 else 0
             username = name.replace(" ", "_").lower()[:24]
@@ -294,6 +298,11 @@ def google_callback():
         else:
             user_id = user["id"]
             is_admin = user["is_admin"]
+            # Promotion admin si l'email correspond à ADMIN_EMAIL
+            if admin_email and email.lower() == admin_email and not is_admin:
+                db.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (user_id,))
+                db.commit()
+                is_admin = 1
         
         token = jwt.encode(
             {"uid": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=TOKEN_DAYS)},
@@ -307,6 +316,37 @@ def google_callback():
     
     except Exception as e:
         return jsonify({"error": f"Erreur OAuth: {str(e)}"}), 400
+
+
+@app.post("/api/register")
+def register():
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+
+    if not USERNAME_RE.match(username):
+        return jsonify({"error": "Identifiant invalide (3-24 caracteres: lettres, chiffres, _ . -)"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Mot de passe trop court (6 caracteres minimum)."}), 400
+
+    db = get_db()
+    existing = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    if existing:
+        return jsonify({"error": "Cet identifiant est deja utilise."}), 409
+
+    admin_username = os.getenv("ADMIN_USERNAME", "").strip().lower()
+    user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    is_admin = 1 if (user_count == 0 or (admin_username and username.lower() == admin_username)) else 0
+
+    now = datetime.now(timezone.utc).isoformat()
+    cur = db.execute(
+        "INSERT INTO users (username, password_hash, is_admin, initial_bankroll, created_at) VALUES (?, ?, ?, 100, ?)",
+        (username, generate_password_hash(password), is_admin, now),
+    )
+    db.commit()
+    user_id = cur.lastrowid
+    resp = jsonify({"username": username, "initial_bankroll": 100.0, "is_admin": bool(is_admin)})
+    return set_auth_cookie(resp, user_id)
 
 
 @app.post("/api/login")
