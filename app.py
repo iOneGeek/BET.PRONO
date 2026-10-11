@@ -336,7 +336,11 @@ def register():
 
     admin_username = os.getenv("ADMIN_USERNAME", "").strip().lower()
     user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    is_admin = 1 if (user_count == 0 or (admin_username and username.lower() == admin_username)) else 0
+    if admin_username:
+        # Admin designe explicitement : lui seul peut devenir admin
+        is_admin = 1 if username.lower() == admin_username else 0
+    else:
+        is_admin = 1 if user_count == 0 else 0
 
     now = datetime.now(timezone.utc).isoformat()
     cur = db.execute(
