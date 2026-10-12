@@ -379,7 +379,7 @@ function renderPicks(){
       footHtml=`<span class="followed-badge">✓ Suivi · mise ${eur(p.follow_stake)}</span>`;
       if(p.result==='pending') footHtml+=`<button type="button" data-unfollow="${p.id}">Ne plus suivre</button>`;
     }else if(p.result==='pending'){
-      footHtml=`<div class="follow-form"><input type="number" min="0.5" step="0.5" value="${advisedStake}" id="stake-${p.id}" aria-label="Mise"><select id="sport-${p.id}" aria-label="Sport">${SPORTS.map(s=>`<option${s===p.sport?' selected':''}>${s}</option>`).join('')}</select><button class="primary" type="button" data-follow="${p.id}">Suivre ce prono</button></div>`;
+      footHtml=`<div class="follow-form"><input type="number" min="0.5" step="0.5" value="${advisedStake}" id="stake-${p.id}" aria-label="Mise"><select id="sport-${p.id}" aria-label="Sport">${SPORTS.map(s=>`<option value="${s}"${s===p.sport?' selected':''}>${SPORT_ICON[s]||''} ${s}</option>`).join('')}</select><button class="primary" type="button" data-follow="${p.id}">Suivre ce prono</button></div>`;
     }else{
       footHtml='<span class="sub">Ce prono est clos.</span>';
     }
@@ -449,7 +449,7 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.8', date='2026-10-12';
+  const v='1.0.9', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
