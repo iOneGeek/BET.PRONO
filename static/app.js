@@ -387,7 +387,6 @@ function renderPicks(){
       <button type="button" data-settle="${p.id}" data-result="won">Gagné</button>
       <button type="button" data-settle="${p.id}" data-result="lost">Perdu</button>
       <button type="button" data-settle="${p.id}" data-result="void">Remboursé</button>
-      <button type="button" data-delpick="${p.id}">Supprimer</button>
     </div>`:'';
     const imageHtml=p.image_url?`<img class="pick-image" src="${p.image_url}" alt="Image du prono">`:'';
     const stakeForGain=p.followed?p.follow_stake:advisedStake;
@@ -401,11 +400,14 @@ function renderPicks(){
       <div class="pick-advice-tag"><span>${prof.emoji} Mise conseillée : <b>${prof.label} (${prof.pct} %)</b></span></div>
       <div class="pick-advice-eur">soit <b>${eur(advisedStake)}</b> selon ta bankroll</div>
     </div>`;
-    return `<div class="pick-card">
+    const collapsedClass=p.result==='won'?' won-collapsed':'';
+    const delBtn=IS_ADMIN?`<button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Supprimer ce prono" title="Supprimer ce prono">✕</button>`:'';
+    return `<div class="pick-card${collapsedClass}" ${p.result==='won'?'data-toggle="1"':''}>
       <div class="pick-head">
         <div><h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3><p class="sub">Par ${p.author}</p></div>
-        <span class="ticket-status ${p.result}"><i>${stIcon}</i>${stLabel}</span>
+        <div class="pick-head-right">${delBtn}<span class="ticket-status ${p.result}"><i>${stIcon}</i>${stLabel}</span></div>
       </div>
+      <div class="pick-body">
       ${imageHtml}
       <div class="ticket-legs">${legsHtml}</div>
       ${ticketTotalsHtml}
@@ -413,6 +415,7 @@ function renderPicks(){
       ${linkHtml}
       <div class="pick-foot">${footHtml}</div>
       ${adminActions}
+      </div>
     </div>`;
   }).join('');
 }
@@ -422,8 +425,15 @@ $('picksList').addEventListener('click',async ev=>{
   const unfollow=ev.target.dataset.unfollow;
   const settle=ev.target.dataset.settle;
   const del=ev.target.dataset.delpick;
+  const toggleEl=ev.target.closest('.won-collapsed');
   try{
-    if(follow){
+    if(del){
+      if(!confirm('Supprimer ce prono publié ?'))return;
+      await api('/api/admin/picks/'+del,{method:'DELETE'});
+      await loadPicks();
+    }else if(toggleEl){
+      toggleEl.classList.toggle('open');
+    }else if(follow){
       const stakeEl=$('stake-'+follow);
       const sportEl=$('sport-'+follow);
       if(!stakeEl||!sportEl){alert('Ce prono a été mis à jour, recharge un instant.');return}
@@ -439,17 +449,13 @@ $('picksList').addEventListener('click',async ev=>{
     }else if(settle){
       await api('/api/admin/picks/'+settle,{method:'PATCH',body:JSON.stringify({result:ev.target.dataset.result})});
       await loadPicks();await loadBets();
-    }else if(del){
-      if(!confirm('Supprimer ce prono publié ?'))return;
-      await api('/api/admin/picks/'+del,{method:'DELETE'});
-      await loadPicks();
     }
   }catch(e){alert(e.message)}
 });
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.10', date='2026-10-12';
+  const v='1.0.11', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
