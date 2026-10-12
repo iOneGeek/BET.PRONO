@@ -27,8 +27,8 @@ main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
   #logout{margin-left:auto}
 }
 .brand{display:flex;align-items:center;gap:12px}
-.brand .logo{width:46px;height:46px;border-radius:12px;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.28);flex-shrink:0;border:2px solid rgba(255,117,24,.25)}
-h1{margin:0;font-size:1.8rem;font-weight:800;line-height:1.1;background:linear-gradient(90deg,var(--text),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-.5px}
+h1{margin:0;font-size:1.8rem;font-weight:800;line-height:1.1;color:var(--text);letter-spacing:-.5px}
+h1 .o{color:var(--accent)}
 .sub{margin:0;color:var(--mute);font-size:.9rem}
 .who{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--mute);flex-wrap:wrap;justify-content:flex-end}
 .who b{color:var(--text)}
@@ -140,7 +140,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 <body>
 <main>
 <header class="topbar">
-  <div class="brand"><img src="/static/logo.png" alt="BET.PRONO" class="logo"><div><h1>BET.PRONO</h1><p class="sub">Suivi de ma bankroll, pari après pari</p></div></div>
+  <div class="brand"><div><h1>BET.<span class="o">PRONO</span></h1><p class="sub">Suivi de ma bankroll, pari après pari</p></div></div>
   <div class="who"><span>Connecté : <b id="whoami">…</b></span><button id="goProfile" type="button">Profil</button><button id="logout" type="button">Déconnexion</button></div>
 </header>
 
