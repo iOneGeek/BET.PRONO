@@ -14,9 +14,14 @@ python app.py
 Puis ouvrir http://127.0.0.1:5000 dans le navigateur. Chacun peut créer son compte
 depuis cette page (onglet « Créer un compte »).
 
-Les données sont stockées dans `instance/bankroll.db` (SQLite), ignoré par git.
-Ce fichier ne doit jamais être partagé ni commité : il contient les mots de passe
-(hashés) et les paris de tous les comptes.
+Les données sont stockées dans une base de données :
+- **En local**, par défaut dans `instance/bankroll.db` (SQLite), ignoré par git.
+- **Dès qu'une variable d'environnement `DATABASE_URL` existe** (PostgreSQL, ex. Neon),
+  l'application utilise automatiquement cette base cloud persistante (aucune perte
+  à chaque redéploiement).
+
+Ce fichier `instance/bankroll.db` ne doit jamais être partagé ni commité : il
+contient les mots de passe (hashés) et les paris de tous les comptes.
 
 ## Installer l'app (PWA)
 
@@ -42,10 +47,32 @@ Dans tous les cas : définir une variable d'environnement ou un volume persistan
 pour le dossier `instance/` (sinon la base de données est perdue à chaque
 redéploiement), et ne jamais exposer ce dossier publiquement.
 
+## Base de données persistance (recommandé)
+
+Pour que les paris ne soient **jamais perdus** lors d'un redéploiement, utilise
+une base PostgreSQL sur **Neon** (offre gratuite) :
+
+1. Crée un compte sur https://console.neon.tech puis un projet.
+2. Copie l'**URL de connexion** (commence par `postgresql://...`).
+3. Sur Render : **Settings → Environment → Environment Variable** nommée
+   `DATABASE_URL` = ton URL. (Pareil en local dans `local.env`.)
+4. L'application utilisera alors automatiquement Neon à la place de SQLite.
+
+La première fois, tu peux copier les données existantes avec :
+
+```bash
+DATABASE_URL=ton-url-neon python migrate_to_neon.py
+```
+
+⚠️ L'URL de Neon contient un mot de passe : ne la mets **jamais** en clair dans un
+fichier commité sur GitHub. Uniquement dans le dashboard Render et dans
+`local.env` (ignoré par git).
+
 ## Structure
 
 - `app.py` — serveur Flask : authentification (cookie + JWT), API REST des paris,
-  base SQLite.
+  base de données SQLite (local) ou PostgreSQL (production, via `DATABASE_URL`).
+- `migrate_to_neon.py` — copie une base SQLite locale vers une base PostgreSQL.
 - `static/login.html` — connexion / création de compte.
 - `static/app.html` + `static/app.js` — tableau de bord (graphique, stats, paris).
 - `static/manifest.json`, `static/sw.js`, `static/icons/` — fichiers PWA.
