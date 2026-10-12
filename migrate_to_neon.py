@@ -28,8 +28,18 @@ def main():
         return src.execute(sql, args).fetchall()
 
     def wipe(conn):
+        """Ne supprime JAMAIS les données cibles : la migration refuse de
+        s'exécuter si la base de destination contient déjà des enregistrements
+        (protège la production d'un effacement accidentel)."""
         with conn.cursor() as c:
-            c.execute("TRUNCATE TABLE users, bets, picks, pick_follows RESTART IDENTITY CASCADE")
+            for table in ("users", "bets", "picks", "pick_follows"):
+                c.execute(f"SELECT COUNT(*) FROM {table}")
+                n = c.fetchone()[0]
+                if n:
+                    raise SystemExit(
+                        f"[SÉCURITÉ] La table {table} de destination contient déjà "
+                        f"{n} ligne(s). Migration abandonnée pour ne rien perdre."
+                    )
 
     wipe(dst)
 
