@@ -12,12 +12,13 @@
 <style>
 :root{--bg:#f1efec;--panel:#fff;--line:#ded8d2;--text:#353839;--mute:#6b6f70;--gain:#0a8f65;--loss:#d1415a;--field:#f6f4f1;--accent:#ff7518;--on-accent:#1c1100;--shadow:0 1px 2px rgba(28,17,0,.06),0 6px 18px rgba(28,17,0,.06);--shadow-sm:0 1px 2px rgba(28,17,0,.05);--radius:14px;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#202223;--panel:#2c2e2f;--line:#484c4d;--text:#f3efe9;--mute:#aeb2b3;--gain:#19e6a0;--loss:#ff7a8a;--field:#262829;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 20px rgba(0,0,0,.35);--shadow-sm:0 1px 2px rgba(0,0,0,.3)}}
-:root[data-theme="dark"]{--bg:#202223;--panel:#2c2e2f;--line:#484c4d;--text:#f3efe9;--mute:#aeb2b3;--gain:#19e6a0;--loss:#ff7a8a;--field:#262829;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 20px rgba(0,0,0,.35);--shadow-sm:0 1px 2px rgba(0,0,0,.3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b192b;--panel:#182438;--line:#2e3d5c;--text:#f4f7fb;--mute:#a9b6ca;--gain:#19e6a0;--loss:#ff7a8a;--field:#223052;--shadow:0 1px 2px rgba(0,0,0,.45),0 8px 22px rgba(2,8,20,.5);--shadow-sm:0 1px 2px rgba(0,0,0,.35)}:root:not([data-theme="light"]) body{background:radial-gradient(ellipse at 55% 0%,rgba(32,74,125,.35),transparent 48%),radial-gradient(ellipse at 100% 45%,rgba(255,111,0,.10),transparent 30%),linear-gradient(135deg,#07111f 0%,#0b192b 52%,#101827 100%);background-attachment:fixed}}
+:root[data-theme="dark"]{--bg:#0b192b;--panel:#182438;--line:#2e3d5c;--text:#f4f7fb;--mute:#a9b6ca;--gain:#19e6a0;--loss:#ff7a8a;--field:#223052;--shadow:0 1px 2px rgba(0,0,0,.45),0 8px 22px rgba(2,8,20,.5);--shadow-sm:0 1px 2px rgba(0,0,0,.35)}
+:root[data-theme="dark"] body{background:radial-gradient(ellipse at 55% 0%,rgba(32,74,125,.35),transparent 48%),radial-gradient(ellipse at 100% 45%,rgba(255,111,0,.10),transparent 30%),linear-gradient(135deg,#07111f 0%,#0b192b 52%,#101827 100%);background-attachment:fixed}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;background-image:radial-gradient(1200px 500px at 90% -10%,rgba(255,117,24,.07),transparent 60%),radial-gradient(900px 420px at 0% 0%,rgba(53,56,57,.06),transparent 55%)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;background-image:radial-gradient(ellipse at 55% 0%,rgba(32,74,125,.10),transparent 48%),radial-gradient(ellipse at 100% 45%,rgba(255,111,0,.08),transparent 30%)}
 main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 4px 4px;z-index:10;position:relative}
 @media (max-width:560px){
@@ -36,7 +37,7 @@ h1{margin:0;font-size:1.8rem;font-weight:800;line-height:1.1;background:linear-g
 label{display:grid;gap:4px;font-size:.85rem;color:var(--mute)}
 input,select{font:inherit;color:var(--text);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
 input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;box-shadow:0 0 0 4px rgba(255,117,24,.15)}
-.chart{background:linear-gradient(160deg,#3a3d3e,#4a4d4e);border-radius:18px;padding:12px 8px 4px;box-shadow:0 8px 24px rgba(28,17,0,.18),inset 0 1px 0 rgba(255,255,255,.08)}
+.chart{background:linear-gradient(160deg,#1e2c49,#2a3c62);border-radius:18px;padding:12px 8px 4px;box-shadow:0 8px 24px rgba(2,8,20,.35),inset 0 1px 0 rgba(255,255,255,.08)}
 .chart svg{width:100%;height:auto;display:block}
 .chart text{fill:rgba(255,255,255,.88);font-size:11px}
 .chart .hint{font-size:14px}
@@ -239,7 +240,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 </div>
 
 <footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.0.6 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.0.7 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -261,6 +262,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   });
 })();
 </script>
-<script src="/static/app.js?v=1.0.6"></script>
+<script src="/static/app.js?v=1.0.7"></script>
 </body>
 </html>
