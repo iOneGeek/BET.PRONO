@@ -1009,6 +1009,20 @@ def update_pick(pick_id):
         adv = (data.get("advice_profile") or "prudent").strip().lower()
         if adv in ("fun", "prudent", "confiance", "maxi"):
             db.execute("UPDATE picks SET advice_profile = ? WHERE id = ?", (adv, pick_id))
+    if "scores" in data and data.get("scores") is not None:
+        scores = data.get("scores")
+        if not isinstance(scores, list):
+            return jsonify({"error": "Scores invalides."}), 400
+        try:
+            legs = json.loads(pick["legs"] or "[]")
+        except ValueError:
+            legs = []
+        for i, sc in enumerate(scores[:len(legs)]):
+            if sc is None or str(sc).strip() == "":
+                legs[i].pop("score", None)
+            else:
+                legs[i]["score"] = str(sc).strip()[:20]
+        db.execute("UPDATE picks SET legs = ? WHERE id = ?", (json.dumps(legs), pick_id))
     db.commit()
     row = db.execute(
         "SELECT picks.*, users.username FROM picks JOIN users ON users.id = picks.author_id WHERE picks.id = ?",

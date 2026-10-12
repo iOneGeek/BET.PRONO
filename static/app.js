@@ -449,7 +449,20 @@ $('picksList').addEventListener('click',async ev=>{
       await api('/api/picks/'+unfollow+'/follow',{method:'DELETE'});
       await loadPicks();await loadBets();
     }else if(settle){
-      await api('/api/admin/picks/'+settle,{method:'PATCH',body:JSON.stringify({result:ev.target.dataset.result})});
+      const result=ev.target.dataset.result;
+      const pick=PICKS.find(p=>p.id==settle);
+      let scores=null;
+      if((result==='won'||result==='lost')&&pick&&pick.legs&&pick.legs.length){
+        const inputs=[];
+        for(let i=0;i<pick.legs.length;i++){
+          const prev=pick.legs[i].score||'';
+          const v=prompt(`Score final du match ${i+1} (${pick.legs[i].match||''}) — laisse vide si aucun :`,prev);
+          if(v===null){return}
+          inputs.push(v.trim());
+        }
+        scores=inputs;
+      }
+      await api('/api/admin/picks/'+settle,{method:'PATCH',body:JSON.stringify({result,scores})});
       await loadPicks();await loadBets();
     }
   }catch(e){alert(e.message)}
@@ -457,7 +470,7 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.16', date='2026-10-12';
+  const v='1.0.17', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
