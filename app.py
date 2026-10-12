@@ -44,7 +44,9 @@ USERNAME_RE = re.compile(r"^[a-zA-Z0-9_.-]{3,24}$")
 
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-if os.path.exists(SECRET_PATH):
+if os.getenv("SECRET_KEY"):
+    SECRET_KEY = os.getenv("SECRET_KEY").strip()
+elif os.path.exists(SECRET_PATH):
     with open(SECRET_PATH, "r") as f:
         SECRET_KEY = f.read().strip()
 else:
