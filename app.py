@@ -3,6 +3,7 @@ import os
 import re
 import sqlite3
 import secrets
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -154,7 +155,7 @@ if USE_PG:
         min_size=1,
         max_size=8,
         open=False,
-        timeout=30,
+        timeout=10,
     )
     POOL.open()
 
@@ -471,6 +472,15 @@ def _google_exchange_code(code):
     return None
 
 
+class _TimedSession(requests.Session):
+    """Session requests avec timeout obligatoire : google-auth fait des appels
+    HTTPS sans timeout par défaut, ce qui peut faire dépasser le budget du worker."""
+
+    def request(self, method, url, **kwargs):
+        kwargs.setdefault("timeout", 10)
+        return super().request(method, url, **kwargs)
+
+
 @app.get("/api/auth/google/callback")
 def google_callback():
     code = request.args.get("code")
@@ -482,8 +492,9 @@ def google_callback():
         return jsonify({"error": "Échec de l'échange avec Google (erreur réseau/SSL). Réessaie dans un instant."}), 502
 
     try:
-        user_info = verify_oauth2_token(id_token, Request(), GOOGLE_CLIENT_ID, clock_skew_in_seconds=10)
-    except Exception:
+        user_info = verify_oauth2_token(id_token, Request(session=_TimedSession()), GOOGLE_CLIENT_ID, clock_skew_in_seconds=10)
+    except Exception as e:
+        print(f"[google_callback] verify_oauth2_token: {e!r}", file=sys.stderr)
         return jsonify({"error": "La vérification du jeton Google a échoué. Réessaie dans un instant."}), 502
 
     email = user_info.get("email")
@@ -491,38 +502,42 @@ def google_callback():
         return jsonify({"error": "Email manquant."}), 400
     name = user_info.get("name") or email.split("@")[0]
 
-    db = get_db()
-    user = db.execute("SELECT id, is_admin FROM users WHERE email = ?", (email,)).fetchone()
+    try:
+        db = get_db()
+        user = db.execute("SELECT id, is_admin FROM users WHERE email = ?", (email,)).fetchone()
 
-    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-    if not user:
-        # Premier passage : créer le compte. L'email admin désigné devient admin,
-        # sinon le tout premier compte, sinon simple utilisateur.
-        is_admin = 1 if (admin_email and email.lower() == admin_email) else 0
-        if not is_admin:
-            user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            is_admin = 1 if user_count == 0 else 0
-        username = name.replace(" ", "_").lower()[:24]
-        username_base = username
-        counter = 1
-        while db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
-            username = f"{username_base}{counter}"
-            counter += 1
+        admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+        if not user:
+            # Premier passage : créer le compte. L'email admin désigné devient admin,
+            # sinon le tout premier compte, sinon simple utilisateur.
+            is_admin = 1 if (admin_email and email.lower() == admin_email) else 0
+            if not is_admin:
+                user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+                is_admin = 1 if user_count == 0 else 0
+            username = name.replace(" ", "_").lower()[:24]
+            username_base = username
+            counter = 1
+            while db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
+                username = f"{username_base}{counter}"
+                counter += 1
 
-        now = datetime.now(timezone.utc).isoformat()
-        cur = db.execute(
-            "INSERT INTO users (username, email, password_hash, is_admin, initial_bankroll, created_at) VALUES (?, ?, ?, ?, 100, ?)",
-            (username, email, generate_password_hash("google_oauth"), is_admin, now),
-        )
-        db.commit()
-        user_id = cur.lastrowid
-    else:
-        user_id = user["id"]
-        is_admin = user["is_admin"]
-        if admin_email and email.lower() == admin_email and not is_admin:
-            db.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (user_id,))
+            now = datetime.now(timezone.utc).isoformat()
+            cur = db.execute(
+                "INSERT INTO users (username, email, password_hash, is_admin, initial_bankroll, created_at) VALUES (?, ?, ?, ?, 100, ?)",
+                (username, email, generate_password_hash("google_oauth"), is_admin, now),
+            )
             db.commit()
-            is_admin = 1
+            user_id = cur.lastrowid
+        else:
+            user_id = user["id"]
+            is_admin = user["is_admin"]
+            if admin_email and email.lower() == admin_email and not is_admin:
+                db.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (user_id,))
+                db.commit()
+                is_admin = 1
+    except Exception as e:
+        print(f"[google_callback] base de données: {e!r}", file=sys.stderr)
+        return jsonify({"error": "Base de données momentanément indisponible (réveil de l'hébergeur). Réessaie dans un instant."}), 503
 
     token = jwt.encode(
         {"uid": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=TOKEN_DAYS)},
