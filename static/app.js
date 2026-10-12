@@ -306,6 +306,8 @@ function updatePickTotal(){
       fd.append('sport',$('pickSport').value);
       fd.append('legs',JSON.stringify(legs));
       fd.append('advice_profile', currentProfile || 'prudent');
+      const linkVal=($('pickLink').value||'').trim();
+      if(linkVal){fd.append('link_url',linkVal);}
       if(imageFile)fd.append('image',imageFile);
       const r=await fetch('/api/admin/picks',{method:'POST',credentials:'same-origin',body:fd});
       if(r.status===401){location.href='/login';return}
@@ -315,6 +317,7 @@ function updatePickTotal(){
       renderPickBets();
       $('pickImage').value='';
       $('pickImagePreview').hidden=true;
+      $('pickLink').value='';
       currentProfile='prudent';
       const sel=$('profileSelect');
       if(sel) [...sel.children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.prof==='prudent'));
@@ -334,6 +337,18 @@ async function loadPicks(){
   renderPicks();
 }
 
+function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function bookmakerLabel(url){
+  try{const h=new URL(url).hostname.replace(/^www\./,'').toLowerCase();
+    if(h.includes('winamax'))return'🎯 Placer sur Winamax';
+    if(h.includes('betclic'))return'🎯 Placer sur Betclic';
+    if(h.includes('unibet'))return'🎯 Placer sur Unibet';
+    if(h.includes('vbet'))return'🎯 Placer sur Vbet';
+    if(h.includes('zebet'))return'🎯 Placer sur Zebet';
+    if(h.includes('pmu'))return'🎯 Placer sur PMU';
+    return'🎯 Ouvrir le pari';
+  }catch(e){return'🎯 Ouvrir le pari'}
+}
 function renderPicks(){
   const el=$('picksList');
   if(!PICKS.length){el.innerHTML='<p class="empty">Aucun prono publié pour l\'instant.</p>';return}
@@ -342,6 +357,7 @@ function renderPicks(){
     const profKey=(p.advice_profile&&PROFILES[p.advice_profile])?p.advice_profile:'prudent';
     const prof=PROFILES[profKey]||PROFILES.prudent;
     const advisedStake=Math.max(1,+(userBk*prof.pct/100).toFixed(2));
+    const linkHtml=p.link_url?`<a class="pick-link" href="${escAttr(p.link_url)}" target="_blank" rel="noopener noreferrer nofollow">${escAttr(bookmakerLabel(p.link_url))} ↗</a>`:'';
     const legsHtml=p.legs.map(l=>{
       // Separateur "Equipe A <sep> Equipe B". Le tiret simple est place en
       // premier et echappe : ailleurs il formait une plage Unicode invalide
@@ -385,6 +401,7 @@ function renderPicks(){
       <div class="pick-legs">${legsHtml}</div>
       ${oddsHtml}
       ${adviceHtml}
+      ${linkHtml}
       <div class="pick-foot">${footHtml}</div>
       ${adminActions}
     </div>`;
@@ -423,7 +440,7 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.5', date='2026-10-12';
+  const v='1.0.6', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

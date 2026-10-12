@@ -130,6 +130,8 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .pick-advice-tag{display:flex;align-items:center;gap:6px;font-weight:600}
 .pick-advice-eur{color:var(--mute);font-size:.82rem}
 .pick-advice-eur b{color:var(--accent);font-size:.95rem}
+.pick-link{display:inline-flex;align-items:center;gap:7px;justify-content:center;width:100%;border:1px solid var(--accent);color:var(--accent);background:var(--field);border-radius:12px;padding:10px 14px;font-weight:700;text-decoration:none;text-align:center;transition:.15s}
+.pick-link:hover{background:var(--accent);color:var(--on-accent)}
 .jserror{position:fixed;top:8px;left:8px;right:8px;z-index:9999;background:var(--loss);color:#fff;padding:10px 12px;border-radius:10px;font-size:.85rem;box-shadow:0 6px 20px rgba(0,0,0,.35)}
 .jserror button{margin-left:8px;background:#fff;color:var(--loss);border:none;border-radius:8px;padding:6px 12px;font-weight:700}
 </style>
@@ -162,6 +164,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
       <div class="total-pill"><span>Cote totale</span><b id="pickTotalOdds">1,00</b></div>
       <label>Image (capture d'écran, affiche, etc. - optionnel)<input id="pickImage" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
       <img id="pickImagePreview" alt="Aperçu de l'image" hidden>
+      <label>Lien du pari (Winamax, Betclic... - optionnel)<input id="pickLink" type="url" inputmode="url" placeholder="https://www.winamax.fr/..." maxlength="500"></label>
       <div class="profile-select" id="profileSelect">
         <button type="button" data-prof="fun">🎉 Fun</button>
         <button type="button" data-prof="prudent" aria-pressed="true">🛡️ Prudent</button>
@@ -236,7 +239,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 </div>
 
 <footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.0.5 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.0.6 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -258,6 +261,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   });
 })();
 </script>
-<script src="/static/app.js?v=1.0.5"></script>
+<script src="/static/app.js?v=1.0.6"></script>
 </body>
 </html>
