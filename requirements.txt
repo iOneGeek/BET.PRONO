@@ -5,3 +5,4 @@ google-auth-oauthlib==1.2.0
 google-auth==2.27.0
 requests==2.31.0
 gunicorn==21.2.0
+psycopg[binary,pool]>=3.2.10
