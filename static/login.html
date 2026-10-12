@@ -16,7 +16,7 @@
 :root[data-theme="dark"] body{background:radial-gradient(ellipse at 55% 0%,rgba(32,74,125,.35),transparent 48%),radial-gradient(ellipse at 100% 45%,rgba(255,111,0,.10),transparent 30%),linear-gradient(135deg,#07111f 0%,#0b192b 52%,#101827 100%)}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;padding:20px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px 24px;max-width:380px;width:100%}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px 24px;max-width:420px;width:100%}
 h1{margin:0 0 4px;font-size:1.5rem;font-weight:800;color:var(--text)}
 h1 .o{color:var(--accent)}
 .sub{margin:0 0 20px;color:var(--mute);font-size:.9rem}
@@ -31,12 +31,30 @@ button.primary{font:inherit;cursor:pointer;border-radius:8px;border:1px solid va
 button.primary:disabled{opacity:.6;cursor:wait}
 .err{color:var(--loss);font-size:.88rem;min-height:1.2em;margin:0}
 footer{color:var(--mute);font-size:.78rem;margin-top:18px;text-align:center}
+.intro{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:14px 14px 6px;margin-bottom:16px}
+.intro p{margin:0 0 10px;color:var(--text);font-size:.92rem}
+.intro .lead{font-weight:800;font-size:1rem}
+.intro .lead .o{color:var(--accent)}
+.intro ul{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:7px}
+.intro li{display:flex;align-items:flex-start;gap:8px;font-size:.85rem;color:var(--text)}
+.intro li .ic{flex-shrink:0;font-size:1rem;line-height:1.3}
+.intro li b{color:var(--text)}
+.intro .hint{font-size:.78rem;color:var(--mute)}
 </style>
 </head>
 <body>
 <div class="card">
   <h1>BET.<span class="o">PRONO</span></h1>
   <p class="sub">Suivi de bankroll personnel — chacun son compte, chacun sa bankroll.</p>
+  <div class="intro">
+    <p class="lead">C'est quoi BET.<span class="o">PRONO</span> ?</p>
+    <ul>
+      <li><span class="ic">📊</span><span><b>Gérer sa bankroll :</b> note tes mises, tes cotes et tes résultats pour suivre si tu es gagnant sur la durée.</span></li>
+      <li><span class="ic">🎯</span><span><b>Suivre des pronos partagés :</b> des paris conseillés avec mise recommandée, ajoutés en un clic à ta bankroll.</span></li>
+      <li><span class="ic">⚖️</span><span><b>Parier avec méthode :</b> analyse tes performances par sport, par type de pari et ton retour sur investissement (ROI).</span></li>
+    </ul>
+    <p class="hint">💡 Conçu pour les parieurs qui veulent miser plus intelligemment et tenir leur capital de façon sérieuse.</p>
+  </div>
   <div class="tabs" role="tablist">
     <button type="button" id="tabLogin" aria-pressed="true">Connexion</button>
     <button type="button" id="tabRegister" aria-pressed="false">Créer un compte</button>
