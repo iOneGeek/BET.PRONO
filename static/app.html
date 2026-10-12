@@ -68,6 +68,17 @@ tbody tr:hover{background:var(--field)}
 .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 textarea{width:100%;height:90px;margin-top:8px;font:12px monospace;background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:8px}
 footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow-sm);line-height:1.6}
+.tg-banner,.ig-banner{display:flex;align-items:center;gap:10px;justify-content:space-between;border-radius:14px;padding:11px 14px;text-decoration:none;color:#fff;box-shadow:var(--shadow-sm);transition:transform .15s ease,box-shadow .18s ease;flex:1;min-width:0}
+.social-row{display:flex;gap:10px;flex-wrap:wrap}
+.tg-banner{background:linear-gradient(120deg,#229ed9,#1f7ec4)}
+.ig-banner{background:linear-gradient(45deg,#f09433,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888)}
+.tg-banner:hover,.ig-banner:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.tg-banner .tg-icon,.ig-banner .tg-icon{font-size:1.4rem;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2));flex-shrink:0}
+.tg-banner .tg-txt,.ig-banner .tg-txt{flex:1;display:flex;flex-direction:column;line-height:1.25;font-size:.75rem;opacity:.95;min-width:0}
+.tg-banner .tg-txt b,.ig-banner .tg-txt b{font-size:.9rem;white-space:nowrap}
+.tg-banner .tg-arrow,.ig-banner .tg-arrow{font-size:1rem;font-weight:800;flex-shrink:0}
+.tg-footer-link{display:inline-block;margin:0 2px;color:#229ed9;text-decoration:none;font-weight:600;font-size:.8rem}
+.tg-footer-link:hover{text-decoration:underline}
 .nav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:5px;box-shadow:var(--shadow-sm)}
 .nav button{flex:1;border:none;background:transparent;color:var(--mute);font-weight:600;padding:10px;border-radius:10px;transition:all .18s ease;cursor:pointer}
 .nav button:hover{color:var(--text)}
@@ -222,6 +233,18 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   <section class="panel">
     <h2>Paris partagés</h2>
     <p class="sub">Choisis un sport, règle ta mise, et suis le prono pour l'ajouter à ta bankroll.</p>
+    <div class="social-row">
+      <a class="tg-banner" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">
+        <span class="tg-icon">✈️</span>
+        <span class="tg-txt"><b>Telegram</b> @bet_prono_fr</span>
+        <span class="tg-arrow">↗</span>
+      </a>
+      <a class="ig-banner" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">
+        <span class="tg-icon">📸</span>
+        <span class="tg-txt"><b>Instagram</b> @bet.prono</span>
+        <span class="tg-arrow">↗</span>
+      </a>
+    </div>
     <div id="picksList" class="share-form"></div>
   </section>
 </div>
@@ -282,8 +305,9 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   </section>
 </div>
 
-<footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.0.11 · <span id="appVersionDate"></span></span></footer>
+<footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">✈️ Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">📸 Instagram</a></span><br>
+Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
+<span style="opacity:.7">BET.PRONO V1.0.12 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -305,6 +329,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   });
 })();
 </script>
-<script src="/static/app.js?v=1.0.11"></script>
+<script src="/static/app.js?v=1.0.12"></script>
 </body>
 </html>
