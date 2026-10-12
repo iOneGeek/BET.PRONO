@@ -1,4 +1,4 @@
-const CACHE = 'bet-prono-v1';
+const CACHE = 'bet-prono-v2';
 const SHELL = [
   '/login',
   '/app',
@@ -24,13 +24,17 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/')) return; // network only, never cache user data
 
+  // Stratégie "réseau d'abord" : on prend toujours la version la plus récente,
+  // le cache n'est qu'un secours hors-ligne. Cela évite de servir d'anciennes
+  // versions du site après un déploiement.
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const network = fetch(event.request).then(resp => {
-        if (resp.ok) caches.open(CACHE).then(cache => cache.put(event.request, resp.clone()));
+    fetch(event.request)
+      .then(resp => {
+        if (resp.ok && !url.pathname.startsWith('/static/')) {
+          caches.open(CACHE).then(cache => cache.put(event.request, resp.clone()));
+        }
         return resp;
-      }).catch(() => cached);
-      return cached || network;
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
