@@ -847,7 +847,7 @@ def validate_legs(legs):
             return None, "Cote invalide dans un des paris."
         if not match or not pick or odds <= 1:
             return None, "Chaque pari doit avoir un match, une sélection et une cote supérieure à 1."
-        clean.append({"match": match, "pick": pick, "odds": odds})
+        clean.append({"match": match, "pick": pick, "odds": odds, "score": (leg.get("score") or "").strip()[:20]})
         total_odds *= odds
     return {"legs": clean, "total_odds": round(total_odds, 4)}, None
 

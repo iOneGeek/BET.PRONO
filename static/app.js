@@ -230,7 +230,7 @@ if('serviceWorker' in navigator){
 
 // ---------- Pronostics (admin + suivi) ----------
 const MAX_PICK_BETS=6;
-let pickBets=[{home:'',away:'',pick:'',odds:''}];
+let pickBets=[{home:'',away:'',pick:'',odds:'',score:''}];
 let PICKS=[];
 
 function parseOddsP(str){const n=parseFloat(String(str).replace(',','.').trim());return isNaN(n)?0:n}
@@ -250,6 +250,7 @@ function renderPickBets(){
       </div>
       <div class="match-row pick-line">
         <label>Pari<input type="text" data-pf="pick" data-pi="${idx}" value="${(bet.pick||'').replace(/"/g,'&quot;')}" placeholder="Real Madrid gagne"></label>
+        <label>Score final<input type="text" data-pf="score" data-pi="${idx}" value="${(bet.score||'').replace(/"/g,'&quot;')}" placeholder="2 - 1"></label>
         <label>Cote<input type="text" inputmode="decimal" data-pf="odds" data-pi="${idx}" value="${bet.odds}" placeholder="1,70"></label>
       </div>
       <button type="button" class="remove-bet" data-premove="${idx}" ${pickBets.length<=1?'disabled':''}>Retirer ce pari</button>
@@ -280,7 +281,7 @@ function updatePickTotal(){
   });
   $('addPickBet').addEventListener('click',()=>{
     if(pickBets.length>=MAX_PICK_BETS)return;
-    pickBets.push({home:'',away:'',pick:'',odds:''});
+    pickBets.push({home:'',away:'',pick:'',odds:'',score:''});
     renderPickBets();
   });
   $('pickImage').addEventListener('change',()=>{
@@ -296,7 +297,7 @@ function updatePickTotal(){
       .map(b=>{
         const home=(b.home||'').trim(), away=(b.away||'').trim();
         const match = (home||away) ? (home+' ⚔ '+(away||'—')) : (b.match||'');
-        return {match, pick:b.pick, odds:parseOddsP(b.odds)};
+        return {match, pick:b.pick, odds:parseOddsP(b.odds), score:(b&&b.score?b.score.trim():'')};
       });
     const imageFile=$('pickImage').files[0];
     if(!legs.length&&!imageFile){msg.textContent='Ajoute au moins un pari ou une image.';return}
@@ -313,7 +314,7 @@ function updatePickTotal(){
       if(r.status===401){location.href='/login';return}
       const resData=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(resData.error||'Erreur serveur');
-      pickBets=[{home:'',away:'',pick:'',odds:''}];
+      pickBets=[{home:'',away:'',pick:'',odds:'',score:''}];
       renderPickBets();
       $('pickImage').value='';
       $('pickImagePreview').hidden=true;
@@ -371,6 +372,7 @@ function renderPicks(){
         : `<span>${l.match||''}</span>`;
       return `<div class="ticket-leg">
         <div class="ticket-teams"><span class="ball">${ball}</span>${teamsHtml}</div>
+        ${l.score?`<div class="ticket-score">${l.score}</div>`:''}
         <div class="ticket-pickline"><span class="lbl">Résultat</span><span class="val">${l.pick}</span><span class="od">${fmtOddsP(l.odds)}</span></div>
       </div>`;
     }).join('');
@@ -455,7 +457,7 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.14', date='2026-10-12';
+  const v='1.0.15', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
