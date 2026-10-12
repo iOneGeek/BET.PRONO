@@ -16,6 +16,7 @@ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:en
 :root[data-theme="dark"]{--bg:#202223;--panel:#2c2e2f;--line:#484c4d;--text:#f3efe9;--mute:#aeb2b3;--gain:#19e6a0;--loss:#ff7a8a;--field:#262829;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 20px rgba(0,0,0,.35);--shadow-sm:0 1px 2px rgba(0,0,0,.3)}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;background-image:radial-gradient(1200px 500px at 90% -10%,rgba(255,117,24,.07),transparent 60%),radial-gradient(900px 420px at 0% 0%,rgba(53,56,57,.06),transparent 55%)}
 main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 4px 4px;z-index:10;position:relative}
@@ -125,6 +126,8 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .advice-big{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .advice-big span{color:var(--mute);font-size:.9rem}
 .advice-big b{font-size:1.9rem;font-weight:800;color:var(--accent)}
+.jserror{position:fixed;top:8px;left:8px;right:8px;z-index:9999;background:var(--loss);color:#fff;padding:10px 12px;border-radius:10px;font-size:.85rem;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.jserror button{margin-left:8px;background:#fff;color:var(--loss);border:none;border-radius:8px;padding:6px 12px;font-weight:700}
 </style>
 </head>
 <body>
@@ -229,9 +232,28 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 </div>
 
 <footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.0.3 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.0.4 · <span id="appVersionDate"></span></span></footer>
 </main>
 
-<script src="/static/app.js"></script>
+<div id="jsError" class="jserror" hidden>
+  <b>La page a rencontré une erreur.</b><span id="jsErrMsg"></span>
+  <button type="button" id="jsErrorFix">Recharger proprement</button>
+</div>
+<script>
+(function(){
+  function show(msg){
+    var el=document.getElementById('jsError'); if(!el) return;
+    el.hidden=false;
+    var m=document.getElementById('jsErrMsg'); if(m) m.textContent=' '+(msg||'Erreur inconnue');
+  }
+  window.addEventListener('error',function(e){ show(e.message||''); },true);
+  document.getElementById('jsErrorFix').addEventListener('click',function(){
+    if(navigator.serviceWorker){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});}).catch(function(){});}
+    if(window.caches&&caches.keys){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});}).catch(function(){});}
+    setTimeout(function(){location.replace('/app?r='+Date.now());},400);
+  });
+})();
+</script>
+<script src="/static/app.js?v=1.0.4"></script>
 </body>
 </html>

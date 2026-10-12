@@ -1,4 +1,32 @@
-const $=id=>document.getElementById(id);
+const NEED=["mainNav","viewHome","viewBankroll","viewProfile","goProfile","picksList","f","t","d"];
+const MISSING=NEED.filter(i=>!document.getElementById(i));
+
+function __heal(){
+  if(navigator.serviceWorker){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});}
+  if(window.caches&&caches.keys){caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{});}
+  setTimeout(()=>location.replace("/app?r="+Date.now()),400);
+}
+
+function __fatal(msg){
+  const box=document.getElementById("jsError");
+  if(box){box.hidden=false;const t=document.getElementById("jsErrMsg");if(t)t.textContent=" "+msg;return;}
+  const d=document.createElement("div");
+  d.style.cssText="position:fixed;top:8px;left:8px;right:8px;z-index:9999;background:#d1415a;color:#fff;padding:14px 16px;border-radius:12px;font:14px/1.5 system-ui";
+  d.innerHTML="<b>Version p\u00e9rim\u00e9e sur ce t\u00e9l\u00e9phone.</b> "+msg+"<br><button style=\"margin-top:8px;background:#fff;color:#d1415a;border:none;border-radius:8px;padding:8px 14px;font-weight:700\">Recharger proprement</button>";
+  d.querySelector("button").onclick=()=>location.replace("/app?r="+Date.now());
+  document.body?(document.body.prepend(d)):document.addEventListener("DOMContentLoaded",()=>document.body.prepend(d));
+}
+
+function nulEl(id){
+  const el={id,dataset:{},style:{},children:[],files:[],options:[],value:"",textContent:"",innerHTML:"",hidden:true,disabled:false};
+  el.classList={add(){},remove(){},toggle(){},contains(){return false}};
+  el.addEventListener=()=>{};el.setAttribute=()=>{};el.removeAttribute=()=>{};el.appendChild=()=>{};
+  el.select=()=>{};el.focus=()=>{};el.click=()=>{};el.remove=()=>{};el.getBoundingClientRect=()=>({top:0,left:0,width:0,height:0});
+  return el;
+}
+
+// Un element manquant ne doit plus jamais casser toute la page (clics morts).
+const $=id=>document.getElementById(id)||nulEl(id);
 const SP={F:'Foot',M:'Mixte',T:'Tennis',B:'MLB',N:'NFL',H:'NHL'},TY={C:'Combiné',S:'Simple',F:'Combiné FUN',4:'Combiné x4',5:'Combiné x5'};
 const SPORTS=['Foot','Mixte','Tennis','NBA','F1','MMA','MLB','NFL','NHL'];
 
@@ -170,6 +198,9 @@ $('profileForm').addEventListener('submit',async ev=>{
 });
 
 (async()=>{
+  showView("home");
+  $('mainNav').hidden=false;   /* navigable meme si une API echoue ensuite */
+  if(MISSING.length){ __fatal("l\u2019interface en cache est p\u00e9rim\u00e9e ("+MISSING.slice(0,3).join(", ")+") \u2014 r\u00e9paration automatique\u2026"); __heal(); return; }
   try{
     const me=await api('/api/me');
     window.__me=me;
@@ -185,7 +216,15 @@ $('profileForm').addEventListener('submit',async ev=>{
   }catch(e){ /* redirect already handled by api() on 401 */ }
 })();
 
-if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'})
+    .then(reg=>{ if(reg&&reg.update) reg.update(); })
+    .catch(()=>{});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(window.__swHanded) return; window.__swHanded=true;
+    location.reload();
+  });
+}
 
 // ---------- Pronostics (admin + suivi) ----------
 const MAX_PICK_BETS=6;
@@ -293,7 +332,10 @@ function renderPicks(){
   if(!PICKS.length){el.innerHTML='<p class="empty">Aucun prono publié pour l\'instant.</p>';return}
   el.innerHTML=PICKS.map(p=>{
     const legsHtml=p.legs.map(l=>{
-      const parts=String(l.match||'').split(/\s*[\u2694\u2013–-=]\s*|\s+vs\.?\s+/i).map(s=>s.trim()).filter(Boolean);
+      // Separateur "Equipe A <sep> Equipe B". Le tiret simple est place en
+      // premier et echappe : ailleurs il formait une plage Unicode invalide
+      // (U+2013 -> U+003D) qui faisait rejeter tout le fichier JS.
+      const parts=String(l.match||'').split(/\s*[\-=\u2694\u2013\u2014]\s*|\s+vs\.?\s+/i).map(s=>s.trim()).filter(Boolean);
       let matchup;
       if(parts.length>=2){
         matchup=`<div class="duel"><span>${parts[0]}</span><i>VS</i><span>${parts.slice(1).join(' – ')}</span></div>`;
