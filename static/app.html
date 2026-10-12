@@ -126,6 +126,10 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .advice-big{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .advice-big span{color:var(--mute);font-size:.9rem}
 .advice-big b{font-size:1.9rem;font-weight:800;color:var(--accent)}
+.pick-advice-box{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:.85rem}
+.pick-advice-tag{display:flex;align-items:center;gap:6px;font-weight:600}
+.pick-advice-eur{color:var(--mute);font-size:.82rem}
+.pick-advice-eur b{color:var(--accent);font-size:.95rem}
 .jserror{position:fixed;top:8px;left:8px;right:8px;z-index:9999;background:var(--loss);color:#fff;padding:10px 12px;border-radius:10px;font-size:.85rem;box-shadow:0 6px 20px rgba(0,0,0,.35)}
 .jserror button{margin-left:8px;background:#fff;color:var(--loss);border:none;border-radius:8px;padding:6px 12px;font-weight:700}
 </style>
@@ -232,7 +236,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 </div>
 
 <footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.0.4 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.0.5 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -254,6 +258,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   });
 })();
 </script>
-<script src="/static/app.js?v=1.0.4"></script>
+<script src="/static/app.js?v=1.0.5"></script>
 </body>
 </html>

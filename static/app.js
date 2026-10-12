@@ -96,6 +96,8 @@ async function loadBets(){
   BETS=data.bets;
   INIT=data.initial_bankroll;
   render();
+  renderAdvice();
+  if(Array.isArray(PICKS)&&PICKS.length&&(!document.activeElement||!document.activeElement.id||!/^stake-|^sport-/.test(document.activeElement.id))) renderPicks();
 }
 
 $('f').addEventListener('submit', async ev=>{
@@ -303,6 +305,7 @@ function updatePickTotal(){
       fd.append('title',$('pickTitle').value);
       fd.append('sport',$('pickSport').value);
       fd.append('legs',JSON.stringify(legs));
+      fd.append('advice_profile', currentProfile || 'prudent');
       if(imageFile)fd.append('image',imageFile);
       const r=await fetch('/api/admin/picks',{method:'POST',credentials:'same-origin',body:fd});
       if(r.status===401){location.href='/login';return}
@@ -312,6 +315,10 @@ function updatePickTotal(){
       renderPickBets();
       $('pickImage').value='';
       $('pickImagePreview').hidden=true;
+      currentProfile='prudent';
+      const sel=$('profileSelect');
+      if(sel) [...sel.children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.prof==='prudent'));
+      renderAdvice();
       msg.textContent='Prono publié !';
       await loadPicks();
     }catch(e){msg.textContent=e.message}
@@ -330,7 +337,11 @@ async function loadPicks(){
 function renderPicks(){
   const el=$('picksList');
   if(!PICKS.length){el.innerHTML='<p class="empty">Aucun prono publié pour l\'instant.</p>';return}
+  const userBk=(window.BK&&window.BK>0)?window.BK:INIT;
   el.innerHTML=PICKS.map(p=>{
+    const profKey=(p.advice_profile&&PROFILES[p.advice_profile])?p.advice_profile:'prudent';
+    const prof=PROFILES[profKey]||PROFILES.prudent;
+    const advisedStake=Math.max(1,+(userBk*prof.pct/100).toFixed(2));
     const legsHtml=p.legs.map(l=>{
       // Separateur "Equipe A <sep> Equipe B". Le tiret simple est place en
       // premier et echappe : ailleurs il formait une plage Unicode invalide
@@ -349,7 +360,7 @@ function renderPicks(){
       footHtml=`<span class="followed-badge">✓ Suivi · mise ${eur(p.follow_stake)}</span>`;
       if(p.result==='pending') footHtml+=`<button type="button" data-unfollow="${p.id}">Ne plus suivre</button>`;
     }else if(p.result==='pending'){
-      footHtml=`<div class="follow-form"><input type="number" min="1" step="0.5" value="10" id="stake-${p.id}" aria-label="Mise"><select id="sport-${p.id}" aria-label="Sport">${SPORTS.map(s=>`<option${s===p.sport?' selected':''}>${s}</option>`).join('')}</select><button class="primary" type="button" data-follow="${p.id}">Suivre ce prono</button></div>`;
+      footHtml=`<div class="follow-form"><input type="number" min="0.5" step="0.5" value="${advisedStake}" id="stake-${p.id}" aria-label="Mise"><select id="sport-${p.id}" aria-label="Sport">${SPORTS.map(s=>`<option${s===p.sport?' selected':''}>${s}</option>`).join('')}</select><button class="primary" type="button" data-follow="${p.id}">Suivre ce prono</button></div>`;
     }else{
       footHtml='<span class="sub">Ce prono est clos.</span>';
     }
@@ -361,6 +372,10 @@ function renderPicks(){
     </div>`:'';
     const imageHtml=p.image_url?`<img class="pick-image" src="${p.image_url}" alt="Image du prono">`:'';
     const oddsHtml=p.legs.length?`<div class="total-pill"><span>Cote totale</span><b>${fmtOddsP(p.total_odds)}</b></div>`:'';
+    const adviceHtml=`<div class="pick-advice-box">
+      <div class="pick-advice-tag"><span>${prof.emoji} Mise conseillée : <b>${prof.label} (${prof.pct} %)</b></span></div>
+      <div class="pick-advice-eur">soit <b>${eur(advisedStake)}</b> selon ta bankroll</div>
+    </div>`;
     return `<div class="pick-card">
       <div class="pick-head">
         <div><h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3><p class="sub">Par ${p.author}</p></div>
@@ -369,6 +384,7 @@ function renderPicks(){
       ${imageHtml}
       <div class="pick-legs">${legsHtml}</div>
       ${oddsHtml}
+      ${adviceHtml}
       <div class="pick-foot">${footHtml}</div>
       ${adminActions}
     </div>`;
@@ -407,7 +423,7 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.3', date='2026-10-12';
+  const v='1.0.5', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
@@ -453,18 +469,21 @@ function renderAdvice(){
   if(amt) amt.textContent = eur(mise);
   if(txt) txt.textContent = prof.text + eur(mise) + ' (soit ' + prof.pct + ' % de ta bankroll de ' + eur(bk) + ').';
 }
-document.addEventListener('DOMContentLoaded',()=>{
+function initProfileSelect(){
   const sel=document.getElementById('profileSelect');
-  if(!sel) return;
+  if(!sel || sel.__init) return;
+  sel.__init = true;
   sel.addEventListener('click',ev=>{
-    const k=ev.target.dataset&&ev.target.dataset.prof; if(!k||!PROFILES[k])return;
+    const btn=ev.target.closest('button');
+    if(!btn) return;
+    const k=btn.dataset&&btn.dataset.prof; if(!k||!PROFILES[k])return;
     currentProfile=k;
     [...sel.children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.prof===k));
     renderAdvice();
   });
-  // recalcule quand la bankroll change
-  if(window.BET_RENDER_HOOK){const old=window.BET_RENDER_HOOK;window.BET_RENDER_HOOK=()=>{old&&old();renderAdvice();};}
-});
+}
+initProfileSelect();
+document.addEventListener('DOMContentLoaded', initProfileSelect);
 // mise à jour après chaque render de la bankroll
 setInterval(()=>{ if(window.__ready) renderAdvice(); }, 1000);
 
