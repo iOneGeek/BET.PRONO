@@ -349,6 +349,8 @@ function bookmakerLabel(url){
     return'🎯 Ouvrir le pari';
   }catch(e){return'🎯 Ouvrir le pari'}
 }
+const SPORT_ICON={Foot:'⚽',NBA:'🏀',Tennis:'🎾',F1:'🏎️',MMA:'🥊',MLB:'⚾',NFL:'🏈',NHL:'🏒',Mixte:'🎯'};
+const TICKET_STATUS={pending:['En cours','⏱'],won:['Gagné','✓'],lost:['Perdu','✕'],void:['Remboursé','↩']};
 function renderPicks(){
   const el=$('picksList');
   if(!PICKS.length){el.innerHTML='<p class="empty">Aucun prono publié pour l\'instant.</p>';return}
@@ -358,18 +360,19 @@ function renderPicks(){
     const prof=PROFILES[profKey]||PROFILES.prudent;
     const advisedStake=Math.max(1,+(userBk*prof.pct/100).toFixed(2));
     const linkHtml=p.link_url?`<a class="pick-link" href="${escAttr(p.link_url)}" target="_blank" rel="noopener noreferrer nofollow">${escAttr(bookmakerLabel(p.link_url))} ↗</a>`:'';
+    const ball=SPORT_ICON[p.sport]||'🎯';
     const legsHtml=p.legs.map(l=>{
       // Separateur "Equipe A <sep> Equipe B". Le tiret simple est place en
       // premier et echappe : ailleurs il formait une plage Unicode invalide
       // (U+2013 -> U+003D) qui faisait rejeter tout le fichier JS.
       const parts=String(l.match||'').split(/\s*[\-=\u2694\u2013\u2014]\s*|\s+vs\.?\s+/i).map(s=>s.trim()).filter(Boolean);
-      let matchup;
-      if(parts.length>=2){
-        matchup=`<div class="duel"><span>${parts[0]}</span><i>VS</i><span>${parts.slice(1).join(' – ')}</span></div>`;
-      }else{
-        matchup=`<div class="m">${l.match||''}</div>`;
-      }
-      return `<div class="pick-leg"><div>${matchup}<div class="p">${l.pick}</div></div><div class="o">${fmtOddsP(l.odds)}</div></div>`;
+      const teamsHtml=parts.length>=2
+        ? `<span>${parts[0]}</span><span style="color:var(--mute);font-weight:400">vs</span><span>${parts.slice(1).join(' – ')}</span>`
+        : `<span>${l.match||''}</span>`;
+      return `<div class="ticket-leg">
+        <div class="ticket-teams"><span class="ball">${ball}</span>${teamsHtml}</div>
+        <div class="ticket-pickline"><span class="lbl">Résultat</span><span class="val">${l.pick}</span><span class="od">${fmtOddsP(l.odds)}</span></div>
+      </div>`;
     }).join('');
     let footHtml;
     if(p.followed){
@@ -387,7 +390,13 @@ function renderPicks(){
       <button type="button" data-delpick="${p.id}">Supprimer</button>
     </div>`:'';
     const imageHtml=p.image_url?`<img class="pick-image" src="${p.image_url}" alt="Image du prono">`:'';
-    const oddsHtml=p.legs.length?`<div class="total-pill"><span>Cote totale</span><b>${fmtOddsP(p.total_odds)}</b></div>`:'';
+    const stakeForGain=p.followed?p.follow_stake:advisedStake;
+    const potentialGain=+(stakeForGain*p.total_odds).toFixed(2);
+    const ticketTotalsHtml=p.legs.length?`
+      <div class="ticket-row total"><span class="lbl">Cote totale</span><span class="sep"></span><span class="val">${fmtOddsP(p.total_odds)}</span></div>
+      <div class="ticket-row"><span class="lbl">Mise${p.followed?'':' (indicative)'}</span><span class="sep"></span><span class="val">${eur(stakeForGain)}</span></div>
+      <div class="ticket-gains"><span class="lbl">Gains potentiels</span><span class="val">${eur(potentialGain)}</span></div>`:'';
+    const [stLabel,stIcon]=TICKET_STATUS[p.result]||TICKET_STATUS.pending;
     const adviceHtml=`<div class="pick-advice-box">
       <div class="pick-advice-tag"><span>${prof.emoji} Mise conseillée : <b>${prof.label} (${prof.pct} %)</b></span></div>
       <div class="pick-advice-eur">soit <b>${eur(advisedStake)}</b> selon ta bankroll</div>
@@ -395,11 +404,11 @@ function renderPicks(){
     return `<div class="pick-card">
       <div class="pick-head">
         <div><h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3><p class="sub">Par ${p.author}</p></div>
-        <span class="result-badge ${p.result}">${PICK_LB[p.result]}</span>
+        <span class="ticket-status ${p.result}"><i>${stIcon}</i>${stLabel}</span>
       </div>
       ${imageHtml}
-      <div class="pick-legs">${legsHtml}</div>
-      ${oddsHtml}
+      <div class="ticket-legs">${legsHtml}</div>
+      ${ticketTotalsHtml}
       ${adviceHtml}
       ${linkHtml}
       <div class="pick-foot">${footHtml}</div>
@@ -440,7 +449,7 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.7', date='2026-10-12';
+  const v='1.0.8', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
