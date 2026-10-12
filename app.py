@@ -443,8 +443,7 @@ def google_callback():
         )
         token_response.raise_for_status()
         tokens = token_response.json()
-        id_token = tokens.get("id_token")
-        
+        id_token = tokens.get("id_token")        
         if not id_token:
             return jsonify({"error": "Pas de token ID."}), 400
         
@@ -500,7 +499,16 @@ def google_callback():
         return response
     
     except Exception as e:
-        return jsonify({"error": f"Erreur OAuth: {str(e)}"}), 400
+        detail = str(e)
+        resp = getattr(e, "response", None)
+        if resp is not None:
+            try:
+                body = resp.json()
+                if isinstance(body, dict) and body.get("error"):
+                    detail = f"{body.get('error')}: {body.get('error_description','')}"
+            except Exception:
+                pass
+        return jsonify({"error": f"Erreur OAuth: {detail}"}), 400
 
 
 @app.post("/api/register")
