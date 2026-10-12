@@ -18,15 +18,20 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;background-image:radial-gradient(1200px 500px at 90% -10%,rgba(255,117,24,.07),transparent 60%),radial-gradient(900px 420px at 0% 0%,rgba(53,56,57,.06),transparent 55%)}
 main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
-.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 4px 4px}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 4px 4px;z-index:10;position:relative}
+@media (max-width:560px){
+  .topbar{flex-direction:column}
+  .who{width:100%}
+  #logout{margin-left:auto}
+}
 .brand{display:flex;align-items:center;gap:12px}
 .brand .logo{width:46px;height:46px;border-radius:12px;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.28);flex-shrink:0;border:2px solid rgba(255,117,24,.25)}
 h1{margin:0;font-size:1.8rem;font-weight:800;line-height:1.1;background:linear-gradient(90deg,var(--text),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-.5px}
 .sub{margin:0;color:var(--mute);font-size:.9rem}
-.who{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--mute)}
+.who{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--mute);flex-wrap:wrap;justify-content:flex-end}
 .who b{color:var(--text)}
-#logout{font:inherit;cursor:pointer;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:7px 14px;font-size:.82rem;box-shadow:var(--shadow-sm);transition:all .15s ease}
-#logout:hover{border-color:var(--accent);color:var(--accent);box-shadow:var(--shadow)}
+#goProfile,#logout{font:inherit;cursor:pointer;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:7px 14px;font-size:.82rem;box-shadow:var(--shadow-sm);transition:all .15s ease;white-space:nowrap;position:relative;z-index:5}
+#goProfile:hover,#logout:hover{border-color:var(--accent);color:var(--accent);box-shadow:var(--shadow)}
 label{display:grid;gap:4px;font-size:.85rem;color:var(--mute)}
 input,select{font:inherit;color:var(--text);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
 input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;box-shadow:0 0 0 4px rgba(255,117,24,.15)}
@@ -132,7 +137,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 <nav class="nav" id="mainNav" hidden>
   <button type="button" data-view="home" aria-pressed="true">Accueil</button>
   <button type="button" data-view="bankroll" aria-pressed="false">Bankroll</button>
-  <button type="button" data-view="profile" aria-pressed="false">Profil</button>
 </nav>
 
 <div id="viewHome" class="view">
