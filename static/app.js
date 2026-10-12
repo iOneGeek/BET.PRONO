@@ -457,7 +457,7 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.15', date='2026-10-12';
+  const v='1.0.16', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

@@ -74,6 +74,10 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .soc .soc-logo{width:18px;height:18px;object-fit:contain}
 .soc-tg{color:#229ed9}
 .soc-ig{color:#bc1888}
+.who-social{display:inline-flex;align-items:center;gap:4px}
+.soc-mini{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:999px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow-sm);transition:all .15s ease;flex-shrink:0}
+.soc-mini:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.soc-mini img{width:18px;height:18px;object-fit:contain}
 .tg-footer-link{display:inline-block;margin:0 2px;color:#229ed9;text-decoration:none;font-weight:600;font-size:.8rem}
 .tg-footer-link:hover{text-decoration:underline}
 .nav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:5px;box-shadow:var(--shadow-sm)}
@@ -187,24 +191,13 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 <main>
 <header class="topbar">
   <div class="brand"><div><h1>BET.<span class="o">PRONO</span></h1><p class="sub">Suivi de ma bankroll, pari après pari</p></div></div>
-  <div class="who"><span>Connecté : <b id="whoami">…</b></span><button id="goProfile" type="button">Profil</button><button id="logout" type="button">Déconnexion</button></div>
+  <div class="who"><span>Connecté : <b id="whoami">…</b></span><span class="who-social"><a class="soc-mini soc-tg" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow" title="Telegram @bet_prono_fr"><img src="/static/icons/telegram.png" width="18" height="18" alt="Telegram"></a><a class="soc-mini soc-ig" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow" title="Instagram @bet.prono"><img src="/static/icons/insta.png" width="18" height="18" alt="Instagram"></a></span><button id="goProfile" type="button">Profil</button><button id="logout" type="button">Déconnexion</button></div>
 </header>
 
 <nav class="nav" id="mainNav" hidden>
   <button type="button" data-view="home" aria-pressed="true">Accueil</button>
   <button type="button" data-view="bankroll" aria-pressed="false">Bankroll</button>
 </nav>
-
-<div class="social-bar">
-  <a class="soc soc-tg" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">
-    <img class="soc-logo" src="/static/icons/telegram.png" width="18" height="18" alt="Telegram">
-    <span>Telegram</span>
-  </a>
-  <a class="soc soc-ig" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">
-    <img class="soc-logo" src="/static/icons/insta.png" width="18" height="18" alt="Instagram">
-    <span>Instagram</span>
-  </a>
-</div>
 
 <div id="viewHome" class="view">
   <section class="panel">
@@ -304,7 +297,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">✈️ Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">📸 Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.0.15 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.0.16 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -326,6 +319,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
   });
 })();
 </script>
-<script src="/static/app.js?v=1.0.15"></script>
+<script src="/static/app.js?v=1.0.16"></script>
 </body>
 </html>

@@ -31,6 +31,11 @@ button.primary{font:inherit;cursor:pointer;border-radius:8px;border:1px solid va
 button.primary:disabled{opacity:.6;cursor:wait}
 .err{color:var(--loss);font-size:.88rem;min-height:1.2em;margin:0}
 footer{color:var(--mute);font-size:.78rem;margin-top:18px;text-align:center}
+.login-social{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:18px}
+.login-social .lbl{color:var(--mute);font-size:.85rem;font-weight:600}
+.soc-mini{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;border:1px solid var(--line);background:var(--field);box-shadow:0 2px 6px rgba(0,0,0,.08);transition:all .15s ease}
+.soc-mini:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.12)}
+.soc-mini img{width:20px;height:20px;object-fit:contain}
 .intro{background:var(--field);border:1px solid var(--line);border-radius:12px;padding:14px 14px 6px;margin-bottom:16px}
 .intro p{margin:0 0 10px;color:var(--text);font-size:.92rem}
 .intro .lead{font-weight:800;font-size:1rem}
@@ -74,6 +79,7 @@ footer{color:var(--mute);font-size:.78rem;margin-top:18px;text-align:center}
       Connexion avec Google
     </button>
   </form>
+  <div class="login-social"><span class="lbl">Rejoins-nous :</span><a class="soc-mini soc-tg" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow" title="Telegram @bet_prono_fr"><img src="/static/icons/telegram.png" width="18" height="18" alt="Telegram"></a><a class="soc-mini soc-ig" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow" title="Instagram @bet.prono"><img src="/static/icons/insta.png" width="18" height="18" alt="Instagram"></a></div>
   <footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? 09 74 75 13 13 (appel non surtaxé).</footer>
 </div>
 <script>
