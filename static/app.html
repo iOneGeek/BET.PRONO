@@ -94,6 +94,9 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .checkrow{display:flex;align-items:center;gap:8px}
 .checkrow input{width:18px;height:18px;accent-color:var(--accent)}
 .admin-badge{display:inline-block;background:var(--accent);color:var(--on-accent);font-size:.72rem;font-weight:700;border-radius:999px;padding:2px 8px;margin-left:8px;vertical-align:middle}
+.info-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--field);color:var(--mute);font-size:.78rem;font-weight:800;line-height:1;cursor:pointer;vertical-align:middle;margin-left:8px}
+.info-btn:hover{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.panel h2 .info-btn{vertical-align:sub}
 .pick-card{border:1px solid var(--line);border-radius:18px;padding:16px;background:var(--panel);display:grid;gap:11px;box-shadow:var(--shadow-sm);transition:box-shadow .18s ease,transform .15s ease;position:relative}
 .pick-card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;border-radius:18px 18px 0 0;background:linear-gradient(90deg,var(--accent),rgba(255,117,24,0))}
 .pick-card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
@@ -217,20 +220,20 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 <section class="chart"><svg id="svg" viewBox="0 0 640 300" role="img" aria-label="Évolution du bénéfice pari après pari"></svg>
 <div class="per" id="per"><button data-p="d">1 j</button><button data-p="w">1 sem.</button><button data-p="m">1 mois</button><button data-p="all" aria-pressed="true">Tout</button></div></section>
 <section class="stats" id="stats"></section>
-<section class="panel"><h2>Mises conseillées</h2><div class="plan" id="plan"></div></section>
-<section class="panel"><h2>Par sport</h2><div class="wrap"><table id="bs"></table></div></section>
-<section class="panel"><h2>Par type de pari</h2><div class="wrap"><table id="bt"></table></div></section>
+<section class="panel"><h2>Mises conseillées <button type="button" class="info-btn" data-help="advice" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-advice" hidden>Mises conseillées selon ta bankroll : respecte la mise préconisée pour améliorer ta bankroll sur la durée.</p><div class="plan" id="plan"></div></section>
+<section class="panel"><h2>Par sport <button type="button" class="info-btn" data-help="sport" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-sport" hidden>Chaque sport est différent : fais des catégories pour savoir quel sport te convient le mieux et sur lequel tu gagnes le plus.</p><div class="wrap"><table id="bs"></table></div></section>
+<section class="panel"><h2>Par type de pari <button type="button" class="info-btn" data-help="type" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-type" hidden>Chaque type de pari a ses particularités : consulte tes résultats pour savoir quel type te convient le mieux.</p><div class="wrap"><table id="bt"></table></div></section>
 
 <section class="panel">
-  <h2>Mes paris</h2>
+  <h2>Mes paris <button type="button" class="info-btn" data-help="history" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-history" hidden>Mes paris : l'historique complet de tes mises et de leurs résultats.</p>
   <div class="wrap"><table id="t"></table></div>
 </section>
 
 <section class="panel">
-  <details id="ed"><summary>Modifier les données</summary>
+  <details id="ed"><summary>Ajoutez vos paris</summary>
   <form id="f" class="form">
     <label>Date<input id="d" type="date" required></label>
-    <label>Sport<select id="sp"><option>Foot</option><option>Mixte</option><option>Tennis</option><option>NBA</option><option>F1</option><option>MMA</option><option>MLB</option><option>NFL</option><option>NHL</option></select></label>
+    <label>Sport<select id="sp"><option value="Foot">⚽ Foot</option><option value="Mixte">🎯 Mixte</option><option value="Tennis">🎾 Tennis</option><option value="NBA">🏀 NBA</option><option value="F1">🏎️ F1</option><option value="MMA">🥊 MMA</option><option value="MLB">⚾ MLB</option><option value="NFL">🏈 NFL</option><option value="NHL">🏒 NHL</option></select></label>
     <label>Type<select id="ty"><option>Simple</option><option selected>Combiné</option><option>Combiné FUN</option><option>Combiné x4</option><option>Combiné x5</option></select></label>
     <label>Mise ou retrait (€)<input id="s" type="number" min="0.01" step="0.01" required></label>
     <label>Cote<input id="o" type="number" min="1.01" step="0.01"></label>
@@ -239,13 +242,19 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
     <button class="primary" id="addBtn">Ajouter</button>
   </form>
   <p class="warn" id="warn" hidden></p>
-  <div class="form" style="margin-top:16px">
+  </details>
+  <p class="sub" style="margin-top:8px">Ajoutez vos paris : note bien tout ce que tu as misé aujourd'hui ou les jours précédents. N'oublie pas de modifier si un pari est encore en cours.</p>
+</section>
+
+<section class="panel">
+  <h2>Modifier ton BK <button type="button" class="info-btn" data-help="bk" aria-label="En savoir plus">?</button></h2>
+  <p class="sub" id="help-bk" hidden>Si tu as déposé de l'argent, je te conseille fortement de mettre ta bankroll à jour.</p>
+  <div class="form">
     <label>Bankroll de départ (€)<input id="initBk" type="number" min="0" step="0.01"></label>
     <button id="saveInit" type="button">Mettre à jour</button>
   </div>
   <div class="row"><button id="ex" type="button">Exporter mes données</button><button id="im" type="button">Importer</button><button id="rs" type="button">Effacer tous mes paris</button></div>
   <p class="sub" id="msg"></p><textarea id="out" hidden aria-label="Données"></textarea>
-  </details>
 </section>
 </div>
 
@@ -264,7 +273,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 </div>
 
 <footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.0.9 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.0.10 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -286,6 +295,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   });
 })();
 </script>
-<script src="/static/app.js?v=1.0.9"></script>
+<script src="/static/app.js?v=1.0.10"></script>
 </body>
 </html>

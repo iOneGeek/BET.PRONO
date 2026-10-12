@@ -377,7 +377,7 @@ function renderPicks(){
     let footHtml;
     if(p.followed){
       footHtml=`<span class="followed-badge">✓ Suivi · mise ${eur(p.follow_stake)}</span>`;
-      if(p.result==='pending') footHtml+=`<button type="button" data-unfollow="${p.id}">Ne plus suivre</button>`;
+      if(p.result==='pending') footHtml+=`<button type="button" data-unfollow="${p.id}">Annule le pari</button>`;
     }else if(p.result==='pending'){
       footHtml=`<div class="follow-form"><input type="number" min="0.5" step="0.5" value="${advisedStake}" id="stake-${p.id}" aria-label="Mise"><select id="sport-${p.id}" aria-label="Sport">${SPORTS.map(s=>`<option value="${s}"${s===p.sport?' selected':''}>${SPORT_ICON[s]||''} ${s}</option>`).join('')}</select><button class="primary" type="button" data-follow="${p.id}">Suivre ce prono</button></div>`;
     }else{
@@ -433,7 +433,7 @@ $('picksList').addEventListener('click',async ev=>{
       await api('/api/picks/'+follow+'/follow',{method:'POST',body:JSON.stringify({stake,sport})});
       await loadPicks();await loadBets();
     }else if(unfollow){
-      if(!confirm('Retirer ce prono de ta bankroll ?'))return;
+      if(!confirm('Annuler ce pari ? Sa mise sera retirée de ta bankroll.'))return;
       await api('/api/picks/'+unfollow+'/follow',{method:'DELETE'});
       await loadPicks();await loadBets();
     }else if(settle){
@@ -449,10 +449,21 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.9', date='2026-10-12';
+  const v='1.0.10', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
+
+// Boutons "?" d'aide : affiche/masque le texte d'explication de chaque bloc
+document.addEventListener('click', ev=>{
+  const btn=ev.target.closest('.info-btn');
+  if(!btn) return;
+  const key=btn.dataset.help;
+  const help=key?document.getElementById('help-'+key):null;
+  if(!help) return;
+  const hidden=help.hasAttribute('hidden');
+  if(hidden) help.removeAttribute('hidden'); else help.setAttribute('hidden','');
+});
 
 // Rafraîchit automatiquement les pronos publiés (partage entre comptes)
 setInterval(async()=>{
