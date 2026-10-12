@@ -70,6 +70,13 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .share-form{display:grid;gap:14px}
 .bet-item{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--field);display:grid;gap:8px}
 .bet-item .grid3{display:grid;grid-template-columns:1fr 1fr 80px;gap:8px}
+.match-row{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end}
+.match-row.pick-line{grid-template-columns:1.6fr 1fr}
+.vs{align-self:center;justify-self:center;font-weight:800;color:var(--accent);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:.75rem;letter-spacing:.5px;box-shadow:var(--shadow-sm)}
+.duel{display:flex;align-items:center;gap:8px;font-weight:600}
+.duel span{flex:1}
+.duel span:first-child{text-align:right}
+.duel i{flex-shrink:0;font-style:normal;color:var(--mute);background:var(--panel);border:1px solid var(--accent);border-radius:999px;padding:2px 10px;font-size:.68rem;font-weight:800;letter-spacing:.4px}
 .bet-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .bet-actions select{max-width:220px}
 .remove-bet{border-color:var(--loss);color:var(--loss)}
@@ -119,15 +126,20 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 <main>
 <header class="topbar">
   <div class="brand"><img src="/static/logo.png" alt="BET.PRONO" class="logo"><div><h1>BET.PRONO</h1><p class="sub">Suivi de ma bankroll, pari après pari</p></div></div>
-  <div class="who"><span>Connecté : <b id="whoami">…</b></span><button id="logout" type="button">Déconnexion</button></div>
+  <div class="who"><span>Connecté : <b id="whoami">…</b></span><button id="goProfile" type="button">Profil</button><button id="logout" type="button">Déconnexion</button></div>
 </header>
 
 <nav class="nav" id="mainNav" hidden>
   <button type="button" data-view="home" aria-pressed="true">Accueil</button>
   <button type="button" data-view="bankroll" aria-pressed="false">Bankroll</button>
+  <button type="button" data-view="profile" aria-pressed="false">Profil</button>
 </nav>
 
 <div id="viewHome" class="view">
+  <section class="panel">
+    <div class="brand"><div><h2 style="display:block">Bienvenue 👋</h2><p class="sub" style="margin:0">BET.PRONO t'aide à gérer ta bankroll pari après pari. Suis des pronos partagés, fixe ta mise conseillée selon ton profil de jeu, et analyse tes résultats (sport, ROI, réussite) pour parier avec méthode.</p></div></div>
+  </section>
+
   <section class="panel" id="adminPanel" hidden>
     <h2>Publier un prono <span class="admin-badge">Admin</span></h2>
     <p class="sub">Ce prono sera visible par tous les comptes, qui pourront le suivre et l'ajouter à leur bankroll.</p>
@@ -139,25 +151,21 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
       <div class="total-pill"><span>Cote totale</span><b id="pickTotalOdds">1,00</b></div>
       <label>Image (capture d'écran, affiche, etc. - optionnel)<input id="pickImage" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
       <img id="pickImagePreview" alt="Aperçu de l'image" hidden>
+      <div class="profile-select" id="profileSelect">
+        <button type="button" data-prof="fun">🎉 Fun</button>
+        <button type="button" data-prof="prudent" aria-pressed="true">🛡️ Prudent</button>
+        <button type="button" data-prof="confiance">🤝 Confiance</button>
+        <button type="button" data-prof="maxi">💪 Maxi</button>
+      </div>
+      <div class="advice-box">
+        <div class="advice-big"><span>Mise conseillée</span><b id="adviceAmount">–</b></div>
+        <p class="sub" id="adviceText">Choisis un profil pour voir la mise conseillée.</p>
+      </div>
       <button class="primary" id="publishPickBtn" type="button">Publier le prono</button>
       <p class="sub" id="pickMsg"></p>
     </div>
   </section>
 
-  <section class="panel">
-    <h2>💡 Mise conseillée</h2>
-    <p class="sub">Choisis ton profil de jeu pour connaître ta mise idéale avant de suivre un prono.</p>
-    <div class="profile-select" id="profileSelect">
-      <button type="button" data-prof="fun">🎉 Fun</button>
-      <button type="button" data-prof="prudent" aria-pressed="true">🛡️ Prudent</button>
-      <button type="button" data-prof="confiance">🤝 Confiance</button>
-      <button type="button" data-prof="maxi">💪 Maxi</button>
-    </div>
-    <div class="advice-box" id="adviceBox">
-      <div class="advice-big"><span>Mise conseillée</span><b id="adviceAmount">–</b></div>
-      <p class="sub" id="adviceText">Sélectionne un profil pour voir l'analyse.</p>
-    </div>
-  </section>
 
   <section class="panel">
     <h2>Paris partagés</h2>
@@ -202,8 +210,22 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 </section>
 </div>
 
+<div id="viewProfile" class="view">
+  <section class="panel">
+    <h2>Mon profil</h2>
+    <p class="sub">Modifie tes informations. Laisse le mot de passe vide pour ne pas le changer.</p>
+    <form id="profileForm" class="share-form">
+      <label>Pseudo<input id="pfUsername" type="text" maxlength="24" placeholder="Ton pseudo"></label>
+      <label>E-mail<input id="pfEmail" type="email" placeholder="ton@email.com"></label>
+      <label>Nouveau mot de passe<input id="pfPassword" type="password" minlength="6" placeholder="•••••• (6 caractères min)"></label>
+      <button class="primary" id="pfSave" type="submit">Enregistrer</button>
+      <p class="sub" id="pfMsg"></p>
+    </form>
+  </section>
+</div>
+
 <footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.0.1 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.0.3 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <script src="/static/app.js"></script>

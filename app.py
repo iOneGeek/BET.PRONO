@@ -578,6 +578,7 @@ def logout():
 def me():
     return jsonify({
         "username": g.user["username"],
+        "email": dict(g.user).get("email"),
         "initial_bankroll": g.user["initial_bankroll"],
         "is_admin": bool(g.user["is_admin"]),
     })
@@ -598,6 +599,48 @@ def update_settings():
         db.execute("UPDATE users SET initial_bankroll = ? WHERE id = ?", (value, g.user["id"]))
         db.commit()
     return jsonify({"ok": True})
+
+
+@app.patch("/api/profile")
+@login_required
+def update_profile():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    user_id = g.user["id"]
+    cur_username = g.user["username"]
+
+    new_username = (data.get("username") or "").strip()
+    new_email = (data.get("email") or "").strip().lower()
+    new_password = data.get("password") or ""
+
+    if "username" in data:
+        if not USERNAME_RE.match(new_username) or not new_username:
+            return jsonify({"error": "Identifiant invalide (3-24 caracteres: lettres, chiffres, _ . -)."}), 400
+        existing = db.execute("SELECT id FROM users WHERE username = ? AND id != ?", (new_username, user_id)).fetchone()
+        if existing:
+            return jsonify({"error": "Cet identifiant est deja utilise."}), 409
+        db.execute("UPDATE users SET username = ? WHERE id = ?", (new_username, user_id))
+        cur_username = new_username
+
+    if "email" in data:
+        if new_email == "":
+            new_email = None
+        elif "@" not in new_email or "." not in new_email:
+            return jsonify({"error": "Adresse e-mail invalide."}), 400
+        else:
+            existing = db.execute("SELECT id FROM users WHERE email = ? AND id != ?", (new_email, user_id)).fetchone()
+            if existing:
+                return jsonify({"error": "Cet e-mail est deja utilise."}), 409
+        db.execute("UPDATE users SET email = ? WHERE id = ?", (new_email, user_id))
+
+    if "password" in data:
+        if len(new_password) < 6:
+            return jsonify({"error": "Mot de passe trop court (6 caracteres minimum)."}), 400
+        db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (generate_password_hash(new_password), user_id))
+
+    db.commit()
+    return jsonify({"ok": True, "username": cur_username})
+
 
 
 # ---------- Bets API ----------

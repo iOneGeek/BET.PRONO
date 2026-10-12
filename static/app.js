@@ -127,19 +127,56 @@ $('d').value=new Date().toISOString().slice(0,10);
 
 $('mainNav').addEventListener('click',ev=>{
   const v=ev.target.dataset.view;if(!v)return;
+  showView(v);
+});
+
+function showView(v){
   [...$('mainNav').children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
   $('viewHome').classList.toggle('active',v==='home');
   $('viewBankroll').classList.toggle('active',v==='bankroll');
-});
+  $('viewProfile').classList.toggle('active',v==='profile');
+}
 
 let IS_ADMIN=false;
+
+// ---------- Profil ----------
+$('goProfile').addEventListener('click',()=>showView('profile'));
+
+function loadProfileForm(){
+  const me=window.__me;
+  if(!me)return;
+  $('pfUsername').value=me.username||'';
+  $('pfEmail').value=me.email||'';
+  $('pfPassword').value='';
+  $('pfMsg').textContent='';
+}
+$('profileForm').addEventListener('submit',async ev=>{
+  ev.preventDefault();
+  const msg=$('pfMsg');
+  const body={};
+  const un=$('pfUsername').value.trim(), em=$('pfEmail').value.trim(), pw=$('pfPassword').value;
+  if(un&&un!==(window.__me&&window.__me.username))body.username=un;
+  if(em&&em!==(window.__me&&window.__me.email))body.email=em;
+  if(pw)body.password=pw;
+  if(!Object.keys(body).length){msg.textContent='Aucune modification.';return;}
+  try{
+    const r=await api('/api/profile',{method:'PATCH',body:JSON.stringify(body)});
+    if(window.__me)window.__me.username=r.username||window.__me.username;
+    $('whoami').textContent=r.username||window.__me.username;
+    $('pfPassword').value='';
+    msg.textContent='Profil mis à jour ✅';
+    loadProfileForm();
+  }catch(e){msg.textContent=e.message}
+});
 
 (async()=>{
   try{
     const me=await api('/api/me');
+    window.__me=me;
     $('whoami').textContent=me.username;
     IS_ADMIN=!!me.is_admin;
     $('adminPanel').hidden=!IS_ADMIN;
+    loadProfileForm();
     await loadBets();
     await loadPicks();
     $('mainNav').hidden=false;
@@ -152,7 +189,7 @@ if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catc
 
 // ---------- Pronostics (admin + suivi) ----------
 const MAX_PICK_BETS=6;
-let pickBets=[{match:'',pick:'',odds:''}];
+let pickBets=[{home:'',away:'',pick:'',odds:''}];
 let PICKS=[];
 
 function parseOddsP(str){const n=parseFloat(String(str).replace(',','.').trim());return isNaN(n)?0:n}
@@ -165,9 +202,13 @@ function renderPickBets(){
     const item=document.createElement('div');
     item.className='bet-item';
     item.innerHTML=`
-      <div class="grid3">
-        <label>Match<input type="text" data-pf="match" data-pi="${idx}" value="${bet.match.replace(/"/g,'&quot;')}" placeholder="Équipe A – Équipe B"></label>
-        <label>Pari<input type="text" data-pf="pick" data-pi="${idx}" value="${bet.pick.replace(/"/g,'&quot;')}" placeholder="Équipe A gagne"></label>
+      <div class="match-row">
+        <label>Équipe A<input type="text" data-pf="home" data-pi="${idx}" value="${(bet.home||'').replace(/"/g,'&quot;')}" placeholder="Real Madrid"></label>
+        <span class="vs">VS</span>
+        <label>Équipe B<input type="text" data-pf="away" data-pi="${idx}" value="${(bet.away||'').replace(/"/g,'&quot;')}" placeholder="PSG"></label>
+      </div>
+      <div class="match-row pick-line">
+        <label>Pari<input type="text" data-pf="pick" data-pi="${idx}" value="${(bet.pick||'').replace(/"/g,'&quot;')}" placeholder="Real Madrid gagne"></label>
         <label>Cote<input type="text" inputmode="decimal" data-pf="odds" data-pi="${idx}" value="${bet.odds}" placeholder="1,70"></label>
       </div>
       <button type="button" class="remove-bet" data-premove="${idx}" ${pickBets.length<=1?'disabled':''}>Retirer ce pari</button>
@@ -198,7 +239,7 @@ function updatePickTotal(){
   });
   $('addPickBet').addEventListener('click',()=>{
     if(pickBets.length>=MAX_PICK_BETS)return;
-    pickBets.push({match:'',pick:'',odds:''});
+    pickBets.push({home:'',away:'',pick:'',odds:''});
     renderPickBets();
   });
   $('pickImage').addEventListener('change',()=>{
@@ -209,7 +250,13 @@ function updatePickTotal(){
   });
   $('publishPickBtn').addEventListener('click',async()=>{
     const msg=$('pickMsg');
-    const legs=pickBets.filter(b=>b.match||b.pick||b.odds).map(b=>({match:b.match,pick:b.pick,odds:parseOddsP(b.odds)}));
+    const legs=pickBets
+      .filter(b=>(b.match||b.home||b.away||b.pick||b.odds))
+      .map(b=>{
+        const home=(b.home||'').trim(), away=(b.away||'').trim();
+        const match = (home||away) ? (home+' ⚔ '+(away||'—')) : (b.match||'');
+        return {match, pick:b.pick, odds:parseOddsP(b.odds)};
+      });
     const imageFile=$('pickImage').files[0];
     if(!legs.length&&!imageFile){msg.textContent='Ajoute au moins un pari ou une image.';return}
     try{
@@ -222,7 +269,7 @@ function updatePickTotal(){
       if(r.status===401){location.href='/login';return}
       const resData=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(resData.error||'Erreur serveur');
-      pickBets=[{match:'',pick:'',odds:''}];
+      pickBets=[{home:'',away:'',pick:'',odds:''}];
       renderPickBets();
       $('pickImage').value='';
       $('pickImagePreview').hidden=true;
@@ -245,7 +292,16 @@ function renderPicks(){
   const el=$('picksList');
   if(!PICKS.length){el.innerHTML='<p class="empty">Aucun prono publié pour l\'instant.</p>';return}
   el.innerHTML=PICKS.map(p=>{
-    const legsHtml=p.legs.map(l=>`<div class="pick-leg"><div><div class="m">${l.match}</div><div class="p">${l.pick}</div></div><div class="o">${fmtOddsP(l.odds)}</div></div>`).join('');
+    const legsHtml=p.legs.map(l=>{
+      const parts=String(l.match||'').split(/\s*[\u2694\u2013–-=]\s*|\s+vs\.?\s+/i).map(s=>s.trim()).filter(Boolean);
+      let matchup;
+      if(parts.length>=2){
+        matchup=`<div class="duel"><span>${parts[0]}</span><i>VS</i><span>${parts.slice(1).join(' – ')}</span></div>`;
+      }else{
+        matchup=`<div class="m">${l.match||''}</div>`;
+      }
+      return `<div class="pick-leg"><div>${matchup}<div class="p">${l.pick}</div></div><div class="o">${fmtOddsP(l.odds)}</div></div>`;
+    }).join('');
     let footHtml;
     if(p.followed){
       footHtml=`<span class="followed-badge">✓ Suivi · mise ${eur(p.follow_stake)}</span>`;
@@ -309,7 +365,7 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.2', date='2026-10-12';
+  const v='1.0.3', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
