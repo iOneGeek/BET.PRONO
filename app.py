@@ -9,6 +9,7 @@ from functools import wraps
 
 import jwt
 import requests
+import time
 from flask import Flask, g, jsonify, request, send_from_directory, redirect, session
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -424,91 +425,95 @@ def google_login():
     return jsonify({"auth_url": auth_url})
 
 
+def _google_exchange_code(code):
+    """Échange le code d'autorisation contre un id_token Google.
+    Réessaie plusieurs fois : les erreurs SSL/EOF vers Google sont souvent
+    intermittentes côté Render et se corrigent à la tentative suivante.
+    Retourne l'id_token, ou None si toutes les tentatives échouent."""
+    url = "https://oauth2.googleapis.com/token"
+    data = {
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "grant_type": "authorization_code",
+    }
+    last_err = None
+    for attempt in range(3):
+        try:
+            with requests.Session() as s:
+                resp = s.post(url, data=data, timeout=30)
+                resp.raise_for_status()
+            tokens = resp.json()
+            id_token = tokens.get("id_token")
+            if id_token:
+                return id_token
+            last_err = "Réponse Google sans id_token"
+        except Exception as e:  # erreurs réseau/SSL/5xx
+            last_err = str(e)
+        time.sleep(0.8 * (attempt + 1))  # 0.8s, 1.6s entre tentatives
+    return None
+
+
 @app.get("/api/auth/google/callback")
 def google_callback():
     code = request.args.get("code")
     if not code:
         return jsonify({"error": "Pas de code d'autorisation."}), 400
-    
-    try:
-        token_response = requests.post(
-            "https://oauth2.googleapis.com/token",
-            data={
-                "code": code,
-                "client_id": GOOGLE_CLIENT_ID,
-                "client_secret": GOOGLE_CLIENT_SECRET,
-                "redirect_uri": GOOGLE_REDIRECT_URI,
-                "grant_type": "authorization_code",
-            },
-        )
-        token_response.raise_for_status()
-        tokens = token_response.json()
-        id_token = tokens.get("id_token")        
-        if not id_token:
-            return jsonify({"error": "Pas de token ID."}), 400
-        
-        user_info = verify_oauth2_token(id_token, Request(), GOOGLE_CLIENT_ID, clock_skew_in_seconds=10)
-        email = user_info.get("email")
-        name = user_info.get("name", email.split("@")[0])
-        
-        if not email:
-            return jsonify({"error": "Email manquant."}), 400
-        
-        db = get_db()
-        user = db.execute("SELECT id, is_admin FROM users WHERE email = ?", (email,)).fetchone()
 
-        admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-        admin_username = os.getenv("ADMIN_USERNAME", "").strip().lower()
-        if not user and admin_email and email.lower() == admin_email:
-            is_admin = 1
-        elif not user:
-            user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            is_admin = 1 if user_count == 0 else 0
-            username = name.replace(" ", "_").lower()[:24]
-            username_base = username
-            counter = 1
-            while db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
-                username = f"{username_base}{counter}"
-                counter += 1
-            
-            now = datetime.now(timezone.utc).isoformat()
-            cur = db.execute(
-                "INSERT INTO users (username, email, password_hash, is_admin, initial_bankroll, created_at) VALUES (?, ?, ?, ?, 100, ?)",
-                (username, email, generate_password_hash("google_oauth"), is_admin, now),
-            )
-            db.commit()
-            user_id = cur.lastrowid
-            is_admin = is_admin
-        else:
-            user_id = user["id"]
-            is_admin = user["is_admin"]
-            # Promotion admin si l'email correspond à ADMIN_EMAIL
-            if admin_email and email.lower() == admin_email and not is_admin:
-                db.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (user_id,))
-                db.commit()
-                is_admin = 1
-        
-        token = jwt.encode(
-            {"uid": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=TOKEN_DAYS)},
-            SECRET_KEY,
-            algorithm="HS256",
+    id_token = _google_exchange_code(code)
+    if id_token is None:
+        return jsonify({"error": "Échec de l'échange avec Google (erreur réseau/SSL). Réessaie dans un instant."}), 502
+
+    user_info = verify_oauth2_token(id_token, Request(), GOOGLE_CLIENT_ID, clock_skew_in_seconds=10)
+    email = user_info.get("email")
+    name = user_info.get("name", email.split("@")[0])
+
+    if not email:
+        return jsonify({"error": "Email manquant."}), 400
+
+    db = get_db()
+    user = db.execute("SELECT id, is_admin FROM users WHERE email = ?", (email,)).fetchone()
+
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    admin_username = os.getenv("ADMIN_USERNAME", "").strip().lower()
+    if not user and admin_email and email.lower() == admin_email:
+        is_admin = 1
+    elif not user:
+        user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        is_admin = 1 if user_count == 0 else 0
+        username = name.replace(" ", "_").lower()[:24]
+        username_base = username
+        counter = 1
+        while db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
+            username = f"{username_base}{counter}"
+            counter += 1
+
+        now = datetime.now(timezone.utc).isoformat()
+        cur = db.execute(
+            "INSERT INTO users (username, email, password_hash, is_admin, initial_bankroll, created_at) VALUES (?, ?, ?, ?, 100, ?)",
+            (username, email, generate_password_hash("google_oauth"), is_admin, now),
         )
-        
-        response = redirect("/app")
-        response.set_cookie(COOKIE_NAME, token, max_age=TOKEN_DAYS * 86400, httponly=True, samesite="Lax")
-        return response
-    
-    except Exception as e:
-        detail = str(e)
-        resp = getattr(e, "response", None)
-        if resp is not None:
-            try:
-                body = resp.json()
-                if isinstance(body, dict) and body.get("error"):
-                    detail = f"{body.get('error')}: {body.get('error_description','')}"
-            except Exception:
-                pass
-        return jsonify({"error": f"Erreur OAuth: {detail}"}), 400
+        db.commit()
+        user_id = cur.lastrowid
+        is_admin = is_admin
+    else:
+        user_id = user["id"]
+        is_admin = user["is_admin"]
+        if admin_email and email.lower() == admin_email and not is_admin:
+            db.execute("UPDATE users SET is_admin = 1 WHERE id = ?", (user_id,))
+            db.commit()
+            is_admin = 1
+
+    token = jwt.encode(
+        {"uid": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=TOKEN_DAYS)},
+        SECRET_KEY,
+        algorithm="HS256",
+    )
+
+    response = redirect("/app")
+    response.set_cookie(COOKIE_NAME, token, max_age=TOKEN_DAYS * 86400, httponly=True, samesite="Lax")
+    return response
 
 
 @app.post("/api/register")
