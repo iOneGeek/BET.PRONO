@@ -451,11 +451,14 @@ def _google_exchange_code(code):
         "redirect_uri": GOOGLE_REDIRECT_URI,
         "grant_type": "authorization_code",
     }
+    # Budget total volontairement court (bien en dessous du timeout worker Gunicorn,
+    # voir Procfile) : un ancien réglage à 30s/tentative x3 pouvait dépasser les 30s
+    # par défaut de Gunicorn et faire tuer le worker en plein échange -> 500 brut.
     last_err = None
     for attempt in range(3):
         try:
             with requests.Session() as s:
-                resp = s.post(url, data=data, timeout=30)
+                resp = s.post(url, data=data, timeout=10)
                 resp.raise_for_status()
             tokens = resp.json()
             id_token = tokens.get("id_token")
@@ -464,7 +467,7 @@ def _google_exchange_code(code):
             last_err = "Réponse Google sans id_token"
         except Exception as e:  # erreurs réseau/SSL/5xx
             last_err = str(e)
-        time.sleep(0.8 * (attempt + 1))  # 0.8s, 1.6s entre tentatives
+        time.sleep(0.6 * (attempt + 1))  # 0.6s, 1.2s entre tentatives
     return None
 
 
