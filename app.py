@@ -249,8 +249,9 @@ def init_pg_db():
             CREATE INDEX IF NOT EXISTS idx_follows_pick ON pick_follows(pick_id);
             CREATE INDEX IF NOT EXISTS idx_follows_user ON pick_follows(user_id);
         """)
-        # Migration : colonne sport sur les tables picks existantes
+        # Migrations : colonnes ajoutées sur des tables existantes
         _run_ddl(conn, "ALTER TABLE picks ADD COLUMN IF NOT EXISTS sport TEXT")
+        _run_ddl(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT")
     finally:
         POOL.putconn(conn)
 
@@ -465,23 +466,27 @@ def google_callback():
     if id_token is None:
         return jsonify({"error": "Échec de l'échange avec Google (erreur réseau/SSL). Réessaie dans un instant."}), 502
 
-    user_info = verify_oauth2_token(id_token, Request(), GOOGLE_CLIENT_ID, clock_skew_in_seconds=10)
-    email = user_info.get("email")
-    name = user_info.get("name", email.split("@")[0])
+    try:
+        user_info = verify_oauth2_token(id_token, Request(), GOOGLE_CLIENT_ID, clock_skew_in_seconds=10)
+    except Exception:
+        return jsonify({"error": "La vérification du jeton Google a échoué. Réessaie dans un instant."}), 502
 
+    email = user_info.get("email")
     if not email:
         return jsonify({"error": "Email manquant."}), 400
+    name = user_info.get("name") or email.split("@")[0]
 
     db = get_db()
     user = db.execute("SELECT id, is_admin FROM users WHERE email = ?", (email,)).fetchone()
 
     admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-    admin_username = os.getenv("ADMIN_USERNAME", "").strip().lower()
-    if not user and admin_email and email.lower() == admin_email:
-        is_admin = 1
-    elif not user:
-        user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-        is_admin = 1 if user_count == 0 else 0
+    if not user:
+        # Premier passage : créer le compte. L'email admin désigné devient admin,
+        # sinon le tout premier compte, sinon simple utilisateur.
+        is_admin = 1 if (admin_email and email.lower() == admin_email) else 0
+        if not is_admin:
+            user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            is_admin = 1 if user_count == 0 else 0
         username = name.replace(" ", "_").lower()[:24]
         username_base = username
         counter = 1
@@ -496,7 +501,6 @@ def google_callback():
         )
         db.commit()
         user_id = cur.lastrowid
-        is_admin = is_admin
     else:
         user_id = user["id"]
         is_admin = user["is_admin"]
