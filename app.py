@@ -427,6 +427,20 @@ def uploaded_file(filename):
     return send_from_directory(UPLOAD_DIR, filename)
 
 
+@app.get("/api/health")
+def health():
+    """Ping de maintenance : garde le compute Neon éveillé (scale-to-zero à 5 min)
+    grâce à un ping régulier externe (cron-job.org / UptimeRobot).
+    Ne renvoie aucune donnée sensible, juste un état."""
+    try:
+        db = get_db()
+        db.execute("SELECT 1").fetchone()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        print(f"[health] {e!r}", file=sys.stderr)
+        return jsonify({"status": "error"}), 503
+
+
 @app.get("/api/auth/google/login")
 def google_login():
     auth_url = (
