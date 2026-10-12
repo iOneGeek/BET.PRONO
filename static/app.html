@@ -19,6 +19,8 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;background-image:radial-gradient(1200px 500px at 90% -10%,rgba(255,117,24,.07),transparent 60%),radial-gradient(900px 420px at 0% 0%,rgba(53,56,57,.06),transparent 55%)}
 main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 4px 4px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .logo{width:46px;height:46px;border-radius:12px;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.28);flex-shrink:0;border:2px solid rgba(255,117,24,.25)}
 h1{margin:0;font-size:1.8rem;font-weight:800;line-height:1.1;background:linear-gradient(90deg,var(--text),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-.5px}
 .sub{margin:0;color:var(--mute);font-size:.9rem}
 .who{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--mute)}
@@ -59,9 +61,6 @@ tbody tr:hover{background:var(--field)}
 .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 textarea{width:100%;height:90px;margin-top:8px;font:12px monospace;background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:8px}
 footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow-sm);line-height:1.6}
-.loading{color:var(--mute);text-align:center;padding:40px 0;display:flex;align-items:center;justify-content:center;gap:10px;min-height:20vh}
-.spinner{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
 .nav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:5px;box-shadow:var(--shadow-sm)}
 .nav button{flex:1;border:none;background:transparent;color:var(--mute);font-weight:600;padding:10px;border-radius:10px;transition:all .18s ease;cursor:pointer}
 .nav button:hover{color:var(--text)}
@@ -107,16 +106,21 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .admin-actions{display:flex;gap:6px;flex-wrap:wrap}
 .admin-actions button{font-size:.82rem;padding:6px 10px}
 .empty{color:var(--mute);text-align:center;padding:20px 0}
+.profile-select{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:4px}
+.profile-select button{border-radius:12px;padding:10px 8px;font-weight:600;text-align:center;transition:.15s}
+.profile-select button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);box-shadow:0 6px 16px rgba(255,117,24,.35)}
+.advice-box{margin-top:14px;background:linear-gradient(160deg,var(--field),var(--panel));border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:4px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+.advice-big{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.advice-big span{color:var(--mute);font-size:.9rem}
+.advice-big b{font-size:1.9rem;font-weight:800;color:var(--accent)}
 </style>
 </head>
 <body>
 <main>
 <header class="topbar">
-  <div><h1>BET.PRONO</h1><p class="sub">Suivi de ma bankroll, pari après pari</p></div>
+  <div class="brand"><img src="/static/logo.png" alt="BET.PRONO" class="logo"><div><h1>BET.PRONO</h1><p class="sub">Suivi de ma bankroll, pari après pari</p></div></div>
   <div class="who"><span>Connecté : <b id="whoami">…</b></span><button id="logout" type="button">Déconnexion</button></div>
 </header>
-
-<div id="loading" class="loading" aria-live="polite"><div class="spinner" aria-hidden="true"></div></div>
 
 <nav class="nav" id="mainNav" hidden>
   <button type="button" data-view="home" aria-pressed="true">Accueil</button>
@@ -137,6 +141,21 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
       <img id="pickImagePreview" alt="Aperçu de l'image" hidden>
       <button class="primary" id="publishPickBtn" type="button">Publier le prono</button>
       <p class="sub" id="pickMsg"></p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>💡 Mise conseillée</h2>
+    <p class="sub">Choisis ton profil de jeu pour connaître ta mise idéale avant de suivre un prono.</p>
+    <div class="profile-select" id="profileSelect">
+      <button type="button" data-prof="fun">🎉 Fun</button>
+      <button type="button" data-prof="prudent" aria-pressed="true">🛡️ Prudent</button>
+      <button type="button" data-prof="confiance">🤝 Confiance</button>
+      <button type="button" data-prof="maxi">💪 Maxi</button>
+    </div>
+    <div class="advice-box" id="adviceBox">
+      <div class="advice-big"><span>Mise conseillée</span><b id="adviceAmount">–</b></div>
+      <p class="sub" id="adviceText">Sélectionne un profil pour voir l'analyse.</p>
     </div>
   </section>
 

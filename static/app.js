@@ -140,7 +140,6 @@ let IS_ADMIN=false;
     $('adminPanel').hidden=!IS_ADMIN;
     await loadBets();
     await loadPicks();
-    $('loading').hidden=true;
     $('mainNav').hidden=false;
     $('viewHome').classList.add('active');
     window.__ready=true;
@@ -283,10 +282,12 @@ $('picksList').addEventListener('click',async ev=>{
   const del=ev.target.dataset.delpick;
   try{
     if(follow){
-      const stake=+$('stake-'+follow).value;
-      if(!(stake>0)){alert('Indique une mise valide.');return}
+      const stakeEl=$('stake-'+follow);
       const sportEl=$('sport-'+follow);
-      const sport=sportEl?$('sport-'+follow).value:'Pronostic';
+      if(!stakeEl||!sportEl){alert('Ce prono a été mis à jour, recharge un instant.');return}
+      const stake=+stakeEl.value;
+      if(!(stake>0)){alert('Indique une mise valide.');return}
+      const sport=sportEl.value||'Pronostic';
       await api('/api/picks/'+follow+'/follow',{method:'POST',body:JSON.stringify({stake,sport})});
       await loadPicks();await loadBets();
     }else if(unfollow){
@@ -306,14 +307,16 @@ $('picksList').addEventListener('click',async ev=>{
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.1', date='2026-10-12';
+  const v='1.0.2', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
-  if(el) el.textContent = 'mise à jour le ' + date;
+  if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
 
 // Rafraîchit automatiquement les pronos publiés (partage entre comptes)
 setInterval(async()=>{
   if(!window.__ready) return;
+  // Ne pas écraser le DOM pendant qu'on saisit une mise dans "Suivre ce prono"
+  if(document.activeElement && document.activeElement.id && /^stake-|^sport-/.test(document.activeElement.id)) return;
   try{
     const r=await fetch('/api/picks',{credentials:'same-origin',headers:{'Content-Type':'application/json'}});
     if(r.status===401) return;
@@ -328,4 +331,40 @@ setInterval(async()=>{
 function data_normalize_picks(p){
   return p.map(x=>({...x}));
 }
+
+// ---------- Mise conseillée (accueil) ----------
+const PROFILES={
+  fun:{pct:1, emoji:'🎉', label:'Fun',
+    text:'Tu joues pour le plaisir, sans prise de tête. Une petite mise de '},
+  prudent:{pct:5, emoji:'🛡️', label:'Prudent',
+    text:'Une approche responsable qui protège ta bankroll sur la durée. Mise conseillée '},
+  confiance:{pct:7, emoji:'🤝', label:'Confiance',
+    text:'Tu suis ce prono avec une vraie conviction. Mise '},
+  maxi:{pct:10, emoji:'💪', label:'Maxi',
+    text:'Gros appétit, gros risque. Ne dépasse jamais ce montant, ta bankroll te remerciera. Mise '}
+};
+let currentProfile='prudent';
+function renderAdvice(){
+  const bk=(window.BK&&window.BK>0)?window.BK:INIT;
+  const prof=PROFILES[currentProfile];
+  const mise=Math.max(1,+(bk*prof.pct/100).toFixed(2));
+  const amt=document.getElementById('adviceAmount');
+  const txt=document.getElementById('adviceText');
+  if(amt) amt.textContent = eur(mise);
+  if(txt) txt.textContent = prof.text + eur(mise) + ' (soit ' + prof.pct + ' % de ta bankroll de ' + eur(bk) + ').';
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const sel=document.getElementById('profileSelect');
+  if(!sel) return;
+  sel.addEventListener('click',ev=>{
+    const k=ev.target.dataset&&ev.target.dataset.prof; if(!k||!PROFILES[k])return;
+    currentProfile=k;
+    [...sel.children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.prof===k));
+    renderAdvice();
+  });
+  // recalcule quand la bankroll change
+  if(window.BET_RENDER_HOOK){const old=window.BET_RENDER_HOOK;window.BET_RENDER_HOOK=()=>{old&&old();renderAdvice();};}
+});
+// mise à jour après chaque render de la bankroll
+setInterval(()=>{ if(window.__ready) renderAdvice(); }, 1000);
 
