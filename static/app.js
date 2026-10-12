@@ -55,8 +55,10 @@ function render(){
 }
 
 function renderPendingPicker(){
+  const sel=$('pendingPicker');
+  if(!sel) return;                    /* élément absent : rien à rendre */
   const pending=BETS.filter(b=>b.r==='pending');
-  const sel=$('pendingPicker'),prev=sel.value;
+  const prev=sel.value;
   sel.innerHTML='<option value="">— choisir —</option>'+pending.map(b=>`<option value="${b.id}">${b.d.slice(8)}/${b.d.slice(5,7)} · ${b.sp} · ${b.ty} · cote ${b.o}</option>`).join('');
   if(pending.some(b=>String(b.id)===prev))sel.value=prev;
 }
