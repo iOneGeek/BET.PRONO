@@ -76,15 +76,15 @@ def main():
 
     # ---- picks ----
     picks = fetch_all(
-        "SELECT id, author_id, title, legs, total_odds, result, image_path, created_at FROM picks"
+        "SELECT id, author_id, title, sport, legs, total_odds, result, image_path, created_at FROM picks"
     )
     with dst.cursor() as c:
         for p in picks:
             c.execute(
                 """INSERT INTO picks
-                   (id, author_id, title, legs, total_odds, result, image_path, created_at)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (p["id"], p["author_id"], p["title"], p["legs"], p["total_odds"],
+                   (id, author_id, title, sport, legs, total_odds, result, image_path, created_at)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (p["id"], p["author_id"], p["title"], p["sport"], p["legs"], p["total_odds"],
                  p["result"], p["image_path"], p["created_at"]),
             )
     print(f"picks : {len(picks)}")

@@ -1,5 +1,6 @@
 const $=id=>document.getElementById(id);
 const SP={F:'Foot',M:'Mixte',T:'Tennis',B:'MLB',N:'NFL',H:'NHL'},TY={C:'Combiné',S:'Simple',F:'Combiné FUN',4:'Combiné x4',5:'Combiné x5'};
+const SPORTS=['Foot','Mixte','Tennis','NBA','F1','MMA','MLB','NFL','NHL'];
 
 let BETS=[], INIT=100;
 
@@ -142,6 +143,7 @@ let IS_ADMIN=false;
     $('loading').hidden=true;
     $('mainNav').hidden=false;
     $('viewHome').classList.add('active');
+    window.__ready=true;
   }catch(e){ /* redirect already handled by api() on 401 */ }
 })();
 
@@ -212,6 +214,7 @@ function updatePickTotal(){
     try{
       const fd=new FormData();
       fd.append('title',$('pickTitle').value);
+      fd.append('sport',$('pickSport').value);
       fd.append('legs',JSON.stringify(legs));
       if(imageFile)fd.append('image',imageFile);
       const r=await fetch('/api/admin/picks',{method:'POST',credentials:'same-origin',body:fd});
@@ -247,7 +250,7 @@ function renderPicks(){
       footHtml=`<span class="followed-badge">✓ Suivi · mise ${eur(p.follow_stake)}</span>`;
       if(p.result==='pending') footHtml+=`<button type="button" data-unfollow="${p.id}">Ne plus suivre</button>`;
     }else if(p.result==='pending'){
-      footHtml=`<div class="follow-form"><input type="number" min="1" step="0.5" value="10" id="stake-${p.id}" aria-label="Mise"><button class="primary" type="button" data-follow="${p.id}">Suivre ce prono</button></div>`;
+      footHtml=`<div class="follow-form"><input type="number" min="1" step="0.5" value="10" id="stake-${p.id}" aria-label="Mise"><select id="sport-${p.id}" aria-label="Sport">${SPORTS.map(s=>`<option${s===p.sport?' selected':''}>${s}</option>`).join('')}</select><button class="primary" type="button" data-follow="${p.id}">Suivre ce prono</button></div>`;
     }else{
       footHtml='<span class="sub">Ce prono est clos.</span>';
     }
@@ -261,7 +264,7 @@ function renderPicks(){
     const oddsHtml=p.legs.length?`<div class="total-pill"><span>Cote totale</span><b>${fmtOddsP(p.total_odds)}</b></div>`:'';
     return `<div class="pick-card">
       <div class="pick-head">
-        <div><h3>${p.title}</h3><p class="sub">Par ${p.author}</p></div>
+        <div><h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3><p class="sub">Par ${p.author}</p></div>
         <span class="result-badge ${p.result}">${PICK_LB[p.result]}</span>
       </div>
       ${imageHtml}
@@ -282,7 +285,9 @@ $('picksList').addEventListener('click',async ev=>{
     if(follow){
       const stake=+$('stake-'+follow).value;
       if(!(stake>0)){alert('Indique une mise valide.');return}
-      await api('/api/picks/'+follow+'/follow',{method:'POST',body:JSON.stringify({stake})});
+      const sportEl=$('sport-'+follow);
+      const sport=sportEl?$('sport-'+follow).value:'Pronostic';
+      await api('/api/picks/'+follow+'/follow',{method:'POST',body:JSON.stringify({stake,sport})});
       await loadPicks();await loadBets();
     }else if(unfollow){
       if(!confirm('Retirer ce prono de ta bankroll ?'))return;
@@ -298,4 +303,29 @@ $('picksList').addEventListener('click',async ev=>{
     }
   }catch(e){alert(e.message)}
 });
+
+// Version de l'application (affichée dans le pied de page)
+(function(){
+  const v='1.0.1', date='2026-10-12';
+  const el=document.getElementById('appVersionDate');
+  if(el) el.textContent = 'mise à jour le ' + date;
+})();
+
+// Rafraîchit automatiquement les pronos publiés (partage entre comptes)
+setInterval(async()=>{
+  if(!window.__ready) return;
+  try{
+    const r=await fetch('/api/picks',{credentials:'same-origin',headers:{'Content-Type':'application/json'}});
+    if(r.status===401) return;
+    const d=await r.json();
+    if(d&&Array.isArray(d.picks)){
+      PICKS=data_normalize_picks(d.picks);
+      renderPicks();
+    }
+  }catch(e){/* silencieux */}
+}, 20000);
+
+function data_normalize_picks(p){
+  return p.map(x=>({...x}));
+}
 

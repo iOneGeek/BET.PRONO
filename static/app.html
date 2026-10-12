@@ -10,10 +10,10 @@
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
 <style>
-:root{--bg:#f1efec;--panel:#fff;--line:#ded8d2;--text:#353839;--mute:#6b6f70;--gain:#0a8f65;--loss:#d1415a;--field:#f6f4f1;--accent:#ff7518;--on-accent:#1c1100;
+:root{--bg:#f1efec;--panel:#fff;--line:#ded8d2;--text:#353839;--mute:#6b6f70;--gain:#0a8f65;--loss:#d1415a;--field:#f6f4f1;--accent:#ff7518;--on-accent:#1c1100;--shadow:0 1px 2px rgba(28,17,0,.06),0 6px 18px rgba(28,17,0,.06);--shadow-sm:0 1px 2px rgba(28,17,0,.05);--radius:14px;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#202223;--panel:#353839;--line:#484c4d;--text:#f3efe9;--mute:#aeb2b3;--gain:#19e6a0;--loss:#ff7a8a;--field:#2b2d2e}}
-:root[data-theme="dark"]{--bg:#202223;--panel:#353839;--line:#484c4d;--text:#f3efe9;--mute:#aeb2b3;--gain:#19e6a0;--loss:#ff7a8a;--field:#2b2d2e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#202223;--panel:#2c2e2f;--line:#484c4d;--text:#f3efe9;--mute:#aeb2b3;--gain:#19e6a0;--loss:#ff7a8a;--field:#262829;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 20px rgba(0,0,0,.35);--shadow-sm:0 1px 2px rgba(0,0,0,.3)}}
+:root[data-theme="dark"]{--bg:#202223;--panel:#2c2e2f;--line:#484c4d;--text:#f3efe9;--mute:#aeb2b3;--gain:#19e6a0;--loss:#ff7a8a;--field:#262829;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 20px rgba(0,0,0,.35);--shadow-sm:0 1px 2px rgba(0,0,0,.3)}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
@@ -34,15 +34,18 @@ input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visi
 .gl{stroke:rgba(255,255,255,.22)}.gl.z{stroke:rgba(255,255,255,.65)}
 .ln{stroke:#fff;stroke-width:3;fill:none;stroke-linejoin:round;stroke-linecap:round}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:2px;box-shadow:var(--shadow-sm);transition:transform .12s ease,box-shadow .12s ease}
+.card:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
 .card span{color:var(--mute);font-size:.85rem}.card b{font-size:1.45rem;font-weight:800}
 .g{color:var(--gain)}.l{color:var(--loss)}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
 h2{margin:0 0 12px;font-size:1.1rem}
 summary{cursor:pointer;font-weight:600}
 .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end;margin-top:12px}
-button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--field);color:var(--text);padding:8px 12px}
-.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--field);color:var(--text);padding:8px 12px;transition:background .12s ease,box-shadow .12s ease,transform .06s ease}
+button:active{transform:translateY(1px)}
+.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600;box-shadow:0 3px 10px rgba(255,117,24,.28)}
+.primary:hover:not(:disabled){filter:brightness(1.04)}
 .primary:disabled{opacity:.6;cursor:wait}
 .wrap{overflow-x:auto;max-height:520px;overflow-y:auto}
 table{border-collapse:collapse;width:100%;min-width:520px;font-size:.92rem}
@@ -52,7 +55,9 @@ th,td{padding:7px 6px;border-bottom:1px solid var(--line)}
 .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 textarea{width:100%;height:90px;margin-top:8px;font:12px monospace;background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:8px}
 footer{color:var(--mute);font-size:.82rem}
-.loading{color:var(--mute);text-align:center;padding:30px 0}
+.loading{color:var(--mute);text-align:center;padding:30px 0;display:flex;align-items:center;justify-content:center;gap:10px}
+.spinner{width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .nav{display:flex;gap:6px;background:var(--field);border-radius:10px;padding:4px}
 .nav button{flex:1;border:none;background:transparent;color:var(--mute);font-weight:600;padding:9px;border-radius:8px}
 .nav button[aria-pressed=true]{background:var(--accent);color:var(--on-accent)}
@@ -70,7 +75,8 @@ footer{color:var(--mute);font-size:.82rem}
 .checkrow{display:flex;align-items:center;gap:8px}
 .checkrow input{width:18px;height:18px;accent-color:var(--accent)}
 .admin-badge{display:inline-block;background:var(--accent);color:var(--on-accent);font-size:.72rem;font-weight:700;border-radius:999px;padding:2px 8px;margin-left:8px;vertical-align:middle}
-.pick-card{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel);display:grid;gap:10px}
+.pick-card{border:1px solid var(--line);border-radius:16px;padding:14px;background:var(--panel);display:grid;gap:10px;box-shadow:var(--shadow-sm);transition:box-shadow .15s ease}
+.pick-card:hover{box-shadow:var(--shadow)}
 .pick-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .pick-head h3{margin:0;font-size:1.05rem}
 .pick-head .sub{margin:0}
@@ -91,6 +97,7 @@ footer{color:var(--mute);font-size:.82rem}
 .follow-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .follow-form input{width:110px}
 .followed-badge{color:var(--accent);font-weight:700;font-size:.9rem}
+.sport-badge{display:inline-block;background:var(--accent);color:var(--on-accent);font-size:.68rem;font-weight:700;border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle}
 .admin-actions{display:flex;gap:6px;flex-wrap:wrap}
 .admin-actions button{font-size:.82rem;padding:6px 10px}
 .empty{color:var(--mute);text-align:center;padding:20px 0}
@@ -103,7 +110,7 @@ footer{color:var(--mute);font-size:.82rem}
   <div class="who"><span>Connecté : <b id="whoami">…</b></span><button id="logout" type="button">Déconnexion</button></div>
 </header>
 
-<div id="loading" class="loading">Chargement de vos données…</div>
+<div id="loading" class="loading"><div class="spinner" aria-hidden="true"></div><span>Chargement de vos données…</span></div>
 
 <nav class="nav" id="mainNav" hidden>
   <button type="button" data-view="home" aria-pressed="true">Accueil</button>
@@ -116,6 +123,7 @@ footer{color:var(--mute);font-size:.82rem}
     <p class="sub">Ce prono sera visible par tous les comptes, qui pourront le suivre et l'ajouter à leur bankroll.</p>
     <div class="share-form">
       <label>Titre du prono<input id="pickTitle" type="text" value="Combiné du jour"></label>
+      <label>Sport<select id="pickSport"><option>Foot</option><option>Mixte</option><option>Tennis</option><option>NBA</option><option>F1</option><option>MMA</option><option>MLB</option><option>NFL</option><option>NHL</option></select></label>
       <div id="pickBetsList"></div>
       <button id="addPickBet" type="button">+ Ajouter un pari</button>
       <div class="total-pill"><span>Cote totale</span><b id="pickTotalOdds">1,00</b></div>
@@ -127,8 +135,8 @@ footer{color:var(--mute);font-size:.82rem}
   </section>
 
   <section class="panel">
-    <h2>Pronostics</h2>
-    <p class="sub">Suis un prono pour l'ajouter automatiquement à ta bankroll avec ta propre mise.</p>
+    <h2>Paris partagés <span class="admin-badge">Live</span></h2>
+    <p class="sub">Choisis un sport, règle ta mise, et suis le prono pour l'ajouter à ta bankroll.</p>
     <div id="picksList" class="share-form"></div>
   </section>
 </div>
@@ -169,7 +177,8 @@ footer{color:var(--mute);font-size:.82rem}
 </section>
 </div>
 
-<footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).</footer>
+<footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
+<span style="opacity:.7">BET.PRONO V1.0.1 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <script src="/static/app.js"></script>
