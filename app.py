@@ -5,8 +5,10 @@ import sqlite3
 import secrets
 import sys
 import uuid
+import base64
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from io import BytesIO
 
 import jwt
 import requests
@@ -257,6 +259,8 @@ def init_pg_db():
         _run_ddl(conn, "ALTER TABLE picks ADD COLUMN IF NOT EXISTS advice_profile TEXT DEFAULT 'prudent'")
         _run_ddl(conn, "UPDATE picks SET advice_profile = 'prudent' WHERE advice_profile IS NULL")
         _run_ddl(conn, "ALTER TABLE picks ADD COLUMN IF NOT EXISTS link_url TEXT")
+        _run_ddl(conn, "ALTER TABLE picks ADD COLUMN IF NOT EXISTS image_data BYTEA")
+        _run_ddl(conn, "ALTER TABLE picks ADD COLUMN IF NOT EXISTS image_mime TEXT")
         _run_ddl(conn, "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT")
     finally:
         POOL.putconn(conn)
@@ -326,6 +330,10 @@ def init_sqlite_db():
         db.execute("UPDATE picks SET advice_profile = 'prudent' WHERE advice_profile IS NULL")
     if "link_url" not in pick_cols:
         db.execute("ALTER TABLE picks ADD COLUMN link_url TEXT")
+    if "image_data" not in pick_cols:
+        db.execute("ALTER TABLE picks ADD COLUMN image_data BLOB")
+    if "image_mime" not in pick_cols:
+        db.execute("ALTER TABLE picks ADD COLUMN image_mime TEXT")
     db.commit()
     db.close()
 
@@ -866,6 +874,8 @@ def clean_pick_link(raw):
 
 def serialize_pick(row, follow=None):
     image_path = row["image_path"] if "image_path" in row.keys() else None
+    image_data = row["image_data"] if ("image_data" in row.keys() and row["image_data"]) else None
+    image_mime = row["image_mime"] if ("image_mime" in row.keys() and row["image_mime"]) else None
     sport = row["sport"] if ("sport" in row.keys() and row["sport"]) else "Pronostic"
     advice_profile = row["advice_profile"] if ("advice_profile" in row.keys() and row["advice_profile"]) else "prudent"
     link_url = (row["link_url"] or None) if "link_url" in row.keys() else None
@@ -874,6 +884,12 @@ def serialize_pick(row, follow=None):
         legs_parsed = json.loads(legs) if legs else []
     except (TypeError, ValueError):
         legs_parsed = []
+    image_url = None
+    if image_data:
+        b = image_data if isinstance(image_data, (bytes, bytearray)) else bytes(image_data)
+        image_url = f"data:{image_mime or 'image/jpeg'};base64,{base64.b64encode(b).decode('ascii')}"
+    elif image_path:
+        image_url = f"/uploads/{image_path}"
     return {
         "id": row["id"],
         "title": row["title"],
@@ -887,25 +903,64 @@ def serialize_pick(row, follow=None):
         "author": row["username"],
         "followed": bool(follow),
         "follow_stake": follow["stake"] if follow else None,
-        "image_url": f"/uploads/{image_path}" if image_path else None,
+        "image_url": image_url,
     }
+
+
+MAX_IMG_W, MAX_IMG_H = 1000, 700
 
 
 def save_pick_image(file_storage):
     if not file_storage or not file_storage.filename:
-        return None, None
+        return None, None, None
     ext = file_storage.filename.rsplit(".", 1)[-1].lower() if "." in file_storage.filename else ""
     if ext not in ALLOWED_IMAGE_EXT:
-        return None, "Format d'image invalide (png, jpg, jpeg, webp, gif)."
+        return None, None, "Format d'image invalide (png, jpg, jpeg, webp, gif)."
     file_storage.seek(0, os.SEEK_END)
     size = file_storage.tell()
     file_storage.seek(0)
     if size > MAX_IMAGE_BYTES:
-        return None, "Image trop lourde (5 Mo maximum)."
-    filename = secure_filename(f"{uuid.uuid4().hex}.{ext}")
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    file_storage.save(os.path.join(UPLOAD_DIR, filename))
-    return filename, None
+        return None, None, "Image trop lourde (3 Mo maximum)."
+    data = file_storage.read()
+    # Compression / redimensionnement (largeur <= 1000px, hauteur <= 700px)
+    try:
+        from PIL import Image, ImageOps
+        im = Image.open(BytesIO(data))
+        im = ImageOps.exif_transpose(im)
+        im.thumbnail((MAX_IMG_W, MAX_IMG_H), Image.LANCZOS)
+        if im.mode in ("RGBA", "LA", "P", "CMYK"):
+            bg = Image.new("RGB", im.size, (18, 20, 26))
+            if im.mode == "RGBA":
+                bg.paste(im, mask=im.split()[3])
+            else:
+                bg.paste(im.convert("RGB"))
+            im = bg
+        else:
+            im = im.convert("RGB")
+        buf = BytesIO()
+        im.save(buf, "JPEG", quality=82, optimize=True)
+        out = buf.getvalue()
+        if len(out) >= len(data) and ext in ("jpg", "jpeg", "gif"):
+            out = data
+            mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}.get(ext, "application/octet-stream")
+            final = ext
+        else:
+            mime = "image/jpeg"
+            final = "jpg"
+    except Exception:
+        # Image corrompue ou non decodable -> on garde les octets bruts.
+        out = data
+        mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}.get(ext, "application/octet-stream")
+        final = ext
+    # Sauvegarde sur disque en secours (compat), mais la source de vérité est la base.
+    filename = secure_filename(f"{uuid.uuid4().hex}.{final}")
+    try:
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        with open(os.path.join(UPLOAD_DIR, filename), "wb") as f:
+            f.write(out)
+    except OSError:
+        filename = None
+    return out, filename, mime
 
 
 @app.get("/api/picks")
@@ -966,16 +1021,16 @@ def create_pick():
     else:
         return jsonify({"error": "Ajoute au moins un pari ou une image."}), 400
 
-    image_path, img_err = save_pick_image(image_file) if is_multipart else (None, None)
-    if img_err:
-        return jsonify({"error": img_err}), 400
+    image_data, image_path, image_mime = save_pick_image(image_file) if is_multipart else (None, None, None)
+    if image_mime and not str(image_mime).startswith("image/"):
+        return jsonify({"error": image_mime}), 400
 
     db = get_db()
     now = datetime.now(timezone.utc).isoformat()
     cur = db.execute(
-        "INSERT INTO picks (author_id, title, sport, legs, total_odds, result, image_path, created_at, advice_profile, link_url) "
-        "VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)",
-        (g.user["id"], title, sport, json.dumps(legs_data["legs"]), legs_data["total_odds"], image_path, now, advice_profile, link_url),
+        "INSERT INTO picks (author_id, title, sport, legs, total_odds, result, image_path, image_data, image_mime, created_at, advice_profile, link_url) "
+        "VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)",
+        (g.user["id"], title, sport, json.dumps(legs_data["legs"]), legs_data["total_odds"], image_path, image_data, image_mime, now, advice_profile, link_url),
     )
     db.commit()
     row = db.execute(
