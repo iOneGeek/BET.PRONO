@@ -397,6 +397,14 @@ def admin_required(fn):
 
 # ---------- Static pages (PWA shell) ----------
 
+@app.errorhandler(500)
+def _err500(e):
+    import traceback
+    traceback.print_exc()
+    msg = getattr(e, "original_exception", e)
+    return jsonify({"error": f"Erreur serveur: {msg}"}), 500
+
+
 @app.get("/")
 def root():
     return send_from_directory(STATIC_DIR, "login.html")
@@ -1027,10 +1035,19 @@ def create_pick():
 
     db = get_db()
     now = datetime.now(timezone.utc).isoformat()
+    # psycopg3 : BYTEA exige un objet Binary quand le protocol est en mode texte,
+    # sinon il ne sait pas encoder un bytes nu -> 500. On l'enveloppe si PG.
+    ins_image = image_data
+    if ins_image is not None and db.backend == "pg":
+        try:
+            import psycopg
+            ins_image = psycopg.Binary(image_data)
+        except Exception:
+            ins_image = image_data
     cur = db.execute(
         "INSERT INTO picks (author_id, title, sport, legs, total_odds, result, image_path, image_data, image_mime, created_at, advice_profile, link_url) "
         "VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)",
-        (g.user["id"], title, sport, json.dumps(legs_data["legs"]), legs_data["total_odds"], image_path, image_data, image_mime, now, advice_profile, link_url),
+        (g.user["id"], title, sport, json.dumps(legs_data["legs"]), legs_data["total_odds"], image_path, ins_image, image_mime, now, advice_profile, link_url),
     )
     db.commit()
     row = db.execute(
