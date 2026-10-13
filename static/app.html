@@ -297,7 +297,13 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
     <h2>Publier un prono <span class="admin-badge">Admin</span></h2>
     <p class="sub">Ce prono sera visible par tous les comptes, qui pourront le suivre et l'ajouter à leur bankroll.</p>
     <div class="share-form">
-      <label>Titre du prono<input id="pickTitle" type="text" value="Combiné du jour"></label>
+      <label>Titre du prono<select id="pickTitle">
+        <option value="Combiné">Combiné</option>
+        <option value="Combiné Fun">Combiné Fun</option>
+        <option value="Simple">Simple</option>
+        <option value="Combiné x 4">Combiné x 4</option>
+        <option value="Combiné x 5">Combiné x 5</option>
+      </select></label>
       <label>Sport<select id="pickSport"><option value="Foot">⚽ Foot</option><option value="Mixte">🎯 Mixte</option><option value="Tennis">🎾 Tennis</option><option value="NBA">🏀 NBA</option><option value="F1">🏎️ F1</option><option value="MMA">🥊 MMA</option><option value="MLB">⚾ MLB</option><option value="NFL">🏈 NFL</option><option value="NHL">🏒 NHL</option></select></label>
       <div id="pickBetsList"></div>
       <button id="addPickBet" type="button">+ Ajouter un pari</button>
@@ -402,7 +408,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.4.5 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.4.6 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -425,6 +431,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.4.5"></script>
+<script src="/static/app.js?v=1.4.6"></script>
 </body>
 </html>
