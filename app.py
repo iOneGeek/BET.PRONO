@@ -170,15 +170,18 @@ def get_db():
                 real = POOL.getconn()
             except Exception:
                 # Connexions du pool devenues obsolètes (redémarrage/pause Neon) :
-                # on rebranche le pool et on retente une fois pour reconnecter vite.
-                try:
-                    POOL.close()
-                except Exception:
-                    pass
-                try:
-                    POOL.open()
-                except Exception:
-                    pass
+                # on purge les connexions mortes SANS fermer le pool global,
+                # puis on retente une fois.
+                if POOL.closed:
+                    try:
+                        POOL.open()
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        POOL.check()
+                    except Exception:
+                        pass
                 real = POOL.getconn()
             g._pg_conn = real
             g.db = Conn("pg", real)
