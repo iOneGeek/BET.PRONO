@@ -232,6 +232,7 @@ if('serviceWorker' in navigator){
 const MAX_PICK_BETS=6;
 let pickBets=[{home:'',away:'',pick:'',odds:'',score:''}];
 let PICKS=[];
+const openWonSet=new Set(); // ids des pronos gagnés dépliés manuellement
 
 function parseOddsP(str){const n=parseFloat(String(str).replace(',','.').trim());return isNaN(n)?0:n}
 function fmtOddsP(n){return n.toFixed(2).replace('.',',')}
@@ -389,6 +390,7 @@ function renderPicks(){
       <button type="button" data-settle="${p.id}" data-result="won">Gagné</button>
       <button type="button" data-settle="${p.id}" data-result="lost">Perdu</button>
       <button type="button" data-settle="${p.id}" data-result="void">Remboursé</button>
+      <button type="button" data-setscore="${p.id}">Modifier score</button>
     </div>`:'';
     const imageHtml=p.image_url?`<img class="pick-image" src="${p.image_url}" alt="Image du prono">`:'';
     const stakeForGain=p.followed?p.follow_stake:advisedStake;
@@ -403,8 +405,9 @@ function renderPicks(){
       <div class="pick-advice-eur">soit <b>${eur(advisedStake)}</b> selon ta bankroll</div>
     </div>`;
     const collapsedClass=p.result==='won'?' won-collapsed':'';
+    const openClass=collapsedClass&&openWonSet.has(p.id)?' open':'';
     const delBtn=IS_ADMIN?`<button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Supprimer ce prono" title="Supprimer ce prono">✕</button>`:'';
-    return `<div class="pick-card${collapsedClass}" ${p.result==='won'?'data-toggle="1"':''}>
+    return `<div class="pick-card${collapsedClass}${openClass}" data-tpid="${p.id}" ${p.result==='won'?'data-toggle="1"':''}>
       <div class="pick-head">
         <div><h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3><p class="sub">Par ${p.author}</p></div>
         <div class="pick-head-right">${delBtn}<span class="ticket-status ${p.result}"><i>${stIcon}</i>${stLabel}</span></div>
@@ -426,6 +429,7 @@ $('picksList').addEventListener('click',async ev=>{
   const follow=ev.target.dataset.follow;
   const unfollow=ev.target.dataset.unfollow;
   const settle=ev.target.dataset.settle;
+  const setscore=ev.target.dataset.setscore;
   const del=ev.target.dataset.delpick;
   const toggleEl=ev.target.closest('.won-collapsed');
   try{
@@ -435,6 +439,8 @@ $('picksList').addEventListener('click',async ev=>{
       await loadPicks();
     }else if(toggleEl){
       toggleEl.classList.toggle('open');
+      const id=+toggleEl.dataset.tpid;
+      if(toggleEl.classList.contains('open')) openWonSet.add(id); else openWonSet.delete(id);
     }else if(follow){
       const stakeEl=$('stake-'+follow);
       const sportEl=$('sport-'+follow);
@@ -451,26 +457,35 @@ $('picksList').addEventListener('click',async ev=>{
     }else if(settle){
       const result=ev.target.dataset.result;
       const pick=PICKS.find(p=>p.id==settle);
-      let scores=null;
-      if((result==='won'||result==='lost')&&pick&&pick.legs&&pick.legs.length){
-        const inputs=[];
-        for(let i=0;i<pick.legs.length;i++){
-          const prev=pick.legs[i].score||'';
-          const v=prompt(`Score final du match ${i+1} (${pick.legs[i].match||''}) — laisse vide si aucun :`,prev);
-          if(v===null){return}
-          inputs.push(v.trim());
-        }
-        scores=inputs;
-      }
+      const scores=(result==='won'||result==='lost')?promptScores(pick):null;
+      if(scores===undefined){return}
       await api('/api/admin/picks/'+settle,{method:'PATCH',body:JSON.stringify({result,scores})});
       await loadPicks();await loadBets();
+    }else if(setscore){
+      const pick=PICKS.find(p=>p.id==setscore);
+      const scores=promptScores(pick);
+      if(scores===undefined){return}
+      await api('/api/admin/picks/'+setscore,{method:'PATCH',body:JSON.stringify({scores})});
+      await loadPicks();
     }
   }catch(e){alert(e.message)}
 });
 
+function promptScores(pick){
+  if(!pick||!pick.legs||!pick.legs.length)return [];
+  const inputs=[];
+  for(let i=0;i<pick.legs.length;i++){
+    const prev=pick.legs[i].score||'';
+    const v=prompt(`Score final du match ${i+1} (${pick.legs[i].match||''}) — laisse vide si aucun :`,prev);
+    if(v===null){return undefined}
+    inputs.push(v.trim());
+  }
+  return inputs;
+}
+
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.17', date='2026-10-12';
+  const v='1.0.18', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
