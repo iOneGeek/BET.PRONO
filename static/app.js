@@ -153,18 +153,22 @@ const bkCanvas=document.getElementById('canvas');
 let bkctx=null,bkConfetti=[],bkSequins=[];
 if(bkCanvas){bkctx=bkCanvas.getContext('2d');bkCanvas.width=window.innerWidth;bkCanvas.height=window.innerHeight;}
 const bkColors=[{front:'#7b5cff',back:'#6245e0'},{front:'#b3c7ff',back:'#8fa5e5'},{front:'#5c86ff',back:'#345dd1'},{front:'#ff6e48',back:'#d35400'}];
+const orangeColors=[{front:'#ff8a3c',back:'#e06700'},{front:'#ffb84d',back:'#e6932f'},{front:'#ff6e48',back:'#d35400'},{front:'#ffd08a',back:'#e6a94d'}];
+let bkActiveColors=null;
 const bkRR=(a,b)=>Math.random()*(b-a)+a;
 const bkBtnRect=()=>bkCanvas&&bkCanvas.getBoundingClientRect?bkCanvas.getBoundingClientRect():{width:innerWidth,height:innerHeight};
-function initBurst(){
+function setConfettiColors(colors){bkActiveColors=colors||null;}
+function initBurst(btnEl,colors){
+  setConfettiColors(colors);
   if(!bkctx)return;
-  const b=$('button')||{offsetWidth:190,offsetHeight:40};
+  const b=btnEl||$('button')||{offsetWidth:190,offsetHeight:40};
   const bw=b.offsetWidth||190,bh=b.offsetHeight||40;
   const midX=innerWidth/2, midY=innerHeight/2;
   for(let i=0;i<20;i++){bkConfetti.push(new BkConfetto(midX,midY,bw,bh));}
   if(bkctx)bkRender();
 }
 function BkConfetto(baseX,baseY,bw,bh){
-  this.mod=bkRR(0,99); this.color=bkColors[Math.floor(bkRR(0,bkColors.length))];
+  this.mod=bkRR(0,99); this.color=(bkActiveColors||bkColors)[Math.floor(bkRR(0,(bkActiveColors||bkColors).length))];
   this.dim={x:bkRR(5,9),y:bkRR(8,15)};
   this.pos={x:bkRR(baseX-bw/4,baseX+bw/4),y:bkRR(baseY+bh/2+8,baseY+1.5*bh-8)};
   this.rot=bkRR(0,2*Math.PI); this.scale={x:1,y:1};
@@ -393,6 +397,9 @@ function updatePickTotal(){
       if(sel) [...sel.children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.prof==='prudent'));
       renderAdvice();
       msg.textContent='Prono publié !';
+      const pubBtn=$('publishPickBtn');
+      if(pubBtn){pubBtn.classList.add('pub-ok');setTimeout(()=>pubBtn.classList.remove('pub-ok'),1200);}
+      initBurst($('publishPickBtn'),orangeColors);
       await loadPicks();
     }catch(e){msg.textContent=e.message}
   });
@@ -576,7 +583,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.1.4', date='2026-10-13';
+  const v='1.1.5', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

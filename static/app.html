@@ -58,6 +58,8 @@ button:active{transform:translateY(1px)}
 .primary{background:linear-gradient(180deg,#ff8f3c,#ff7518);border-color:var(--accent);color:var(--on-accent);font-weight:600;box-shadow:0 4px 14px rgba(255,117,24,.35)}
 .primary:hover:not(:disabled){filter:brightness(1.05);box-shadow:0 6px 18px rgba(255,117,24,.45);transform:translateY(-1px)}
 .primary:disabled{opacity:.6;cursor:wait}
+.primary.pub-ok{animation:pubOk .5s ease}
+@keyframes pubOk{0%{transform:scale(1)}40%{transform:scale(1.06);box-shadow:0 0 0 4px rgba(255,117,24,.25)}100%{transform:scale(1)}}
 .wrap{overflow-x:auto;max-height:520px;overflow-y:auto}
 table{border-collapse:collapse;width:100%;min-width:520px;font-size:.92rem}
 th{text-align:left;color:var(--mute);font-weight:400;font-size:.82rem;position:sticky;top:0;background:var(--panel)}
@@ -335,7 +337,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
       <span id="saveInitFeedback" class="save-check" hidden>✔</span>
     </div>
   </div>
-  <canvas id="canvas"></canvas>
   <div class="row"><button id="ex" type="button">Exporter mes données</button><button id="im" type="button">Importer</button><button id="rs" type="button">Effacer tous mes paris</button></div>
   <p class="sub" id="msg"></p><textarea id="out" hidden aria-label="Données"></textarea>
 </section>
@@ -357,7 +358,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.1.4 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.1.5 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -379,6 +380,7 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
   });
 })();
 </script>
-<script src="/static/app.js?v=1.1.4"></script>
+<canvas id="canvas"></canvas>
+<script src="/static/app.js?v=1.1.5"></script>
 </body>
 </html>
