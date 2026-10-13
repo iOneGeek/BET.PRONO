@@ -495,10 +495,10 @@ function renderPicks(){
       <div class="pick-advice-tag"><span>${prof.emoji} Mise conseillée : <b>${prof.label} (${prof.pct} %)</b></span></div>
       <div class="pick-advice-eur">soit <b>${eur(advisedStake)}</b> selon ta bankroll</div>
     </div>`;
-    const collapsedClass=p.result==='won'?' won-collapsed':'';
+    const collapsible=p.result==='won'||p.result==='lost'||p.result==='void';
+    const collapsedClass=collapsible?' won-collapsed':'';
     const openClass=collapsedClass&&openWonSet.has(p.id)?' open':'';
-    const delBtn=IS_ADMIN?`<button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Retirer ce prono de l'historique" title="Retirer">✕</button>`:'';
-    return `<div class="pick-card${collapsedClass}${openClass}" data-tpid="${p.id}" ${p.result==='won'?'data-toggle="1"':''}>
+    return `<div class="pick-card${collapsedClass}${openClass}" data-tpid="${p.id}" ${collapsible?'data-toggle="1"':''}>
       <div class="pick-head">
         <div>
           <h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3>
@@ -611,7 +611,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.3.6', date='2026-10-13';
+  const v='1.3.7', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

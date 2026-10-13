@@ -162,8 +162,10 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 .pick-details .chev{font-size:.9rem;transform:rotate(0deg);transition:transform .3s ease;display:inline-block;font-weight:800}
 .pick-card.open .pick-details,.pick-details:hover{color:var(--text);border-color:var(--accent);background:rgba(255,117,24,.08)}
 .pick-card.open .pick-details .chev{transform:rotate(90deg)}
-/* Les pronos gagnés se replient en un bandeau compact ; clic pour déplier de nouveau */
+/* Les pronos réglés (gagné/perdu/remboursé) se replient en un bandeau compact ; clic sur le bandeau pour déplier de nouveau */
 .pick-card.won-collapsed{cursor:pointer;border-color:rgba(25,230,160,.35)}
+#picksHistory .pick-card.won-collapsed.lost{border-color:rgba(255,82,82,.55)}
+#picksHistory .pick-card.won-collapsed.void{border-color:rgba(128,140,155,.5)}
 .pick-card.won-collapsed .pick-body{display:none}
 .pick-card.won-collapsed.open .pick-body{display:grid;animation:histIn .3s ease}
 .pick-card.won-collapsed .pick-head{padding-bottom:2px}
@@ -398,7 +400,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.3.6 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.3.7 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -421,6 +423,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.3.6"></script>
+<script src="/static/app.js?v=1.3.7"></script>
 </body>
 </html>
