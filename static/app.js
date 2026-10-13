@@ -508,12 +508,22 @@ function renderPicks(){
   });
   const openCards=[];const closedCards=[];
   PICKS.forEach((p,i)=>{
-    (p.result==='pending'?openCards:closedCards).push(cards[i]);
+    (p.result==='pending'?openCards:closedCards).push({card:cards[i],p});
   });
-  const openHtml=openCards.join('')||'<p class="empty">Aucun prono en cours. Quand un prono est publié, il apparaît ici.</p>';
-  const closedHtml=closedCards.map((h,i)=>h.replace(' class="pick-card',' data-idx="'+i+'" class="pick-card')).join('')||'<p class="empty">Aucun prono réglé pour l\'instant (gagné / perdu / remboursé).</p>';
+  closedCards.sort((a,b)=>(b.p.created_at||'').localeCompare(a.p.created_at||''));
+  const openHtml=openCards.map(c=>c.card).join('')||'<p class="empty">Aucun prono en cours. Quand un prono est publié, il apparaît ici.</p>';
+  const closedHtml=closedCards.map((c,i)=>c.card.replace(' class="pick-card',' data-idx="'+i+'" class="pick-card')).join('')||'<p class="empty">Aucun prono réglé pour l\'instant (gagné / perdu / remboursé).</p>';
   el.innerHTML=openHtml;
-  if(hist){hist.innerHTML=closedHtml;const c=hist.querySelectorAll('.pick-card');Array.prototype.forEach.call(c,function(card){card.style.animationDelay=(+card.dataset.idx*0.06)+'s';});}
+  if(hist){
+    const hTitle=document.querySelector('.hist-title');
+    if(hTitle&&closedCards.length)hTitle.textContent=`Historique des paris partagés · ${closedCards.length}`;
+    else if(hTitle)hTitle.textContent='Historique des paris partagés';
+    if(hist.__lastHtml!==closedHtml){
+      hist.__lastHtml=closedHtml;
+      hist.innerHTML=closedHtml;
+      const c=hist.querySelectorAll('.pick-card');Array.prototype.forEach.call(c,function(card){card.style.animationDelay=(+card.dataset.idx*0.06)+'s';});
+    }
+  }
 }
 
 async function handlePicksClick(ev){
@@ -579,7 +589,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.2.8', date='2026-10-13';
+  const v='1.2.9', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
