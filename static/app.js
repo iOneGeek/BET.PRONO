@@ -437,23 +437,6 @@ $('picksList').addEventListener('click',async ev=>{
       if(!confirm('Supprimer ce prono publié ?'))return;
       await api('/api/admin/picks/'+del,{method:'DELETE'});
       await loadPicks();
-    }else if(toggleEl){
-      toggleEl.classList.toggle('open');
-      const id=+toggleEl.dataset.tpid;
-      if(toggleEl.classList.contains('open')) openWonSet.add(id); else openWonSet.delete(id);
-    }else if(follow){
-      const stakeEl=$('stake-'+follow);
-      const sportEl=$('sport-'+follow);
-      if(!stakeEl||!sportEl){alert('Ce prono a été mis à jour, recharge un instant.');return}
-      const stake=+stakeEl.value;
-      if(!(stake>0)){alert('Indique une mise valide.');return}
-      const sport=sportEl.value||'Pronostic';
-      await api('/api/picks/'+follow+'/follow',{method:'POST',body:JSON.stringify({stake,sport})});
-      await loadPicks();await loadBets();
-    }else if(unfollow){
-      if(!confirm('Annuler ce pari ? Sa mise sera retirée de ta bankroll.'))return;
-      await api('/api/picks/'+unfollow+'/follow',{method:'DELETE'});
-      await loadPicks();await loadBets();
     }else if(settle){
       const result=ev.target.dataset.result;
       const pick=PICKS.find(p=>p.id==settle);
@@ -467,6 +450,23 @@ $('picksList').addEventListener('click',async ev=>{
       if(scores===undefined){return}
       await api('/api/admin/picks/'+setscore,{method:'PATCH',body:JSON.stringify({scores})});
       await loadPicks();
+    }else if(follow){
+      const stakeEl=$('stake-'+follow);
+      const sportEl=$('sport-'+follow);
+      if(!stakeEl||!sportEl){alert('Ce prono a été mis à jour, recharge un instant.');return}
+      const stake=+stakeEl.value;
+      if(!(stake>0)){alert('Indique une mise valide.');return}
+      const sport=sportEl.value||'Pronostic';
+      await api('/api/picks/'+follow+'/follow',{method:'POST',body:JSON.stringify({stake,sport})});
+      await loadPicks();await loadBets();
+    }else if(unfollow){
+      if(!confirm('Annuler ce pari ? Sa mise sera retirée de ta bankroll.'))return;
+      await api('/api/picks/'+unfollow+'/follow',{method:'DELETE'});
+      await loadPicks();await loadBets();
+    }else if(toggleEl){
+      toggleEl.classList.toggle('open');
+      const id=+toggleEl.dataset.tpid;
+      if(toggleEl.classList.contains('open')) openWonSet.add(id); else openWonSet.delete(id);
     }
   }catch(e){alert(e.message)}
 });
@@ -485,7 +485,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.18', date='2026-10-12';
+  const v='1.0.19', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
