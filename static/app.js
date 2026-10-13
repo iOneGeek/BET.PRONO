@@ -447,7 +447,7 @@ function bookmakerLink(url){
 }
 function bookmakerIcon(url){
   try{const h=new URL(url).hostname.replace(/^www\./,'').toLowerCase();
-    if(h.includes('winamax'))return'<img class="pick-link-logo" src="/static/logo_winamax.png" alt="Winamax">';
+    if(h.includes('winamax'))return'<img class="pick-link-logo" src="/static/logo_winamax.svg" alt="Winamax">';
     return'';
   }catch(e){return''}
 }
@@ -646,7 +646,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.4.3', date='2026-10-13';
+  const v='1.4.4', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
