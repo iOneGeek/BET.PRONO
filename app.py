@@ -924,12 +924,9 @@ def save_pick_image(file_storage):
     ext = file_storage.filename.rsplit(".", 1)[-1].lower() if "." in file_storage.filename else ""
     if ext not in ALLOWED_IMAGE_EXT:
         return None, None, "Format d'image invalide (png, jpg, jpeg, webp, gif)."
-    file_storage.seek(0, os.SEEK_END)
-    size = file_storage.tell()
-    file_storage.seek(0)
-    if size > MAX_IMAGE_BYTES:
-        return None, None, "Image trop lourde (3 Mo maximum)."
     data = file_storage.read()
+    if len(data) > MAX_IMAGE_BYTES:
+        return None, None, "Image trop lourde."
     # Compression / redimensionnement (largeur <= 1000px, hauteur <= 700px)
     try:
         from PIL import Image, ImageOps
