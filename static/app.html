@@ -121,22 +121,49 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .info-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--field);color:var(--mute);font-size:.78rem;font-weight:800;line-height:1;cursor:pointer;vertical-align:middle;margin-left:8px}
 .info-btn:hover{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .panel h2 .info-btn{vertical-align:sub}
-.pick-card{border:1px solid var(--line);border-radius:18px;padding:16px;background:var(--panel);display:grid;gap:11px;box-shadow:var(--shadow-sm);transition:box-shadow .18s ease,transform .15s ease;position:relative;max-width:560px;width:100%;margin:0 auto}
-.pick-card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;border-radius:18px 18px 0 0;background:linear-gradient(90deg,var(--accent),rgba(255,117,24,0))}
+/* Barre verticale orange avant les titres de section */
+h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background:var(--accent);margin-right:9px;vertical-align:-4px}
+.hist-title{display:flex;align-items:center;gap:8px;margin:14px 0 10px;font-size:1.05rem}
+.hist-title .bar{vertical-align:-4px}
+.hist-sep{height:1px;background:var(--line);opacity:.35;margin:18px 0 4px}
+.hist-count{background:var(--field);border:1px solid var(--line);color:var(--mute);font-size:.75rem;font-weight:700;border-radius:999px;padding:2px 10px;line-height:1.4}
+/* État vide des pronos */
+.pick-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:34px 18px;border:1.5px dashed var(--line);border-radius:16px;opacity:.85;text-align:center}
+.pick-empty .pe-icon{font-size:1.7rem;display:flex;align-items:center;gap:2px;color:var(--mute)}
+.pick-empty .pe-icon small{font-size:.95rem;color:var(--accent)}
+.pick-empty b{color:var(--text);font-weight:700}
+.pick-empty p{margin:0;color:var(--mute);font-size:.85rem}
+.pick-card{border:1px solid var(--line);border-radius:18px;padding:16px 16px 16px 20px;background:var(--panel);display:grid;gap:11px;box-shadow:var(--shadow-sm);transition:box-shadow .18s ease,transform .15s ease;position:relative;max-width:560px;width:100%;margin:0 auto;overflow:hidden}
+.pick-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--accent),rgba(255,117,24,.55))}
+.pick-card::after{content:"";position:absolute;inset:0 0 auto 0;height:3px;border-radius:18px 18px 0 0;background:linear-gradient(90deg,var(--accent),rgba(255,117,24,0))}
 .pick-card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
-.pick-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-.pick-head h3{margin:0;font-size:1.05rem}
+.title-accent{display:inline-block;width:5px;height:20px;border-radius:99px;background:var(--accent);margin-right:8px;vertical-align:middle}
+.pick-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.pick-head h3{margin:0;font-size:1.05rem;display:flex;align-items:center;flex-wrap:wrap}
 .pick-head .sub{margin:0}
-.pick-head-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.pick-head-right{display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
 .pick-card .pick-body{display:grid;gap:11px}
-.pick-del{border:1px solid var(--line);background:var(--field);color:var(--mute);border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:.85rem;line-height:1;cursor:pointer;transition:.15s;flex-shrink:0}
-.pick-del:hover{background:var(--loss);border-color:var(--loss);color:#fff}
+.pick-del{border:1px solid var(--line);background:var(--field);color:var(--mute);border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:.85rem;line-height:1;cursor:pointer;transition:.15s;flex-shrink:0;opacity:.85}
+.pick-del:hover{background:var(--loss);border-color:var(--loss);color:#fff;opacity:1}
+/* Badge de résultat (pouce) */
+.ticket-status{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:700;border-radius:999px;padding:4px 11px;border:1px solid transparent;white-space:nowrap}
+.ticket-status i{font-style:normal;font-size:.95rem;line-height:1}
+.ticket-status.won{color:var(--gain);background:rgba(25,230,160,.13);border-color:rgba(25,230,160,.4)}
+.ticket-status.lost{color:var(--loss);background:rgba(255,122,138,.13);border-color:rgba(255,122,138,.4)}
+.ticket-status.void{color:var(--mute);background:rgba(128,140,155,.13);border-color:rgba(128,140,155,.35)}
+.ticket-status.pending{color:var(--mute);background:rgba(128,140,155,.1);border-color:rgba(128,140,155,.3)}
+.head-sep{width:1px;height:18px;background:var(--line);opacity:.7;flex-shrink:0}
+/* Bouton Voir les détails (animé) */
+.pick-details{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;color:var(--mute);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;transition:color .2s ease,border-color .2s ease,background .2s ease;flex-shrink:0}
+.pick-details .chev{font-size:.9rem;transform:rotate(0deg);transition:transform .3s ease;display:inline-block;font-weight:800}
+.pick-card.open .pick-details,.pick-details:hover{color:var(--text);border-color:var(--accent);background:rgba(255,117,24,.08)}
+.pick-card.open .pick-details .chev{transform:rotate(90deg)}
 /* Les pronos gagnés se replient en un bandeau compact ; clic pour déplier de nouveau */
 .pick-card.won-collapsed{cursor:pointer;border-color:rgba(25,230,160,.35)}
 .pick-card.won-collapsed .pick-body{display:none}
-.pick-card.won-collapsed.open .pick-body{display:grid}
+.pick-card.won-collapsed.open .pick-body{display:grid;animation:histIn .3s ease}
 .pick-card.won-collapsed .pick-head{padding-bottom:2px}
-.pick-card.won-collapsed:not(.open) .ticket-status::after{content:" · Cliquer pour déplier";font-weight:600;opacity:.7;white-space:normal}
+.pick-card.won-collapsed .pick-head-right{flex-wrap:wrap}
 /* Historique des paris partagés : bordure colorée selon le statut + apparition douce en cascade */
 #picksHistory .pick-card{animation:histIn .45s ease both}
 #picksHistory .pick-card.won{border-color:rgba(25,230,160,.45)}
@@ -285,10 +312,11 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 
   <section class="panel">
-    <h2>Paris partagés</h2>
+    <h2><span class="bar"></span>Paris partagés</h2>
     <p class="sub">Choisis un sport, règle ta mise, et suis le prono pour l'ajouter à ta bankroll.</p>
     <div id="picksList" class="share-form"></div>
-    <h2 class="hist-title">Historique des paris partagés</h2>
+    <div class="hist-sep"></div>
+    <h2 class="hist-title"><span class="bar"></span>Historique des paris partagés<span class="hist-count" id="histCount" hidden></span></h2>
     <div id="picksHistory" class="share-form"></div>
   </section>
 </div>
@@ -366,7 +394,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.3.0 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.3.1 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -389,6 +417,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.3.0"></script>
+<script src="/static/app.js?v=1.3.1"></script>
 </body>
 </html>

@@ -432,11 +432,11 @@ function bookmakerLabel(url){
   }catch(e){return'🎯 Ouvrir le pari'}
 }
 const SPORT_ICON={Foot:'⚽',NBA:'🏀',Tennis:'🎾',F1:'🏎️',MMA:'🥊',MLB:'⚾',NFL:'🏈',NHL:'🏒',Mixte:'🎯'};
-const TICKET_STATUS={pending:['En cours','⏱'],won:['Gagné','✓'],lost:['Perdu','✕'],void:['Remboursé','↩']};
+const TICKET_STATUS={pending:['En cours','⏳'],won:['Gagné','👍'],lost:['Perdu','👎'],void:['Remboursé','↩']};
 function renderPicks(){
   const el=$('picksList');
   const hist=$('picksHistory');
-  if(!PICKS.length){el.innerHTML='<p class="empty">Aucun prono publié pour l\'instant.</p>';if(hist)hist.innerHTML='';return}
+  if(!PICKS.length){el.innerHTML='<div class="pick-empty"><div class="pe-icon">📄<small>↗</small></div><b>Aucun prono en cours</b><p>Quand un prono est publié, il apparaîtra ici.</p></div>';if(hist)hist.innerHTML='';return}
   const userBk=(window.BK&&window.BK>0)?window.BK:INIT;
   const cards=PICKS.map(p=>{
     const profKey=(p.advice_profile&&PROFILES[p.advice_profile])?p.advice_profile:'prudent';
@@ -497,11 +497,18 @@ function renderPicks(){
     </div>`;
     const collapsedClass=p.result==='won'?' won-collapsed':'';
     const openClass=collapsedClass&&openWonSet.has(p.id)?' open':'';
-    const delBtn=IS_ADMIN?`<button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Supprimer ce prono" title="Supprimer ce prono">✕</button>`:'';
+    const delBtn=IS_ADMIN?`<button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Retirer ce prono de l'historique" title="Retirer">✕</button>`:'';
     return `<div class="pick-card${collapsedClass}${openClass}" data-tpid="${p.id}" ${p.result==='won'?'data-toggle="1"':''}>
       <div class="pick-head">
-        <div><h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3><p class="sub">Par ${p.author}${fmtDt(p.created_at)?` · <span class="pick-date">${fmtDt(p.created_at)}</span>`:''}</p></div>
-        <div class="pick-head-right">${delBtn}<span class="ticket-status ${p.result}"><i>${stIcon}</i>${stLabel}</span></div>
+        <div>
+          <h3><span class="title-accent"></span>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3>
+          <p class="sub">Par ${p.author}${fmtDt(p.created_at)?` · <span class="pick-date">${fmtDt(p.created_at)}</span>`:''}</p>
+        </div>
+        <div class="pick-head-right">
+          <span class="ticket-status ${p.result}"><i>${stIcon}</i>${stLabel}</span>
+          ${!p.result||p.result==='pending'?'':`<span class="head-sep"></span><button type="button" class="pick-details" data-details="${p.id}" aria-label="Voir les détails" aria-expanded="${openClass?'true':'false'}">Voir les détails<b class="chev">▸</b></button>`}
+          ${delBtn}
+        </div>
       </div>
       <div class="pick-body">
       <div class="ticket-legs">${legsHtml}</div>
@@ -518,13 +525,17 @@ function renderPicks(){
     (p.result==='pending'?openCards:closedCards).push({card:cards[i],p});
   });
   closedCards.sort((a,b)=>(b.p.created_at||'').localeCompare(a.p.created_at||''));
-  const openHtml=openCards.map(c=>c.card).join('')||'<p class="empty">Aucun prono en cours. Quand un prono est publié, il apparaît ici.</p>';
-  const closedHtml=closedCards.map((c,i)=>c.card.replace(' class="pick-card',' data-idx="'+i+'" class="pick-card')).join('')||'<p class="empty">Aucun prono réglé pour l\'instant (gagné / perdu / remboursé).</p>';
+  const openHtml=openCards.map(c=>c.card).join('')||'<div class="pick-empty"><div class="pe-icon">📄<small>↗</small></div><b>Aucun prono en cours</b><p>Quand un prono est publié, il apparaîtra ici.</p></div>';
+  const closedHtml=closedCards.map((c,i)=>c.card.replace(' class="pick-card',' data-idx="'+i+'" class="pick-card')).join('')||'<div class="pick-empty"><div class="pe-icon">📄<small>↗</small></div><b>Aucun pari réglé</b><p>Les pronos gagnés, perdus ou remboursés apparaîtront ici.</p></div>';
   el.innerHTML=openHtml;
   if(hist){
     const hTitle=document.querySelector('.hist-title');
-    if(hTitle&&closedCards.length)hTitle.textContent=`Historique des paris partagés · ${closedCards.length}`;
-    else if(hTitle)hTitle.textContent='Historique des paris partagés';
+    const hCount=document.getElementById('histCount');
+    if(hCount){
+      if(closedCards.length){hCount.hidden=false;hCount.textContent=closedCards.length;}
+      else hCount.hidden=true;
+    }
+    if(hTitle){const hc=hTitle.querySelector('.hist-count');if(hc)hc.hidden=!closedCards.length;}
     if(hist.__lastHtml!==closedHtml){
       hist.__lastHtml=closedHtml;
       hist.innerHTML=closedHtml;
@@ -571,10 +582,14 @@ async function handlePicksClick(ev){
       if(!confirm('Annuler ce pari ? Sa mise sera retirée de ta bankroll.'))return;
       await api('/api/picks/'+unfollow+'/follow',{method:'DELETE'});
       await loadPicks();await loadBets();
-    }else if(toggleEl){
-      toggleEl.classList.toggle('open');
-      const id=+toggleEl.dataset.tpid;
-      if(toggleEl.classList.contains('open')) openWonSet.add(id); else openWonSet.delete(id);
+    }else if(toggleEl||ev.target.closest('.pick-details')){
+      const card=ev.target.closest('.pick-card');
+      if(!card)return;
+      card.classList.toggle('open');
+      const id=+card.dataset.tpid;
+      const btn=card.querySelector('.pick-details');
+      if(btn)btn.setAttribute('aria-expanded',card.classList.contains('open')?'true':'false');
+      if(card.classList.contains('open'))openWonSet.add(id); else openWonSet.delete(id);
     }
   }catch(e){alert(e.message)}
 }
@@ -596,7 +611,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.3.0', date='2026-10-13';
+  const v='1.3.1', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
