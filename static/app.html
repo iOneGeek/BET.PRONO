@@ -19,7 +19,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;background-image:radial-gradient(ellipse at 55% 0%,rgba(32,74,125,.10),transparent 48%),radial-gradient(ellipse at 100% 45%,rgba(255,111,0,.08),transparent 30%)}
-main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px}
+main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px;position:relative;z-index:1}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 4px 4px;z-index:10;position:relative}
 @media (max-width:560px){
   .topbar{flex-direction:column}
@@ -192,6 +192,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 /* ===== Bouton animé "Mettre à jour" + confettis ===== */
 @keyframes bkloading{0%{cy:10}25%{cy:3}50%{cy:10}}
 #canvas{position:fixed;inset:0;width:100%;height:100vh;pointer-events:none;z-index:999}
+#bgfx{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
 #button{position:relative;flex:0 0 auto;background:none;border:none;color:var(--text);cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;height:40px;outline:none;overflow:hidden;padding:0 14px;width:190px;z-index:1}
 #button::before{background:var(--accent);border-radius:50px;box-shadow:0 2px 5px rgba(0,0,0,.4) inset;content:'';display:block;height:100%;margin:0 auto;position:relative;transition:width .2s cubic-bezier(.39,1.86,.64,1) .3s;width:100%}
 #button.ready .submitMessage svg{opacity:1;top:1px;transition:top .4s ease 600ms,opacity .3s linear 600ms}
@@ -232,6 +233,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 </style>
 </head>
 <body>
+<canvas id="bgfx" aria-hidden="true"></canvas>
 <main>
 <header class="topbar">
   <div class="brand"><div><h1>BET.<span class="o">PRONO</span></h1><p class="sub">Suivi de ma bankroll, pari après pari</p></div></div>
@@ -358,7 +360,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.1.5 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.1.6 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -381,6 +383,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.1.5"></script>
+<script src="/static/app.js?v=1.1.6"></script>
 </body>
 </html>
