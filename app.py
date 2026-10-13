@@ -149,12 +149,16 @@ class Conn:
 
 POOL = None
 if USE_PG:
+    dsn = DATABASE_URL
+    if "connect_timeout=" not in dsn:
+        sep = "&" if "?" in dsn else "?"
+        dsn = f"{dsn}{sep}connect_timeout=10"
     POOL = ConnectionPool(
-        DATABASE_URL,
+        dsn,
         min_size=1,
         max_size=8,
         open=False,
-        timeout=45,
+        timeout=8,
     )
     POOL.open()
 
@@ -162,7 +166,20 @@ if USE_PG:
 def get_db():
     if "db" not in g:
         if USE_PG:
-            real = POOL.getconn()
+            try:
+                real = POOL.getconn()
+            except Exception:
+                # Connexions du pool devenues obsolètes (redémarrage/pause Neon) :
+                # on purge le pool et on retente une fois pour rebrancher vite.
+                try:
+                    POOL.reset()
+                except Exception:
+                    try:
+                        POOL.close()
+                        POOL.open()
+                    except Exception:
+                        pass
+                real = POOL.getconn()
             g._pg_conn = real
             g.db = Conn("pg", real)
         else:
