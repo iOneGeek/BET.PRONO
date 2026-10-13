@@ -422,7 +422,7 @@ async function loadPicks(){
 function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function bookmakerLabel(url){
   try{const h=new URL(url).hostname.replace(/^www\./,'').toLowerCase();
-    if(h.includes('winamax'))return'🎯 Placer sur Winamax';
+    if(h.includes('winamax'))return'Placer sur Winamax';
     if(h.includes('betclic'))return'🎯 Placer sur Betclic';
     if(h.includes('unibet'))return'🎯 Placer sur Unibet';
     if(h.includes('vbet'))return'🎯 Placer sur Vbet';
@@ -430,6 +430,12 @@ function bookmakerLabel(url){
     if(h.includes('pmu'))return'🎯 Placer sur PMU';
     return'🎯 Ouvrir le pari';
   }catch(e){return'🎯 Ouvrir le pari'}
+}
+function bookmakerIcon(url){
+  try{const h=new URL(url).hostname.replace(/^www\./,'').toLowerCase();
+    if(h.includes('winamax'))return'<img class="pick-link-logo" src="/static/logo_winamax.png" alt="Winamax">';
+    return'';
+  }catch(e){return''}
 }
 const SPORT_ICON={Foot:'⚽',NBA:'🏀',Tennis:'🎾',F1:'🏎️',MMA:'🥊',MLB:'⚾',NFL:'🏈',NHL:'🏒',Mixte:'🎯'};
 const TICKET_STATUS={pending:['En cours','⏳'],won:['Gagné','👍'],lost:['Perdu','👎'],void:['Remboursé','↩']};
@@ -442,7 +448,7 @@ function renderPicks(){
     const profKey=(p.advice_profile&&PROFILES[p.advice_profile])?p.advice_profile:'prudent';
     const prof=PROFILES[profKey]||PROFILES.prudent;
     const advisedStake=Math.max(1,+(userBk*prof.pct/100).toFixed(2));
-    const linkHtml=p.link_url?`<a class="pick-link" href="${escAttr(p.link_url)}" target="_blank" rel="noopener noreferrer nofollow">${escAttr(bookmakerLabel(p.link_url))} ↗</a>`:'';
+    const linkHtml=p.link_url?`<a class="pick-link" href="${escAttr(p.link_url)}" target="_blank" rel="noopener noreferrer nofollow">${bookmakerIcon(p.link_url)}${escAttr(bookmakerLabel(p.link_url))} ↗</a>`:'';
     const ball=SPORT_ICON[p.sport]||'🎯';
     const legsHtml=p.legs.map(l=>{
       // Separateur "Equipe A <sep> Equipe B". Le tiret simple est place en
@@ -611,7 +617,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.3.7', date='2026-10-13';
+  const v='1.3.8', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
