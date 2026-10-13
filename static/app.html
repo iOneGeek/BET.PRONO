@@ -123,6 +123,14 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .info-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--field);color:var(--mute);font-size:.78rem;font-weight:800;line-height:1;cursor:pointer;vertical-align:middle;margin-left:8px}
 .info-btn:hover{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .panel h2 .info-btn{vertical-align:sub}
+/* Panel admin repliable : titres cliquables avec chevron pivotant */
+.panel summary{list-style:none;cursor:pointer;user-select:none}
+.panel summary::-webkit-details-marker{display:none}
+.panel summary h2{display:flex;align-items:center;gap:6px;flex-wrap:wrap;width:100%;margin:0}
+.panel summary h2 .chev{margin-left:auto;font-size:.95rem;color:var(--mute);transform:rotate(90deg);transition:transform .3s ease;font-weight:800}
+#adminPanel:not([open]) summary h2 .chev{transform:rotate(0deg)}
+details.panel[open] summary{padding-bottom:12px;border-bottom:1px dashed var(--line);margin-bottom:12px}
+details.panel:not([open]) summary h2{color:var(--accent)}
 /* Barre verticale orange avant les titres de section */
 h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background:var(--accent);margin-right:9px;vertical-align:-4px}
 .hist-title{display:flex;align-items:center;gap:8px;margin:14px 0 10px;font-size:1.05rem}
@@ -293,8 +301,8 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
     <div class="brand"><div><h2 style="display:block">Bienvenue 👋</h2><p class="sub" style="margin:0">BET.PRONO t'aide à gérer ta bankroll pari après pari. Suis des pronos partagés, fixe ta mise conseillée selon ton profil de jeu, et analyse tes résultats (sport, ROI, réussite) pour parier avec méthode.</p></div></div>
   </section>
 
-  <section class="panel" id="adminPanel" hidden>
-    <h2>Publier un prono <span class="admin-badge">Admin</span></h2>
+  <details class="panel" id="adminPanel" open>
+    <summary><h2>Publier un prono <span class="admin-badge">Admin</span><b class="chev">▸</b></h2></summary>
     <p class="sub">Ce prono sera visible par tous les comptes, qui pourront le suivre et l'ajouter à leur bankroll.</p>
     <div class="share-form">
       <label>Titre du prono<select id="pickTitle">
@@ -322,7 +330,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
       <button class="primary" id="publishPickBtn" type="button">Publier le prono</button>
       <p class="sub" id="pickMsg"></p>
     </div>
-  </section>
+  </details>
 
 
   <section class="panel">
@@ -408,7 +416,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.4.6 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.4.7 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -431,6 +439,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.4.6"></script>
+<script src="/static/app.js?v=1.4.7"></script>
 </body>
 </html>
