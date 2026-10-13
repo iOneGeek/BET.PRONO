@@ -178,6 +178,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .ticket-team .tgoal{font-weight:800;font-size:.95rem;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:0 8px;min-width:28px;text-align:center;color:var(--accent);line-height:1.7}
 .ticket-tsep{height:1px;background:var(--line);margin:4px 0}
 .ticket-pickline{display:flex;align-items:baseline;gap:8px;padding:0 2px}
+.hist-title{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-size:1.1rem}
 .ticket-pickline .lbl{color:var(--mute);font-size:.82rem;white-space:nowrap}
 .ticket-pickline .val{font-weight:700;flex:1;border-bottom:1px dotted var(--line);align-self:flex-end;min-width:0}
 .ticket-pickline .od{font-weight:800;color:var(--text)}
@@ -242,6 +243,8 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
     <h2>Paris partagés</h2>
     <p class="sub">Choisis un sport, règle ta mise, et suis le prono pour l'ajouter à ta bankroll.</p>
     <div id="picksList" class="share-form"></div>
+    <h2 class="hist-title">Historique des paris partagés</h2>
+    <div id="picksHistory" class="share-form"></div>
   </section>
 </div>
 
@@ -301,9 +304,9 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   </section>
 </div>
 
-<footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">✈️ Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">📸 Instagram</a></span><br>
+<footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.0.22 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.1.0 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -325,6 +328,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
   });
 })();
 </script>
-<script src="/static/app.js?v=1.0.22"></script>
+<script src="/static/app.js?v=1.1.0"></script>
 </body>
 </html>

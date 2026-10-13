@@ -355,9 +355,10 @@ const SPORT_ICON={Foot:'⚽',NBA:'🏀',Tennis:'🎾',F1:'🏎️',MMA:'🥊',ML
 const TICKET_STATUS={pending:['En cours','⏱'],won:['Gagné','✓'],lost:['Perdu','✕'],void:['Remboursé','↩']};
 function renderPicks(){
   const el=$('picksList');
-  if(!PICKS.length){el.innerHTML='<p class="empty">Aucun prono publié pour l\'instant.</p>';return}
+  const hist=$('picksHistory');
+  if(!PICKS.length){el.innerHTML='<p class="empty">Aucun prono publié pour l\'instant.</p>';if(hist)hist.innerHTML='';return}
   const userBk=(window.BK&&window.BK>0)?window.BK:INIT;
-  el.innerHTML=PICKS.map(p=>{
+  const cards=PICKS.map(p=>{
     const profKey=(p.advice_profile&&PROFILES[p.advice_profile])?p.advice_profile:'prudent';
     const prof=PROFILES[profKey]||PROFILES.prudent;
     const advisedStake=Math.max(1,+(userBk*prof.pct/100).toFixed(2));
@@ -433,10 +434,18 @@ function renderPicks(){
       ${adminActions}
       </div>
     </div>`;
-  }).join('');
+  });
+  const openCards=[];const closedCards=[];
+  PICKS.forEach((p,i)=>{
+    (p.result==='pending'?openCards:closedCards).push(cards[i]);
+  });
+  const openHtml=openCards.join('')||'<p class="empty">Aucun prono en cours. Quand un prono est publié, il apparaît ici.</p>';
+  const closedHtml=closedCards.join('')||'<p class="empty">Aucun prono réglé pour l\'instant (gagné / perdu / remboursé).</p>';
+  el.innerHTML=openHtml;
+  if(hist)hist.innerHTML=closedHtml;
 }
 
-$('picksList').addEventListener('click',async ev=>{
+async function handlePicksClick(ev){
   const follow=ev.target.dataset.follow;
   const unfollow=ev.target.dataset.unfollow;
   const settle=ev.target.dataset.settle;
@@ -480,7 +489,10 @@ $('picksList').addEventListener('click',async ev=>{
       if(toggleEl.classList.contains('open')) openWonSet.add(id); else openWonSet.delete(id);
     }
   }catch(e){alert(e.message)}
-});
+}
+$('picksList').addEventListener('click',handlePicksClick);
+const $histEl=document.getElementById('picksHistory');
+if($histEl)$histEl.addEventListener('click',handlePicksClick);
 
 function promptScores(pick){
   if(!pick||!pick.legs||!pick.legs.length)return [];
@@ -496,7 +508,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.22', date='2026-10-12';
+  const v='1.1.0', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
