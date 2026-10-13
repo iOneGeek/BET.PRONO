@@ -69,9 +69,9 @@ function render(){
   const c0=cut(),bets=all.filter(b=>b.d>=c0&&b.r!=='wd'),done=bets.filter(b=>b.r==='won'||b.r==='lost');
   const profit=bets.reduce((a,b)=>a+pl(b),0),staked=done.reduce((a,b)=>a+b.s,0);
   const wd=all.filter(b=>b.r==='wd').reduce((a,b)=>a+b.s,0),bk=INIT+all.reduce((a,b)=>a+pl(b),0)-wd,wins=done.filter(b=>b.r==='won').length;
-  const maxOdds=Math.max(0,...done.map(b=>+b.o||0));
+  const maxOdds=Math.max(0,...bets.filter(b=>b.r==='won').map(b=>+b.o||0));
   const maxGain=bets.length?Math.max(...bets.map(b=>pl(b))):0;
-  const recOddsBet=done.reduce((a,b)=>(+b.o||0)>((a&&+a.o)||0)?b:a,null);
+  const recOddsBet=bets.filter(b=>b.r==='won').reduce((a,b)=>(+b.o||0)>((a&&+a.o)||0)?b:a,null);
   const recGainBet=done.reduce((a,b)=>pl(b)>((a&&pl(a))||0)?b:a,null);
   const recDetail=b=>b?`<em>${b.d.slice(5,10)} · ${b.sp}</em>`:'';
   const cells=[['Paris',bets.length,'',''],['Bénéfice',eur(profit),profit,''],['ROI',staked?pct(profit/staked*100):'–',profit,''],['Progression',INIT?pct(profit/INIT*100):'–',profit,''],['Réussite',done.length?pct(wins/done.length*100):'–','',''],['Record côte max',maxOdds?('× '+maxOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'–','',recDetail(recOddsBet)],['Record gain max',maxGain>0?eur(maxGain):'–','',recDetail(recGainBet)],['Bankroll',eur(bk),'','']];
@@ -580,7 +580,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.2.4', date='2026-10-13';
+  const v='1.2.5', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
