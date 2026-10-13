@@ -428,7 +428,7 @@ async function loadPicks(retryOK){
 function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function bookmakerLabel(url){
   try{const h=new URL(url).hostname.replace(/^www\./,'').toLowerCase();
-    if(h.includes('winamax'))return'Placer sur Winamax';
+    if(h.includes('winamax'))return'Placer sur';
     if(h.includes('betclic'))return'🎯 Placer sur Betclic';
     if(h.includes('unibet'))return'🎯 Placer sur Unibet';
     if(h.includes('vbet'))return'🎯 Placer sur Vbet';
@@ -436,6 +436,14 @@ function bookmakerLabel(url){
     if(h.includes('pmu'))return'🎯 Placer sur PMU';
     return'🎯 Ouvrir le pari';
   }catch(e){return'🎯 Ouvrir le pari'}
+}
+/** HTML interne du lien bookmaker : "Placer sur" puis le logo (Winamax), sinon badge avec emoji. */
+function bookmakerLink(url){
+  const label=escAttr(bookmakerLabel(url));
+  const icon=bookmakerIcon(url);
+  // Winamax : "Placer sur" suivi du logo agrandi.
+  if(icon)return label+' '+icon;
+  return label;
 }
 function bookmakerIcon(url){
   try{const h=new URL(url).hostname.replace(/^www\./,'').toLowerCase();
@@ -467,7 +475,7 @@ function renderPicksInner(el,hist){
     const profKey=(p.advice_profile&&PROFILES[p.advice_profile])?p.advice_profile:'prudent';
     const prof=PROFILES[profKey]||PROFILES.prudent;
     const advisedStake=Math.max(1,+(userBk*prof.pct/100).toFixed(2));
-    const linkHtml=p.link_url?`<a class="pick-link" href="${escAttr(p.link_url)}" target="_blank" rel="noopener noreferrer nofollow">${bookmakerIcon(p.link_url)}${escAttr(bookmakerLabel(p.link_url))} ↗</a>`:'';
+    const linkHtml=p.link_url?`<a class="pick-link" href="${escAttr(p.link_url)}" target="_blank" rel="noopener noreferrer nofollow">${bookmakerLink(p.link_url)} ↗</a>`:'';
     const ball=SPORT_ICON[p.sport]||'🎯';
     const legsHtml=p.legs.map(l=>{
       // Separateur "Equipe A <sep> Equipe B". Le tiret simple est place en
@@ -509,7 +517,7 @@ function renderPicksInner(el,hist){
       <button type="button" data-settle="${p.id}" data-result="void">Remboursé</button>
       <button type="button" data-setscore="${p.id}">Modifier score</button>
     </div>`:'';
-    const delBtn=IS_ADMIN?`<span class="head-sep"></span><button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Supprimer ce prono">Supprimer</button>`:'';
+    const delBtn=IS_ADMIN?`<button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Supprimer ce prono" title="Supprimer">×</button>`:'';
     const stakeForGain=p.followed?p.follow_stake:advisedStake;
     const potentialGain=+(stakeForGain*p.total_odds).toFixed(2);
     const ticketTotalsHtml=p.legs.length?`
@@ -524,7 +532,8 @@ function renderPicksInner(el,hist){
     const collapsible=p.result==='won'||p.result==='lost'||p.result==='void';
     const collapsedClass=collapsible?' won-collapsed':'';
     const openClass=collapsedClass&&openWonSet.has(p.id)?' open':'';
-    return `<div class="pick-card${collapsedClass}${openClass}" data-tpid="${p.id}" ${collapsible?'data-toggle="1"':''}>
+    const resultClass=!p.result||p.result==='pending'?'':(' '+p.result);
+    return `<div class="pick-card${collapsedClass}${openClass}${resultClass}" data-tpid="${p.id}" ${collapsible?'data-toggle="1"':''}>
       <div class="pick-head">
         <div>
           <h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3>
@@ -637,7 +646,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.3.10', date='2026-10-13';
+  const v='1.4.0', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
