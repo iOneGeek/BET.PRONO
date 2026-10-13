@@ -314,6 +314,13 @@ const openWonSet=new Set(); // ids des pronos gagnés dépliés manuellement
 
 function parseOddsP(str){const n=parseFloat(String(str).replace(',','.').trim());return isNaN(n)?0:n}
 function fmtOddsP(n){return n.toFixed(2).replace('.',',')}
+function fmtDt(s){
+  if(!s)return '';
+  const d=new Date(s);
+  if(isNaN(d))return '';
+  const p=n=>String(n).padStart(2,'0');
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} · ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 function renderPickBets(){
   const list=$('pickBetsList');
@@ -493,7 +500,7 @@ function renderPicks(){
     const delBtn=IS_ADMIN?`<button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Supprimer ce prono" title="Supprimer ce prono">✕</button>`:'';
     return `<div class="pick-card${collapsedClass}${openClass}" data-tpid="${p.id}" ${p.result==='won'?'data-toggle="1"':''}>
       <div class="pick-head">
-        <div><h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3><p class="sub">Par ${p.author}</p></div>
+        <div><h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3><p class="sub">Par ${p.author}${fmtDt(p.created_at)?` · <span class="pick-date">${fmtDt(p.created_at)}</span>`:''}</p></div>
         <div class="pick-head-right">${delBtn}<span class="ticket-status ${p.result}"><i>${stIcon}</i>${stLabel}</span></div>
       </div>
       <div class="pick-body">
@@ -589,7 +596,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.2.9', date='2026-10-13';
+  const v='1.3.0', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
