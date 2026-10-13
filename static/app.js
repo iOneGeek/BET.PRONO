@@ -82,7 +82,7 @@ function render(){
   [...$('per').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===PER));
   chart(bets.filter(b=>b.r!=='pending'));
   $('t').innerHTML='<thead><tr><th>Date</th><th>Sport</th><th>Type</th><th>Mise</th><th>Cote</th><th>Résultat</th><th>Gain</th><th></th></tr></thead><tbody>'+[...all].reverse().map(b=>{const p=pl(b),w=b.r==='wd';
-    return `<tr><td>${b.d.slice(8)}/${b.d.slice(5,7)}</td><td>${b.sp}</td><td>${b.ty}</td><td>${eur(b.s)}</td><td>${w?'–':b.o}</td><td>${w?LB[b.r]:`<span class="v">${LB[b.r]}</span><select class="x" data-i="${b.id}" aria-label="Résultat">${['won','lost','void','pending'].map(k=>`<option value="${k}"${k===b.r?' selected':''}>${LB[k]}</option>`).join('')}</select>`}</td><td class="${p>0?'g':p<0?'l':''}">${w||b.r==='pending'?'–':eur(p)}</td><td><button class="x" data-x="${b.id}" aria-label="Supprimer">✕</button></td></tr>`}).join('')+'</tbody>';
+    return `<tr><td>${b.d.slice(8)}/${b.d.slice(5,7)}</td><td>${b.sp}</td><td>${b.ty}</td><td>${eur(b.s)}</td><td>${w?'–':b.o}</td><td>${w?LB[b.r]:`<span class="v">${LB[b.r]}</span><select class="x" data-i="${b.id}" aria-label="Résultat">${['won','lost','void','pending'].map(k=>`<option value="${k}"${k===b.r?' selected':''}>${LB[k]}</option>`).join('')}</select>`}</td><td class="${p>0?'g':p<0?'l':''}">${w||b.r==='pending'?'–':eur(p)}</td><td>${w?'':`<button class="row-edit-btn" data-e="${b.id}" aria-label="Modifier le résultat" title="Modifier le résultat">✎</button>`}<button class="x" data-x="${b.id}" aria-label="Supprimer">✕</button></td></tr>`}).join('')+'</tbody>';
   $('initBk').value=INIT;
   renderPendingPicker();
 }
@@ -120,6 +120,8 @@ $('f').addEventListener('submit', async ev=>{
 });
 
 $('t').addEventListener('click', async ev=>{
+  const e=ev.target.dataset.e;
+  if(e){const tr=ev.target.closest('tr');if(tr){tr.classList.toggle('row-edit');}return}
   const x=ev.target.dataset.x;if(!x)return;
   if(!confirm('Supprimer ce pari ?'))return;
   await api('/api/bets/'+x,{method:'DELETE'});
@@ -578,7 +580,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.2.3', date='2026-10-13';
+  const v='1.2.4', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
