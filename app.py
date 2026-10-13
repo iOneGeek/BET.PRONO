@@ -155,7 +155,7 @@ if USE_PG:
         min_size=1,
         max_size=8,
         open=False,
-        timeout=10,
+        timeout=45,
     )
     POOL.open()
 
