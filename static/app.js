@@ -129,19 +129,78 @@ $('per').addEventListener('click',ev=>{if(ev.target.dataset.p){PER=ev.target.dat
 $('s').addEventListener('input',()=>{const w=$('warn'),lim=(window.BK||0)*0.1;w.hidden=!(+$('s').value>lim&&$('r').value!=='wd');w.textContent=`Cette mise dépasse 10 % de votre bankroll (maximum conseillé : ${eur(lim)}).`});
 $('r').addEventListener('change',()=>$('s').dispatchEvent(new Event('input')));
 
-$('saveInit').onclick=async()=>{
-  const fb=$('saveInitFeedback'), msg=$('msg');
-  try{
-    await api('/api/settings',{method:'PATCH',body:JSON.stringify({initial_bankroll:+$('initBk').value})});
-    await loadBets();
-    msg.textContent='Bankroll de départ mise à jour.';
-    if(fb){
-      fb.hidden=false;
-      fb.style.animation='none';void fb.offsetWidth;fb.style.animation='';
-      setTimeout(()=>{fb.hidden=true;},1600);
-    }
-  }catch(e){msg.textContent=e.message}
+$('saveInit').onclick=()=>{};
+let bkDisabled=false;
+function clickButton(){
+  if(bkDisabled) return;
+  bkDisabled=true;
+  const msg=$('msg'), fb=$('saveInitFeedback');
+  const b=$('button');
+  b.classList.add('loading'); b.classList.remove('ready');
+  const doPatch=async()=>{
+    try{ await api('/api/settings',{method:'PATCH',body:JSON.stringify({initial_bankroll:+$('initBk').value})}); await loadBets(); msg.textContent='Bankroll de départ mise à jour.'; if(fb){fb.hidden=false;fb.style.animation='none';void fb.offsetWidth;fb.style.animation='';setTimeout(()=>{fb.hidden=true;},2000);} return true; }
+    catch(e){ msg.textContent=e.message; return false; }
+  };
+  doPatch().then(ok=>{
+    setTimeout(()=>{
+      b.classList.add('complete'); b.classList.remove('loading');
+      setTimeout(()=>{ initBurst(); setTimeout(()=>{ b.classList.add('ready'); b.classList.remove('complete'); bkDisabled=false; },4000); },320);
+    },1800);
+  });
+}
+// --------- confettis ---------
+const bkCanvas=document.getElementById('canvas');
+let bkctx=null,bkConfetti=[],bkSequins=[];
+if(bkCanvas){bkctx=bkCanvas.getContext('2d');bkCanvas.width=window.innerWidth;bkCanvas.height=window.innerHeight;}
+const bkColors=[{front:'#7b5cff',back:'#6245e0'},{front:'#b3c7ff',back:'#8fa5e5'},{front:'#5c86ff',back:'#345dd1'},{front:'#ff6e48',back:'#d35400'}];
+const bkRR=(a,b)=>Math.random()*(b-a)+a;
+const bkBtnRect=()=>bkCanvas&&bkCanvas.getBoundingClientRect?bkCanvas.getBoundingClientRect():{width:innerWidth,height:innerHeight};
+function initBurst(){
+  if(!bkctx)return;
+  const b=$('button')||{offsetWidth:190,offsetHeight:40};
+  const bw=b.offsetWidth||190,bh=b.offsetHeight||40;
+  const midX=innerWidth/2, midY=innerHeight/2;
+  for(let i=0;i<20;i++){bkConfetti.push(new BkConfetto(midX,midY,bw,bh));}
+  if(bkctx)bkRender();
+}
+function BkConfetto(baseX,baseY,bw,bh){
+  this.mod=bkRR(0,99); this.color=bkColors[Math.floor(bkRR(0,bkColors.length))];
+  this.dim={x:bkRR(5,9),y:bkRR(8,15)};
+  this.pos={x:bkRR(baseX-bw/4,baseX+bw/4),y:bkRR(baseY+bh/2+8,baseY+1.5*bh-8)};
+  this.rot=bkRR(0,2*Math.PI); this.scale={x:1,y:1};
+  this.vel={x:bkRR(-9,9),y:-(6+Math.abs(bkRR(0,5)))};
+}
+BkConfetto.prototype.update=function(){
+  this.vel.x-=this.vel.x*.075; this.vel.y=Math.min(this.vel.y+.3,3); this.vel.x+=Math.random()>.5?Math.random():-Math.random();
+  this.pos.x+=this.vel.x; this.pos.y+=this.vel.y; this.scale.y=Math.cos((this.pos.y+this.mod)*.09);
 };
+function bkRender(){
+  if(!bkctx){requestAnimationFrame(bkRender);return;}
+  bkctx.clearRect(0,0,bkCanvas.width,bkCanvas.height);
+  bkConfetti.forEach((c,i)=>{
+    const w=c.dim.x*c.scale.x,h=c.dim.y*c.scale.y;
+    bkctx.shadowColor='transparent';
+    bkctx.translate(c.pos.x,c.pos.y); bkctx.rotate(c.rot);
+    c.update();
+    bkctx.fillStyle=c.scale.y>0?c.color.front:c.color.back;
+    bkctx.fillRect(-w/2,-h/2,w,h);
+    bkctx.setTransform(1,0,0,1,0,0);
+  });
+  bkConfetti.forEach((c,i)=>{ if(c.pos.y>=bkCanvas.height)bkConfetti.splice(i,1); });
+  if(bkConfetti.length){requestAnimationFrame(bkRender);}
+}
+window.addEventListener('resize',()=>{ if(bkCanvas){bkCanvas.width=innerWidth;bkCanvas.height=innerHeight;} });
+// decomposer le texte du bouton en lettres pour l'animation
+document.querySelectorAll('#button .button-text').forEach(el=>{
+  const chars=el.textContent.split('');
+  let html='';
+  chars.forEach((letter,index)=>{
+    html+='<span class="ch" style="--d:'+(index*30)+'ms;--dr:'+((chars.length-index-1)*30)+'ms">'+letter+'</span>';
+  });
+  el.innerHTML=html;
+});
+if(bkCanvas)bkRender();
+
 
 $('im').onclick=async()=>{
   const o=$('out'),m=$('msg');
@@ -517,7 +576,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.1.3', date='2026-10-13';
+  const v='1.1.4', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

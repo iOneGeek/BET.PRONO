@@ -187,6 +187,32 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .save-row{display:flex;align-items:center;gap:10px}
 .save-check{color:var(--win,#19e6a0);font-size:1.5rem;font-weight:800;animation:checkPop .5s ease}
 @keyframes checkPop{0%{transform:scale(0) rotate(-30deg);opacity:0}60%{transform:scale(1.35) rotate(8deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+/* ===== Bouton animé "Mettre à jour" + confettis ===== */
+@keyframes bkloading{0%{cy:10}25%{cy:3}50%{cy:10}}
+#canvas{position:fixed;inset:0;width:100%;height:100vh;pointer-events:none;z-index:999}
+#button{position:relative;flex:0 0 auto;background:none;border:none;color:var(--text);cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;height:40px;outline:none;overflow:hidden;padding:0 14px;width:190px;z-index:1}
+#button::before{background:var(--accent);border-radius:50px;box-shadow:0 2px 5px rgba(0,0,0,.4) inset;content:'';display:block;height:100%;margin:0 auto;position:relative;transition:width .2s cubic-bezier(.39,1.86,.64,1) .3s;width:100%}
+#button.ready .submitMessage svg{opacity:1;top:1px;transition:top .4s ease 600ms,opacity .3s linear 600ms}
+#button.ready .submitMessage .button-text span{top:0;opacity:1;transition:all .2s ease calc(var(--dr) + 600ms)}
+#button.loading::before{transition:width .3s ease;width:80%}
+#button.loading .loadingMessage{opacity:1}
+#button.loading .loadingCircle{animation-duration:1s;animation-iteration-count:infinite;animation-name:bkloading;cy:10}
+#button.complete .submitMessage svg{top:-30px;transition:none}
+#button.complete .submitMessage .button-text span{top:-8px;transition:none}
+#button.complete .loadingMessage{top:80px}
+#button.complete .successMessage .button-text span{left:0;opacity:1;transition:all .2s ease calc(var(--d) + 1000ms)}
+#button.complete .successMessage svg{stroke-dashoffset:0;transition:stroke-dashoffset .3s ease-in-out 1.4s}
+#button .button-text span{opacity:0;position:relative;color:var(--text)}
+#button .message{left:50%;position:absolute;top:50%;transform:translate(-50%,-50%);width:100%}
+#button .message svg{display:inline-block;fill:none;margin-right:5px;stroke-linecap:round;stroke-linejoin:round;stroke-width:2}
+#button .submitMessage .button-text span{top:8px;transition:all .2s ease var(--d)}
+#button .submitMessage svg{color:var(--on-accent);margin-left:-1px;opacity:0;position:relative;top:30px;transition:top .4s ease,opacity .3s linear;width:14px}
+#button .loadingMessage{opacity:0;transition:opacity .3s linear .3s,top .4s cubic-bezier(.22,0,.41,-.57)}
+#button .loadingMessage svg{fill:var(--on-accent);margin:0;width:22px}
+#button .successMessage .button-text span{left:5px;transition:all .2s ease var(--dr)}
+#button .successMessage svg{color:#5cffa1;stroke-dasharray:20;stroke-dashoffset:20;transition:stroke-dashoffset .3s ease-in-out;width:14px}
+#button .loadingCircle:nth-child(2){animation-delay:.1s}
+#button .loadingCircle:nth-child(3){animation-delay:.2s}
 .hist-title{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-size:1.1rem}
 .ticket-pickline .lbl{color:var(--mute);font-size:.82rem;white-space:nowrap}
 .ticket-pickline .val{font-weight:700;flex:1;border-bottom:1px dotted var(--line);align-self:flex-end;min-width:0}
@@ -292,8 +318,24 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   <p class="sub" id="help-bk" hidden>Si tu as déposé de l'argent, je te conseille fortement de mettre ta bankroll à jour.</p>
   <div class="form">
     <label>Bankroll de départ (€)<input id="initBk" type="number" min="0" step="0.01"></label>
-    <div class="save-row"><button id="saveInit" type="button">Mettre à jour</button><span id="saveInitFeedback" class="save-check" hidden>✔</span></div>
+    <div class="save-row">
+      <button id="button" class="ready" type="button" onclick="clickButton();">
+        <div class="message submitMessage">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 13 11" width="14" height="14" aria-hidden="true"><polyline stroke="currentColor" points="1.4,5.8 5.1,9.5 11.6,2.1 "/></svg>
+          <span class="button-text">Mettre à jour</span>
+        </div>
+        <div class="message loadingMessage">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 19 17" width="22" height="22" aria-hidden="true"><circle class="loadingCircle" cx="2.2" cy="10" r="1.6"/><circle class="loadingCircle" cx="9.5" cy="10" r="1.6"/><circle class="loadingCircle" cx="16.8" cy="10" r="1.6"/></svg>
+        </div>
+        <div class="message successMessage">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 13 11" width="14" height="14" aria-hidden="true"><polyline stroke="currentColor" points="1.4,5.8 5.1,9.5 11.6,2.1 "/></svg>
+          <span class="button-text">Success</span>
+        </div>
+      </button>
+      <span id="saveInitFeedback" class="save-check" hidden>✔</span>
+    </div>
   </div>
+  <canvas id="canvas"></canvas>
   <div class="row"><button id="ex" type="button">Exporter mes données</button><button id="im" type="button">Importer</button><button id="rs" type="button">Effacer tous mes paris</button></div>
   <p class="sub" id="msg"></p><textarea id="out" hidden aria-label="Données"></textarea>
 </section>
@@ -315,7 +357,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.1.3 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.1.4 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -337,6 +379,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
   });
 })();
 </script>
-<script src="/static/app.js?v=1.1.3"></script>
+<script src="/static/app.js?v=1.1.4"></script>
 </body>
 </html>
