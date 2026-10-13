@@ -368,12 +368,23 @@ function renderPicks(){
       // premier et echappe : ailleurs il formait une plage Unicode invalide
       // (U+2013 -> U+003D) qui faisait rejeter tout le fichier JS.
       const parts=String(l.match||'').split(/\s*[\-=\u2694\u2013\u2014]\s*|\s+vs\.?\s+/i).map(s=>s.trim()).filter(Boolean);
-      const teamsHtml=parts.length>=2
-        ? `<span>${parts[0]}</span><span style="color:var(--mute);font-weight:400">vs</span><span>${parts.slice(1).join(' – ')}</span>`
-        : `<span>${l.match||''}</span>`;
+      const scoreParts=String(l.score||'').split(/\s*[-:]\s*|\s+/).map(s=>s.trim()).filter(Boolean);
+      let teamsHtml;
+      if(parts.length>=2&&scoreParts.length>=2){
+        // Affichage style score de match : chaque équipe sur sa ligne, un but par côté
+        teamsHtml=`<div class="ticket-chiefs">
+          <div class="ticket-team"><span class="tname">${parts[0]}</span><span class="tgoal">${scoreParts[0]}</span></div>
+          <div class="ticket-tsep"></div>
+          <div class="ticket-team"><span class="tname">${parts.slice(1).join(' – ')}</span><span class="tgoal">${scoreParts[1]}</span></div>
+        </div>`;
+      }else{
+        teamsHtml=parts.length>=2
+          ? `<span>${parts[0]}</span><span style="color:var(--mute);font-weight:400">vs</span><span>${parts.slice(1).join(' – ')}</span>`
+          : `<span>${l.match||''}</span>`;
+      }
       return `<div class="ticket-leg">
-        <div class="ticket-teams"><span class="ball">${ball}</span>${teamsHtml}</div>
-        ${l.score?`<div class="ticket-score">${l.score}</div>`:''}
+        <div class="ticket-teams ${(parts.length>=2&&scoreParts.length>=2)?'has-score':''}"><span class="ball">${ball}</span>${teamsHtml}</div>
+        ${l.score&&scoreParts.length<2?`<div class="ticket-score">${l.score}</div>`:''}
         <div class="ticket-pickline"><span class="lbl">Résultat</span><span class="val">${l.pick}</span><span class="od">${fmtOddsP(l.odds)}</span></div>
       </div>`;
     }).join('');
@@ -485,7 +496,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.0.19', date='2026-10-12';
+  const v='1.0.20', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
