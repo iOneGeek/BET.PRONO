@@ -125,6 +125,12 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .pick-card.won-collapsed.open .pick-body{display:grid}
 .pick-card.won-collapsed .pick-head{padding-bottom:2px}
 .pick-card.won-collapsed:not(.open) .ticket-status::after{content:" · Cliquer pour déplier";font-weight:600;opacity:.7;white-space:normal}
+/* Historique des paris partagés : bordure colorée selon le statut + apparition douce en cascade */
+#picksHistory .pick-card{animation:histIn .45s ease both}
+#picksHistory .pick-card.won{border-color:rgba(25,230,160,.45)}
+#picksHistory .pick-card.lost{border-color:rgba(255,82,82,.45)}
+#picksHistory .pick-card.void{border-color:rgba(128,140,155,.4)}
+@keyframes histIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .result-badge{font-size:.78rem;font-weight:700;border-radius:999px;padding:4px 12px;white-space:nowrap;border:1px solid transparent}
 .result-badge.pending{background:var(--field);color:var(--mute);border-color:var(--line)}
 .result-badge.won{background:rgba(10,143,101,.12);color:var(--gain);border:1px solid rgba(10,143,101,.35)}
@@ -309,7 +315,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.1.1 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.1.2 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -331,6 +337,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
   });
 })();
 </script>
-<script src="/static/app.js?v=1.1.1"></script>
+<script src="/static/app.js?v=1.1.2"></script>
 </body>
 </html>

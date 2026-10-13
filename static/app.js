@@ -449,9 +449,9 @@ function renderPicks(){
     (p.result==='pending'?openCards:closedCards).push(cards[i]);
   });
   const openHtml=openCards.join('')||'<p class="empty">Aucun prono en cours. Quand un prono est publié, il apparaît ici.</p>';
-  const closedHtml=closedCards.join('')||'<p class="empty">Aucun prono réglé pour l\'instant (gagné / perdu / remboursé).</p>';
+  const closedHtml=closedCards.map((h,i)=>h.replace(' class="pick-card',' data-idx="'+i+'" class="pick-card')).join('')||'<p class="empty">Aucun prono réglé pour l\'instant (gagné / perdu / remboursé).</p>';
   el.innerHTML=openHtml;
-  if(hist)hist.innerHTML=closedHtml;
+  if(hist){hist.innerHTML=closedHtml;const c=hist.querySelectorAll('.pick-card');Array.prototype.forEach.call(c,function(card){card.style.animationDelay=(+card.dataset.idx*0.06)+'s';});}
 }
 
 async function handlePicksClick(ev){
@@ -517,7 +517,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.1.1', date='2026-10-12';
+  const v='1.1.2', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
