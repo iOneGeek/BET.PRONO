@@ -223,7 +223,6 @@ $('im').onclick=async()=>{
     await loadBets();o.hidden=true;m.textContent='Données importées.'
   }catch(e){m.textContent=e.message||"Données non valides : collez le texte tel qu'il a été exporté."}
 };
-$('ed').addEventListener('toggle',e=>document.body.classList.toggle('edit',e.target.open));
 $('ex').onclick=()=>{const o=$('out');o.hidden=false;o.value=JSON.stringify(BETS);o.select()};
 $('rs').onclick=async()=>{
   if(!confirm('Effacer définitivement tous vos paris ? Cette action est irréversible.'))return;
@@ -580,7 +579,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.2.5', date='2026-10-13';
+  const v='1.2.6', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
