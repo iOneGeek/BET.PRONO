@@ -1029,7 +1029,10 @@ def create_pick():
     else:
         return jsonify({"error": "Ajoute au moins un pari ou une image."}), 400
 
-    image_data, image_path, image_mime = save_pick_image(image_file) if is_multipart else (None, None, None)
+    try:
+        image_data, image_path, image_mime = save_pick_image(image_file) if is_multipart else (None, None, None)
+    except Exception:
+        image_data, image_path, image_mime = None, None, "Impossible de traiter l'image."
     if image_mime and not str(image_mime).startswith("image/"):
         return jsonify({"error": image_mime}), 400
 
