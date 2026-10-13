@@ -178,6 +178,9 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .ticket-team .tgoal{font-weight:800;font-size:.95rem;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:0 8px;min-width:28px;text-align:center;color:var(--accent);line-height:1.7}
 .ticket-tsep{height:1px;background:var(--line);margin:4px 0}
 .ticket-pickline{display:flex;align-items:baseline;gap:8px;padding:0 2px}
+.save-row{display:flex;align-items:center;gap:10px}
+.save-check{color:var(--win,#19e6a0);font-size:1.5rem;font-weight:800;animation:checkPop .5s ease}
+@keyframes checkPop{0%{transform:scale(0) rotate(-30deg);opacity:0}60%{transform:scale(1.35) rotate(8deg);opacity:1}100%{transform:scale(1) rotate(0)}}
 .hist-title{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-size:1.1rem}
 .ticket-pickline .lbl{color:var(--mute);font-size:.82rem;white-space:nowrap}
 .ticket-pickline .val{font-weight:700;flex:1;border-bottom:1px dotted var(--line);align-self:flex-end;min-width:0}
@@ -283,7 +286,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
   <p class="sub" id="help-bk" hidden>Si tu as déposé de l'argent, je te conseille fortement de mettre ta bankroll à jour.</p>
   <div class="form">
     <label>Bankroll de départ (€)<input id="initBk" type="number" min="0" step="0.01"></label>
-    <button id="saveInit" type="button">Mettre à jour</button>
+    <div class="save-row"><button id="saveInit" type="button">Mettre à jour</button><span id="saveInitFeedback" class="save-check" hidden>✔</span></div>
   </div>
   <div class="row"><button id="ex" type="button">Exporter mes données</button><button id="im" type="button">Importer</button><button id="rs" type="button">Effacer tous mes paris</button></div>
   <p class="sub" id="msg"></p><textarea id="out" hidden aria-label="Données"></textarea>
@@ -306,7 +309,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.1.0 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.1.1 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -328,6 +331,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
   });
 })();
 </script>
-<script src="/static/app.js?v=1.1.0"></script>
+<script src="/static/app.js?v=1.1.1"></script>
 </body>
 </html>

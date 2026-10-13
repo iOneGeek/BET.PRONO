@@ -130,8 +130,17 @@ $('s').addEventListener('input',()=>{const w=$('warn'),lim=(window.BK||0)*0.1;w.
 $('r').addEventListener('change',()=>$('s').dispatchEvent(new Event('input')));
 
 $('saveInit').onclick=async()=>{
-  try{await api('/api/settings',{method:'PATCH',body:JSON.stringify({initial_bankroll:+$('initBk').value})});await loadBets();$('msg').textContent='Bankroll de départ mise à jour.'}
-  catch(e){$('msg').textContent=e.message}
+  const fb=$('saveInitFeedback'), msg=$('msg');
+  try{
+    await api('/api/settings',{method:'PATCH',body:JSON.stringify({initial_bankroll:+$('initBk').value})});
+    await loadBets();
+    msg.textContent='Bankroll de départ mise à jour.';
+    if(fb){
+      fb.hidden=false;
+      fb.style.animation='none';void fb.offsetWidth;fb.style.animation='';
+      setTimeout(()=>{fb.hidden=true;},1600);
+    }
+  }catch(e){msg.textContent=e.message}
 };
 
 $('im').onclick=async()=>{
@@ -508,7 +517,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.1.0', date='2026-10-12';
+  const v='1.1.1', date='2026-10-12';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
