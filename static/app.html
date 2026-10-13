@@ -45,6 +45,7 @@ input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visi
 .ln{stroke:#fff;stroke-width:3;fill:none;stroke-linejoin:round;stroke-linecap:round}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:2px;box-shadow:var(--shadow-sm);transition:transform .12s ease,box-shadow .12s ease}
+.card em{font-style:normal;color:var(--mute);font-size:.72rem;opacity:.85}
 .card:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
 .card span{color:var(--mute);font-size:.85rem}.card b{font-size:1.45rem;font-weight:800;letter-spacing:-.3px}
 .g{color:var(--gain)}.l{color:var(--loss)}
@@ -356,7 +357,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.2.1 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.2.2 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -379,6 +380,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.2.1"></script>
+<script src="/static/app.js?v=1.2.2"></script>
 </body>
 </html>
