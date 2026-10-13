@@ -501,7 +501,7 @@ function renderPicks(){
     return `<div class="pick-card${collapsedClass}${openClass}" data-tpid="${p.id}" ${p.result==='won'?'data-toggle="1"':''}>
       <div class="pick-head">
         <div>
-          <h3><span class="title-accent"></span>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3>
+          <h3>${p.title}${p.sport?` <span class="sport-badge">${p.sport}</span>`:''}</h3>
           <p class="sub">Par ${p.author}${fmtDt(p.created_at)?` · <span class="pick-date">${fmtDt(p.created_at)}</span>`:''}</p>
         </div>
         <div class="pick-head-right">
@@ -611,7 +611,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.3.1', date='2026-10-13';
+  const v='1.3.2', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

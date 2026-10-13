@@ -124,7 +124,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 /* Barre verticale orange avant les titres de section */
 h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background:var(--accent);margin-right:9px;vertical-align:-4px}
 .hist-title{display:flex;align-items:center;gap:8px;margin:14px 0 10px;font-size:1.05rem}
-.hist-title .bar{vertical-align:-4px}
 .hist-sep{height:1px;background:var(--line);opacity:.35;margin:18px 0 4px}
 .hist-count{background:var(--field);border:1px solid var(--line);color:var(--mute);font-size:.75rem;font-weight:700;border-radius:999px;padding:2px 10px;line-height:1.4}
 /* État vide des pronos */
@@ -135,9 +134,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 .pick-empty p{margin:0;color:var(--mute);font-size:.85rem}
 .pick-card{border:1px solid var(--line);border-radius:18px;padding:16px 16px 16px 20px;background:var(--panel);display:grid;gap:11px;box-shadow:var(--shadow-sm);transition:box-shadow .18s ease,transform .15s ease;position:relative;max-width:560px;width:100%;margin:0 auto;overflow:hidden}
 .pick-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--accent),rgba(255,117,24,.55))}
-.pick-card::after{content:"";position:absolute;inset:0 0 auto 0;height:3px;border-radius:18px 18px 0 0;background:linear-gradient(90deg,var(--accent),rgba(255,117,24,0))}
 .pick-card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
-.title-accent{display:inline-block;width:5px;height:20px;border-radius:99px;background:var(--accent);margin-right:8px;vertical-align:middle}
 .pick-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .pick-head h3{margin:0;font-size:1.05rem;display:flex;align-items:center;flex-wrap:wrap}
 .pick-head .sub{margin:0}
@@ -312,11 +309,11 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 
   <section class="panel">
-    <h2><span class="bar"></span>Paris partagés</h2>
+    <h2>Paris partagés</h2>
     <p class="sub">Choisis un sport, règle ta mise, et suis le prono pour l'ajouter à ta bankroll.</p>
     <div id="picksList" class="share-form"></div>
     <div class="hist-sep"></div>
-    <h2 class="hist-title"><span class="bar"></span>Historique des paris partagés<span class="hist-count" id="histCount" hidden></span></h2>
+    <h2 class="hist-title">Historique des paris partagés<span class="hist-count" id="histCount" hidden></span></h2>
     <div id="picksHistory" class="share-form"></div>
   </section>
 </div>
@@ -394,7 +391,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.3.1 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.3.2 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -417,6 +414,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.3.1"></script>
+<script src="/static/app.js?v=1.3.2"></script>
 </body>
 </html>
