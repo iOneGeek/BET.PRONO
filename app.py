@@ -148,7 +148,10 @@ class Conn:
 
 
 POOL = None
+_POOL_LOCK = None
 if USE_PG:
+    import threading
+    _POOL_LOCK = threading.Lock()
     dsn = DATABASE_URL
     if "connect_timeout=" not in dsn:
         sep = "&" if "?" in dsn else "?"
@@ -163,20 +166,42 @@ if USE_PG:
     POOL.open()
 
 
+def _ensure_pool_open():
+    """Garantit que le pool est ouvert. L'auto-reconnect règle les coupures
+    temporaires (maintenances Render/Neon, pause du compute) : dès que la base
+    redevient joignable, le pool se rouvre tout seul, sans erreur ni blocage."""
+    if not USE_PG or POOL is None:
+        return True
+    if not POOL.closed:
+        return True
+    try:
+        with _POOL_LOCK:
+            if POOL.closed:
+                try:
+                    POOL.open()
+                except Exception:
+                    return False
+        return not POOL.closed
+    except Exception:
+        return False
+
+
 def get_db():
     if "db" not in g:
         if USE_PG:
+            real = None
             try:
                 real = POOL.getconn()
             except Exception:
-                # Connexions du pool devenues obsolètes (redémarrage/pause Neon) :
-                # on purge les connexions mortes SANS fermer le pool global,
-                # puis on retente une fois.
-                if POOL.closed:
-                    try:
-                        POOL.open()
-                    except Exception:
-                        pass
+                # Première tentative a échoué : on rouvre/commit le pool puis
+                # on réessaie. L'auto-reconnect permet de se rebrancher dès que
+                # l'hébergeur répond à nouveau.
+                if not _ensure_pool_open():
+                    pass
+                try:
+                    real = POOL.getconn()
+                except Exception:
+                    real = POOL.getconn()
                 else:
                     try:
                         POOL.check()
