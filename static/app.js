@@ -413,9 +413,15 @@ renderPickBets();
 
 const PICK_LB={pending:'En cours',won:'Gagné',lost:'Perdu',void:'Remboursé'};
 
-async function loadPicks(){
-  const data=await api('/api/picks');
-  PICKS=data.picks;
+async function loadPicks(retryOK){
+  let data;
+  try{ data=await api('/api/picks'); }
+  catch(e){ if(retryOK){ /* reessaie une fois apres un petit delai */ await new Promise(r=>setTimeout(r,1200)); return loadPicks(false); } throw e; }
+  const list=Array.isArray(data&&data.picks)?data.picks:null;
+  // Ne jamais remplacer une liste deja chargee par un tableau vide "transitoire".
+  if(list===null){ if(retryOK){ await new Promise(r=>setTimeout(r,1200)); return loadPicks(false); } return }
+  if(list.length===0 && PICKS.length>0){ return; } // garder les pronos deja affiches
+  PICKS=list;
   renderPicks();
 }
 
@@ -442,6 +448,19 @@ const TICKET_STATUS={pending:['En cours','⏳'],won:['Gagné','👍'],lost:['Per
 function renderPicks(){
   const el=$('picksList');
   const hist=$('picksHistory');
+  try{
+    renderPicksInner(el,hist);
+  }catch(err){
+    // Un vrai plantage ne doit JAMAIS laisser croire que "aucun prono" :
+    // on affiche l'erreur a l'ecran pour pouvoir la corriger.
+    console.error('[PICKS] echec du rendu:',err);
+    const parr=el||hist;
+    if(parr){
+      parr.innerHTML='<div class="pick-empty"><div class="pe-icon">⚠️</div><b>Erreur d\'affichage</b><p>Impossible d\'afficher les pronos (voir la console).</p></div>';
+    }
+  }
+}
+function renderPicksInner(el,hist){
   if(!PICKS.length){el.innerHTML='<div class="pick-empty"><div class="pe-icon">📄<small>↗</small></div><b>Aucun prono en cours</b><p>Quand un prono est publié, il apparaîtra ici.</p></div>';if(hist)hist.innerHTML='';return}
   const userBk=(window.BK&&window.BK>0)?window.BK:INIT;
   const cards=PICKS.map(p=>{
@@ -617,7 +636,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.3.8', date='2026-10-13';
+  const v='1.3.9', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
@@ -643,10 +662,13 @@ setInterval(async()=>{
     if(r.status===401) return;
     const d=await r.json();
     if(d&&Array.isArray(d.picks)){
+      // Une reponse vide transitoire ne doit pas effacer les pronos deja affiches :
+      // on retente avant de declencher l'etat vide.
+      if(!d.picks.length && PICKS.length){ return; }
       PICKS=data_normalize_picks(d.picks);
       renderPicks();
     }
-  }catch(e){/* silencieux */}
+  }catch(e){console.error('[PICKS] echec de la mise a jour periodique:',e)}
 }, 20000);
 
 function data_normalize_picks(p){
