@@ -509,6 +509,7 @@ function renderPicksInner(el,hist){
       <button type="button" data-settle="${p.id}" data-result="void">Remboursé</button>
       <button type="button" data-setscore="${p.id}">Modifier score</button>
     </div>`:'';
+    const delBtn=IS_ADMIN?`<span class="head-sep"></span><button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Supprimer ce prono">Supprimer</button>`:'';
     const stakeForGain=p.followed?p.follow_stake:advisedStake;
     const potentialGain=+(stakeForGain*p.total_odds).toFixed(2);
     const ticketTotalsHtml=p.legs.length?`
@@ -636,7 +637,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.3.9', date='2026-10-13';
+  const v='1.3.10', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
