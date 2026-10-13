@@ -357,12 +357,6 @@ function updatePickTotal(){
     pickBets.push({home:'',away:'',pick:'',odds:'',score:''});
     renderPickBets();
   });
-  $('pickImage').addEventListener('change',()=>{
-    const file=$('pickImage').files[0],prev=$('pickImagePreview');
-    if(!file){prev.hidden=true;prev.src='';return}
-    prev.src=URL.createObjectURL(file);
-    prev.hidden=false;
-  });
   $('publishPickBtn').addEventListener('click',async()=>{
     const msg=$('pickMsg');
     const legs=pickBets
@@ -372,8 +366,8 @@ function updatePickTotal(){
         const match = (home||away) ? (home+' ⚔ '+(away||'—')) : (b.match||'');
         return {match, pick:b.pick, odds:parseOddsP(b.odds), score:(b&&b.score?b.score.trim():'')};
       });
-    const imageFile=$('pickImage').files[0];
-    if(!legs.length&&!imageFile){msg.textContent='Ajoute au moins un pari ou une image.';return}
+    const imageFile=$('pickImage').files && $('pickImage').files[0];
+    if(!legs.length&&!imageFile){msg.textContent='Ajoute au moins un pari.';return}
     try{
       const fd=new FormData();
       fd.append('title',$('pickTitle').value);
@@ -389,8 +383,6 @@ function updatePickTotal(){
       if(!r.ok)throw new Error(resData.error||'Erreur serveur');
       pickBets=[{home:'',away:'',pick:'',odds:'',score:''}];
       renderPickBets();
-      $('pickImage').value='';
-      $('pickImagePreview').hidden=true;
       $('pickLink').value='';
       currentProfile='prudent';
       const sel=$('profileSelect');
@@ -479,7 +471,6 @@ function renderPicks(){
       <button type="button" data-settle="${p.id}" data-result="void">Remboursé</button>
       <button type="button" data-setscore="${p.id}">Modifier score</button>
     </div>`:'';
-    const imageHtml=p.image_url?`<img class="pick-image" src="${p.image_url}" alt="Image du prono">`:'';
     const stakeForGain=p.followed?p.follow_stake:advisedStake;
     const potentialGain=+(stakeForGain*p.total_odds).toFixed(2);
     const ticketTotalsHtml=p.legs.length?`
@@ -500,7 +491,6 @@ function renderPicks(){
         <div class="pick-head-right">${delBtn}<span class="ticket-status ${p.result}"><i>${stIcon}</i>${stLabel}</span></div>
       </div>
       <div class="pick-body">
-      ${imageHtml}
       <div class="ticket-legs">${legsHtml}</div>
       ${ticketTotalsHtml}
       ${adviceHtml}
@@ -583,7 +573,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.1.9', date='2026-10-13';
+  const v='1.2.0', date='2026-10-13';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

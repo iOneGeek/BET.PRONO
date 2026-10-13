@@ -145,8 +145,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .pick-leg .p{font-weight:600}
 .pick-leg .o{color:var(--accent);font-weight:700}
 .pick-foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-.pick-image{width:100%;border-radius:10px;display:block;max-height:360px;object-fit:cover}
-#pickImagePreview{width:100%;border-radius:10px;max-height:240px;object-fit:cover}
 .follow-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .follow-form input{width:110px}
 .followed-badge{color:var(--accent);font-weight:700;font-size:.9rem}
@@ -259,8 +257,6 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
       <div id="pickBetsList"></div>
       <button id="addPickBet" type="button">+ Ajouter un pari</button>
       <div class="total-pill"><span>Cote totale</span><b id="pickTotalOdds">1,00</b></div>
-      <label>Image (capture d'écran, affiche, etc. - optionnel)<input id="pickImage" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
-      <img id="pickImagePreview" alt="Aperçu de l'image" hidden>
       <label>Lien du pari (Winamax, Betclic... - optionnel)<input id="pickLink" type="url" inputmode="url" placeholder="https://www.winamax.fr/..." maxlength="500"></label>
       <div class="profile-select" id="profileSelect">
         <button type="button" data-prof="fun">🎉 Fun</button>
@@ -360,7 +356,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.1.9 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.2.0 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -383,6 +379,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.1.9"></script>
+<script src="/static/app.js?v=1.2.0"></script>
 </body>
 </html>

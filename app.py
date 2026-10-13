@@ -8,7 +8,6 @@ import uuid
 import base64
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from io import BytesIO
 
 import jwt
 import requests
@@ -24,8 +23,6 @@ DB_PATH = os.path.join(BASE_DIR, "instance", "bankroll.db")
 SECRET_PATH = os.path.join(BASE_DIR, "instance", "secret.key")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 UPLOAD_DIR = os.path.join(BASE_DIR, "instance", "uploads")
-ALLOWED_IMAGE_EXT = {"png", "jpg", "jpeg", "webp", "gif"}
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
 def _load_local_env():
     """Charge local.env (non versionné) pour les secrets en local."""
     path = os.path.join(BASE_DIR, "local.env")
@@ -915,59 +912,6 @@ def serialize_pick(row, follow=None):
     }
 
 
-MAX_IMG_W, MAX_IMG_H = 1000, 700
-
-
-def save_pick_image(file_storage):
-    if not file_storage or not file_storage.filename:
-        return None, None, None
-    ext = file_storage.filename.rsplit(".", 1)[-1].lower() if "." in file_storage.filename else ""
-    if ext not in ALLOWED_IMAGE_EXT:
-        return None, None, "Format d'image invalide (png, jpg, jpeg, webp, gif)."
-    data = file_storage.read()
-    if len(data) > MAX_IMAGE_BYTES:
-        return None, None, "Image trop lourde."
-    # Compression / redimensionnement (largeur <= 1000px, hauteur <= 700px)
-    try:
-        from PIL import Image, ImageOps
-        im = Image.open(BytesIO(data))
-        im = ImageOps.exif_transpose(im)
-        im.thumbnail((MAX_IMG_W, MAX_IMG_H), Image.LANCZOS)
-        if im.mode in ("RGBA", "LA", "P", "CMYK"):
-            bg = Image.new("RGB", im.size, (18, 20, 26))
-            if im.mode == "RGBA":
-                bg.paste(im, mask=im.split()[3])
-            else:
-                bg.paste(im.convert("RGB"))
-            im = bg
-        else:
-            im = im.convert("RGB")
-        buf = BytesIO()
-        im.save(buf, "JPEG", quality=82, optimize=True)
-        out = buf.getvalue()
-        if len(out) >= len(data) and ext in ("jpg", "jpeg", "gif"):
-            out = data
-            mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}.get(ext, "application/octet-stream")
-            final = ext
-        else:
-            mime = "image/jpeg"
-            final = "jpg"
-    except Exception:
-        # Image corrompue ou non decodable -> on garde les octets bruts.
-        out = data
-        mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}.get(ext, "application/octet-stream")
-        final = ext
-    # Sauvegarde sur disque en secours (compat), mais la source de vérité est la base.
-    filename = secure_filename(f"{uuid.uuid4().hex}.{final}")
-    try:
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        with open(os.path.join(UPLOAD_DIR, filename), "wb") as f:
-            f.write(out)
-    except OSError:
-        filename = None
-    return out, filename, mime
-
-
 @app.get("/api/picks")
 @login_required
 def list_picks():
@@ -1000,7 +944,6 @@ def create_pick():
             legs_raw = json.loads(request.form.get("legs") or "[]")
         except ValueError:
             legs_raw = []
-        image_file = request.files.get("image")
     else:
         data = request.get_json(silent=True) or {}
         title = (data.get("title") or "").strip()[:60] or "Prono"
@@ -1008,7 +951,6 @@ def create_pick():
         advice_profile = (data.get("advice_profile") or "prudent").strip().lower()
         link_raw = data.get("link_url")
         legs_raw = data.get("legs") or []
-        image_file = None
 
     if advice_profile not in ("fun", "prudent", "confiance", "maxi"):
         advice_profile = "prudent"
@@ -1021,33 +963,15 @@ def create_pick():
         legs_data, err = validate_legs(legs_raw)
         if err:
             return jsonify({"error": err}), 400
-    elif is_multipart and image_file and image_file.filename:
-        legs_data = {"legs": [], "total_odds": 1.0}
     else:
-        return jsonify({"error": "Ajoute au moins un pari ou une image."}), 400
-
-    try:
-        image_data, image_path, image_mime = save_pick_image(image_file) if is_multipart else (None, None, None)
-    except Exception:
-        image_data, image_path, image_mime = None, None, "Impossible de traiter l'image."
-    if image_mime and not str(image_mime).startswith("image/"):
-        return jsonify({"error": image_mime}), 400
+        return jsonify({"error": "Ajoute au moins un pari."}), 400
 
     db = get_db()
     now = datetime.now(timezone.utc).isoformat()
-    # psycopg3 : BYTEA exige un objet Binary quand le protocol est en mode texte,
-    # sinon il ne sait pas encoder un bytes nu -> 500. On l'enveloppe si PG.
-    ins_image = image_data
-    if ins_image is not None and db.backend == "pg":
-        try:
-            import psycopg
-            ins_image = psycopg.Binary(image_data)
-        except Exception:
-            ins_image = image_data
     cur = db.execute(
-        "INSERT INTO picks (author_id, title, sport, legs, total_odds, result, image_path, image_data, image_mime, created_at, advice_profile, link_url) "
-        "VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)",
-        (g.user["id"], title, sport, json.dumps(legs_data["legs"]), legs_data["total_odds"], image_path, ins_image, image_mime, now, advice_profile, link_url),
+        "INSERT INTO picks (author_id, title, sport, legs, total_odds, result, created_at, advice_profile, link_url) "
+        "VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)",
+        (g.user["id"], title, sport, json.dumps(legs_data["legs"]), legs_data["total_odds"], now, advice_profile, link_url),
     )
     db.commit()
     row = db.execute(
