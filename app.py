@@ -1439,23 +1439,36 @@ def admin_users():
     _reconcile_expired_bans(db)
     where, args = [], []
     if search:
-        where.append("(username LIKE ? OR COALESCE(email, '') LIKE ?)")
+        where.append("(u.username LIKE ? OR COALESCE(u.email, '') LIKE ?)")
         args += [f"%{search}%", f"%{search}%"]
     if filt in {"active", "banned"}:
-        where.append(f"banned = {1 if filt == 'banned' else 0}")
+        where.append(f"u.banned = {1 if filt == 'banned' else 0}")
 
     allowed = {"created_at", "username", "is_admin", "last_activity", "banned"}
     if sort_col not in allowed:
         sort_col = "created_at"
     where_sql = (" WHERE " + " AND ".join(where)) if where else ""
-    total = db.execute(f"SELECT COUNT(*) FROM users{where_sql}", args).fetchone()[0]
+    total = db.execute(f"SELECT COUNT(*) FROM users u{where_sql}", args).fetchone()[0]
 
     rows = db.execute(
-        f"SELECT * FROM users{where_sql} ORDER BY {sort_col} {order} LIMIT ? OFFSET ?",
+        f"""SELECT u.*,
+        COALESCE((
+            SELECT SUM(
+                CASE
+                    WHEN b.result = 'won'  THEN b.stake * (b.odds - 1) + COALESCE(b.bonus, 0)
+                    WHEN b.result = 'lost'  THEN -b.stake
+                    WHEN b.result = 'wd'    THEN -b.stake
+                    ELSE 0
+                END
+            ) FROM bets b WHERE b.user_id = u.id
+        ), 0) AS net_bets
+        FROM users u{where_sql} ORDER BY u.{sort_col} {order} LIMIT ? OFFSET ?""",
         args + [per, (page - 1) * per],
     ).fetchall()
     users = []
     for r in rows:
+        net = r["net_bets"] if "net_bets" in r.keys() else 0
+        bankroll = float(r["initial_bankroll"]) + net
         users.append({
             "id": r["id"],
             "username": r["username"],
@@ -1466,6 +1479,9 @@ def admin_users():
             "banned_until": r["banned_until"] if "banned_until" in r.keys() else None,
             "created_at": r["created_at"],
             "last_activity": r["last_activity"] if "last_activity" in r.keys() else None,
+            "initial_bankroll": r["initial_bankroll"],
+            "net_bets": round(net, 2),
+            "bankroll": round(bankroll, 2),
         })
     return jsonify({"users": users, "total": total, "page": page, "per": per})
 
@@ -1480,11 +1496,22 @@ def admin_user_detail(user_id):
     if not r:
         return jsonify({"error": "Utilisateur introuvable."}), 404
     nbets = db.execute("SELECT COUNT(*) FROM bets WHERE user_id = ?", (user_id,)).fetchone()[0]
+    net = db.execute(
+        "SELECT COALESCE(SUM(CASE "
+        "WHEN result = 'won' THEN stake * (odds - 1) + COALESCE(bonus, 0) "
+        "WHEN result = 'lost' THEN -stake "
+        "WHEN result = 'wd' THEN -stake "
+        "ELSE 0 END), 0) FROM bets WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()[0]
+    bankroll = float(r["initial_bankroll"]) + net
     return jsonify({
         "id": r["id"],
         "username": r["username"],
         "email": dict(r).get("email"),
         "initial_bankroll": r["initial_bankroll"],
+        "net_bets": round(net, 2),
+        "bankroll": round(bankroll, 2),
         "is_admin": bool(r["is_admin"]),
         "banned": bool(r["banned"]),
         "banned_reason": r["banned_reason"] if "banned_reason" in r.keys() else None,

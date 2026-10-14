@@ -57,13 +57,13 @@ h2:before{content:"";width:4px;height:1em;border-radius:2px;background:linear-gr
 .stat-card b{font-size:1.5rem;font-weight:800;letter-spacing:-.3px;display:block;margin-top:2px}
 .stat-card b.accent{color:var(--accent)}.stat-card b.g{color:var(--gain)}.stat-card b.l{color:var(--loss)}
 /* Chart */
-.chart{background:linear-gradient(160deg,#1e2c49,#2a3c62);border-radius:18px;padding:14px 10px 6px;box-shadow:0 8px 24px rgba(2,8,20,.35),inset 0 1px 0 rgba(255,255,255,.08)}
+.chart{background:linear-gradient(160deg,#1e2c49,#2a3c62);border-radius:18px;padding:14px 10px 6px;box-shadow:0 8px 24px rgba(2,8,20,.35),inset 0 1px 0 rgba(255,255,255,.08);max-width:460px;margin:0 auto}
 .chart svg{width:100%;height:auto;display:block}
 .chart text{fill:rgba(255,255,255,.88);font-size:11px}
 .chart .gl{stroke:rgba(255,255,255,.22)}.chart .gl.z{stroke:rgba(255,255,255,.65)}
 .chart .ln{stroke:#fff;stroke-width:3;fill:none;stroke-linejoin:round;stroke-linecap:round}
 .chart .fn-g{fill:#2e3d5c}.chart .fn-a{fill:var(--accent)}
-.chart-toggle{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.chart-toggle{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;justify-content:center}
 .chart-toggle button{background:transparent;border:1px solid var(--line);color:var(--mute);padding:5px 12px;border-radius:999px;font-size:.8rem}
 .chart-toggle button[aria-pressed=true]{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:600}
 /* Table */
@@ -77,6 +77,7 @@ h2:before{content:"";width:4px;height:1em;border-radius:2px;background:linear-gr
 table{border-collapse:collapse;width:100%;min-width:640px;font-size:.9rem}
 th{text-align:left;color:var(--mute);font-weight:400;font-size:.8rem;position:sticky;top:0;background:var(--panel)}
 th,td{padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td.nr,th.nr{text-align:right;font-variant-numeric:tabular-nums}
 tbody tr{transition:background .12s ease}
 tbody tr:hover{background:var(--field)}
 th.sortable{cursor:pointer;user-select:none}
@@ -221,10 +222,11 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;margin-top:30px;opaci
                 <th class="sortable" data-sort="banned">Statut<span class="colarrow">↕</span></th>
                 <th class="sortable" data-sort="created_at">Inscrit<span class="colarrow">↕</span></th>
                 <th class="sortable" data-sort="last_activity">Dernière activité<span class="colarrow">↕</span></th>
+                <th title="Bankroll actuelle = bankroll initiale + gains nets">Bankroll<span class="colarrow">↕</span></th>
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody id="usrRows"><tr><td colspan="6" class="info">Chargement…</td></tr></tbody>
+            <tbody id="usrRows"><tr><td colspan="7" class="info">Chargement…</td></tr></tbody>
           </table>
         </div>
         <div class="pager">
@@ -277,7 +279,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;margin-top:30px;opaci
       </div>
     </section>
 
-    <footer>BET.PRONO V1.8.1 · Panneau d'administration · <a href="/app">Retour à l'app</a></footer>
+    <footer>BET.PRONO V1.8.3 · Panneau d'administration · <a href="/app">Retour à l'app</a></footer>
   </div>
 </div>
 
@@ -285,6 +287,8 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;margin-top:30px;opaci
 const $ = (id) => document.getElementById(id);
 const FR = new Intl.DateTimeFormat('fr-FR', { dateStyle:'medium', timeStyle:'short', timeZone:'Europe/Paris' });
 function fmt(d){ if(!d) return '—'; try { return FR.format(new Date(d)); } catch(e){ return d; } }
+const CUR = new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR', minimumFractionDigits:2, maximumFractionDigits:2 });
+function money(x){ if(x==null||isNaN(x)) return '—'; return CUR.format(Number(x)); }
 
 /* ---------- Auth helpers ---------- */
 async function api(path, opts={}){
@@ -426,7 +430,7 @@ function roleBadge(u){ return u.is_admin?'<span class="badge admin">admin</span>
 function statusBadge(u){ return u.banned?'<span class="badge banned">banni</span>':'<span class="badge active">actif</span>'; }
 function renderUsers(rows){
   const t=$('usrRows');
-  if(!rows.length){ t.innerHTML='<tr><td colspan="6" class="info">Aucun utilisateur.</td></tr>'; return; }
+  if(!rows.length){ t.innerHTML='<tr><td colspan="7" class="info">Aucun utilisateur.</td></tr>'; return; }
   t.innerHTML=rows.map(u=>`
     <tr>
       <td><b>${u.username}</b><div style="color:var(--mute);font-size:.78rem">${u.email||''}</div></td>
@@ -434,6 +438,7 @@ function renderUsers(rows){
       <td>${statusBadge(u)}</td>
       <td>${fmt(u.created_at)}</td>
       <td>${fmt(u.last_activity)}</td>
+      <td class="nr">${u.bankroll!=null? money(u.bankroll) : money(u.initial_bankroll)}</td>
       <td>
         <button type="button" class="ghost" data-act="view" data-id="${u.id}">Détail</button>
         ${u.banned
@@ -494,7 +499,9 @@ $('usrRows').addEventListener('click', async (e)=>{
           <div class="detail-item"><em>Pseudo</em><b>${u.username}</b></div>
           <div class="detail-item"><em>E-mail</em><b>${u.email||'—'}</b></div>
           <div class="detail-item"><em>Rôle</em><b>${u.is_admin?'Admin':'Utilisateur'}</b></div>
-          <div class="detail-item"><em>Bankroll initiale</em><b>${u.initial_bankroll}</b></div>
+          <div class="detail-item"><em>Bankroll actuelle</em><b>${money(u.bankroll!=null?u.bankroll:u.initial_bankroll)}</b></div>
+          <div class="detail-item"><em>Bankroll initiale</em><b>${money(u.initial_bankroll)}</b></div>
+          <div class="detail-item"><em>Gains nets</em><b>${money(u.net_bets!=null?u.net_bets:0)}</b></div>
           <div class="detail-item"><em>Inscription</em><b>${fmt(u.created_at)}</b></div>
           <div class="detail-item"><em>Dernière activité</em><b>${fmt(u.last_activity)}</b></div>
           <div class="detail-item"><em>Paris enregistrés</em><b>${u.total_bets}</b></div>
