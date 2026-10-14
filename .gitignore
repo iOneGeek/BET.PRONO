@@ -5,3 +5,4 @@ server.log
 tmp/
 local.env
 .abacusai/
+_test/

@@ -287,6 +287,7 @@ $('profileForm').addEventListener('submit',async ev=>{
     $('whoami').textContent=me.username;
     IS_ADMIN=!!me.is_admin;
     $('adminPanel').hidden=!IS_ADMIN;
+    const admLink=$('adminLink'); if(admLink)admLink.hidden=!IS_ADMIN;
     loadProfileForm();
     await loadBets();
     await loadPicks();
