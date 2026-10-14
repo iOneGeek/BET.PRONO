@@ -145,8 +145,8 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 .fx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .fs-label{grid-column:1/-1;display:block;text-align:center;color:var(--mute);font-size:.72rem;padding:8px 0 2px}
 .fx-tile{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.fx-tile-match{display:flex;flex-direction:column;align-items:stretch;gap:4px}
-.fx-tile-match .fx-team{min-width:0;display:flex;align-items:center;gap:6px;font-weight:700;font-size:.85rem;color:var(--text)}
+.fx-tile-match{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.fx-tile-match .fx-team{min-width:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;max-width:100%;font-weight:700;font-size:.85rem;color:var(--text)}
 .fx-tile-match .fx-team-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fx-team-logo{width:20px;height:20px;object-fit:contain;border-radius:50%;background:var(--field);padding:1px;flex-shrink:0}
 .fx-tile-match .fx-vs{color:var(--accent);font-weight:800;font-size:.62rem;letter-spacing:.08em;flex-shrink:0;text-align:center;line-height:1}
@@ -444,7 +444,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.6.7 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.6.8 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -467,6 +467,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.6.7"></script>
+<script src="/static/app.js?v=1.6.8"></script>
 </body>
 </html>
