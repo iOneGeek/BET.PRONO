@@ -1,4 +1,4 @@
-const CACHE = 'bet-prono-v62';
+const CACHE = 'bet-prono-v63';
 
 // Rien n'est pré-caché à l'installation : cacher le HTML ici provoquait
 // justement un mélange de versions (ancien HTML + nouveau JS) et des clics morts.

@@ -1233,6 +1233,7 @@ def _sportmonks_day(day):
             "state": state,
             "kickoff": kickoff,
             "league": league or "?",
+            "teams": names,
         })
     return out, False
 
