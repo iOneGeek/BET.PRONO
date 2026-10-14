@@ -277,7 +277,7 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;margin-top:30px;opaci
       </div>
     </section>
 
-    <footer>BET.PRONO V1.8.0 · Panneau d'administration · <a href="/app">Retour à l'app</a></footer>
+    <footer>BET.PRONO V1.8.1 · Panneau d'administration · <a href="/app">Retour à l'app</a></footer>
   </div>
 </div>
 
@@ -472,6 +472,16 @@ $('usrExport').addEventListener('click', async ()=>{
 });
 
 /* ---------- Détail / ban / unban ---------- */
+function fnBanBlock(u){
+  if(u.banned){
+    var when = u.banned_until ? '<span id="banUntilVal">'+fmt(u.banned_until)+'</span>' : 'durée permanente';
+    return '<div class="alert">Motif : '+(u.banned_reason||'non précisé')+'<br>Jusqu\'au : '+when+'</div>';
+  }
+  if(u.is_admin){ return ''; }
+  return '<div class="mod-wrap"><div class="mod-row"><label>Motif du bannissement<input type="text" id="banReason" maxlength="300" placeholder="Motif affiché à l\'utilisateur"></label>'
+    +'<label>Durée<select id="banDuration"><option value="">Permanent</option><option value="1">24 heures</option><option value="7">7 jours</option><option value="30">30 jours</option></select></label>'
+    +'<button type="button" class="danger" id="doBan">Bannir</button></div></div>';
+}
 $('usrRows').addEventListener('click', async (e)=>{
   const b=e.target.closest('button[data-act]'); if(!b) return;
   const id=b.dataset.id, name=b.dataset.name;
@@ -490,8 +500,7 @@ $('usrRows').addEventListener('click', async (e)=>{
           <div class="detail-item"><em>Paris enregistrés</em><b>${u.total_bets}</b></div>
           <div class="detail-item"><em>Statut</em><b><span class="badge ${u.banned?'banned':'active'}">${u.banned?'banni':'actif'}</span></b></div>
         </div>
-        ${u.banned?`<div class="alert">Motif : ${u.banned_reason||'non précisé'}<br>Jusqu'au : ${u.banned_until?'<span id="banUntilVal">'+fmt(u.banned_until)+'</span>':'durée permanente'}</div>`
-          :(u.is_admin?'':'<div class="mod-wrap"><div class="mod-row"><label>Motif du bannissement<input type="text" id="banReason" maxlength="300" placeholder="Motif affiché à l'utilisateur"></label><label>Durée<select id="banDuration"><option value="">Permanent</option><option value="1">24 heures</option><option value="7">7 jours</option><option value="30">30 jours</option></select></label><button type="button" class="danger" id="doBan">Bannir</button></div></div>')}
+        ${fnBanBlock(u)}
       `;
       const doBan=$('doBan');
       if(doBan){
