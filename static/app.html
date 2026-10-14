@@ -52,6 +52,13 @@ input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visi
 .pick-date{color:var(--mute);font-size:.8rem;white-space:nowrap}
 .card:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
 .card span{color:var(--mute);font-size:.85rem}.card b{font-size:1.45rem;font-weight:800;letter-spacing:-.3px}
+.pick-stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.pick-stats .ps{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:7px 12px;font-size:.82rem;color:var(--mute)}
+.pick-stats .ps b{color:var(--text);font-size:.95rem;font-weight:800}
+.pick-stats .ps.w{--c:26,168,83}.pick-stats .ps.w b{color:rgb(var(--c))}
+.pick-stats .ps.l{--c:255,82,82}.pick-stats .ps.l b{color:rgb(var(--c))}
+.pick-stats .ps.v b{color:var(--mute)}
+.pick-stats .ps.r b{color:var(--accent)}
 .g{color:var(--gain)}.l{color:var(--loss)}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
 h2{margin:0 0 12px;font-size:1.08rem;display:flex;align-items:center;gap:8px}
@@ -95,10 +102,10 @@ footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--pane
 .soc-mini img{width:18px;height:18px;object-fit:contain}
 .tg-footer-link{display:inline-block;margin:0 2px;color:#229ed9;text-decoration:none;font-weight:600;font-size:.8rem}
 .tg-footer-link:hover{text-decoration:underline}
-.nav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:5px;box-shadow:var(--shadow-sm)}
-.nav button{flex:1;border:none;background:transparent;color:var(--mute);font-weight:600;padding:10px;border-radius:10px;transition:all .18s ease;cursor:pointer}
-.nav button:hover{color:var(--text)}
-.nav button[aria-pressed=true]{background:var(--accent);color:var(--on-accent);box-shadow:0 3px 10px rgba(255,117,24,.35)}
+.nav{display:flex;gap:4px;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:5px;box-shadow:var(--shadow-sm)}
+.nav .nav-selector{position:absolute;top:5px;bottom:5px;left:5px;z-index:1;background:var(--accent);box-shadow:0 3px 10px rgba(255,117,24,.35);border-radius:10px;transition:left .38s cubic-bezier(.22,1,.36,1),width .38s cubic-bezier(.22,1,.36,1);pointer-events:none}
+.nav button{flex:1;position:relative;z-index:2;border:none;background:transparent;color:var(--mute);font-weight:600;padding:10px;border-radius:10px;transition:color .3s ease;cursor:pointer}
+.nav button[aria-pressed=true]{color:var(--on-accent)}
 .view{display:none}
 .view.active{display:grid;gap:16px}
 .share-form{display:grid;gap:14px}
@@ -296,6 +303,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 <nav class="nav" id="mainNav" hidden>
   <button type="button" data-view="home" aria-pressed="true">Accueil</button>
   <button type="button" data-view="bankroll" aria-pressed="false">Bankroll</button>
+  <span class="nav-selector" id="navSelector" aria-hidden="true"></span>
 </nav>
 
 <div id="viewHome" class="view">
@@ -338,6 +346,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
   <section class="panel">
     <h2>Paris partagés</h2>
     <p class="sub">Choisis un sport, règle ta mise, et suis le prono pour l'ajouter à ta bankroll.</p>
+    <div id="pickStats" class="pick-stats" hidden></div>
     <div id="picksList" class="share-form"></div>
     <div class="hist-sep"></div>
     <h2 class="hist-title">Historique des paris partagés<span class="hist-count" id="histCount" hidden></span></h2>
@@ -418,13 +427,27 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.8.7 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V1.9.0 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
   <b>La page a rencontré une erreur.</b><span id="jsErrMsg"></span>
   <button type="button" id="jsErrorFix">Recharger proprement</button>
 </div>
+<dialog id="editBetDlg">
+  <h3 id="editBetTitle">Modifier le pari</h3>
+  <form method="dialog" class="share-form" id="editBetForm">
+    <label>Date<input type="date" id="ebDate"></label>
+    <label>Sport<input id="ebSport" maxlength="20"></label>
+    <label>Type de pari<input id="ebType" maxlength="20"></label>
+    <label>Mise (€)<input type="number" id="ebStake" min="0.1" step="0.5"></label>
+    <label>Cote<input type="number" id="ebOdds" min="1" step="0.01"></label>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button type="button" class="primary" id="ebSave">Enregistrer</button>
+      <button type="button" class="ghost" value="cancel">Annuler</button>
+    </div>
+  </form>
+</dialog>
 <script>
 (function(){
   function show(msg){
@@ -441,6 +464,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=1.8.7"></script>
+    <script src="/static/app.js?v=1.9.0"></script>
 </body>
 </html>

@@ -239,10 +239,21 @@ $('mainNav').addEventListener('click',ev=>{
 });
 
 function showView(v){
-  [...$('mainNav').children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
+  const btns=[...$('mainNav').children].filter(b=>b.dataset&&b.dataset.view);
+  btns.forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
   $('viewHome').classList.toggle('active',v==='home');
   $('viewBankroll').classList.toggle('active',v==='bankroll');
   $('viewProfile').classList.toggle('active',v==='profile');
+  moveNavSelector();
+}
+function moveNavSelector(){
+  const nav=$('mainNav'), sel=document.getElementById('navSelector');
+  if(!nav||!sel) return;
+  const active=[...nav.children].find(b=>b.dataset&&b.dataset.view&&b.getAttribute('aria-pressed')==='true');
+  if(!active) return;
+  if(!sel._w) sel._w=active.offsetWidth;
+  sel.style.width=sel._w+'px';
+  sel.style.left=active.offsetLeft+'px';
 }
 
 let IS_ADMIN=false;
@@ -278,8 +289,8 @@ $('profileForm').addEventListener('submit',async ev=>{
 });
 
 (async()=>{
-  showView("home");
   $('mainNav').hidden=false;   /* navigable meme si une API echoue ensuite */
+  showView("home");
   if(MISSING.length){ __fatal("l\u2019interface en cache est p\u00e9rim\u00e9e ("+MISSING.slice(0,3).join(", ")+") \u2014 r\u00e9paration automatique\u2026"); __heal(); return; }
   try{
     const me=await api('/api/me');
@@ -423,6 +434,7 @@ async function loadPicks(retryOK){
   if(list===null){ if(retryOK){ await new Promise(r=>setTimeout(r,1200)); return loadPicks(false); } return }
   if(list.length===0 && PICKS.length>0){ return; } // garder les pronos deja affiches
   PICKS=list;
+  renderPickStats(data&&data.pick_stats);
   renderPicks();
 }
 
@@ -454,6 +466,19 @@ function bookmakerIcon(url){
 }
 const SPORT_ICON={Foot:'⚽',NBA:'🏀',Tennis:'🎾',F1:'🏎️',MMA:'🥊',MLB:'⚾',NFL:'🏈',NHL:'🏒',Mixte:'🎯'};
 const TICKET_STATUS={pending:['En cours','⏳'],won:['Gagné','👍'],lost:['Perdu','👎'],void:['Remboursé','↩']};
+function renderPickStats(s){
+  const el=document.getElementById('pickStats');
+  if(!el) return;
+  if(!s||!s.total){ el.hidden=true; el.innerHTML=''; return; }
+  const winrate=s.winrate==null?'—':s.winrate+'%';
+  el.innerHTML=
+    `<span class="ps"><b>${s.total}</b> pronos</span>`+
+    `<span class="ps w"><b>${s.won}</b> gagnés</span>`+
+    `<span class="ps l"><b>${s.lost}</b> perdus</span>`+
+    `<span class="ps v"><b>${s.void}</b> remboursés</span>`+
+    `<span class="ps r"><b>${winrate}</b> de réussite</span>`;
+  el.hidden=false;
+}
 function renderPicks(){
   const el=$('picksList');
   const hist=$('picksHistory');
@@ -513,6 +538,7 @@ function renderPicksInner(el,hist){
       footHtml='<span class="sub">Ce prono est clos.</span>';
     }
     const adminActions=IS_ADMIN?`<div class="admin-actions">
+      ${p.result!=='pending'&&p.result?`<button type="button" data-settle="${p.id}" data-result="pending">↩ Remettre en attente</button>`:''}
       <button type="button" data-settle="${p.id}" data-result="won">Gagné</button>
       <button type="button" data-settle="${p.id}" data-result="lost">Perdu</button>
       <button type="button" data-settle="${p.id}" data-result="void">Remboursé</button>
@@ -647,7 +673,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.8.7', date='2026-10-14';
+  const v='1.9.0', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
@@ -677,6 +703,7 @@ setInterval(async()=>{
       // on retente avant de declencher l'etat vide.
       if(!d.picks.length && PICKS.length){ return; }
       PICKS=data_normalize_picks(d.picks);
+      renderPickStats(d.pick_stats);
       renderPicks();
     }
   }catch(e){console.error('[PICKS] echec de la mise a jour periodique:',e)}

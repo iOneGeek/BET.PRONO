@@ -907,15 +907,43 @@ def create_bet():
 @login_required
 def update_bet(bet_id):
     data = request.get_json(silent=True) or {}
-    result = data.get("r")
-    if result not in RESULTS:
-        return jsonify({"error": "Résultat invalide."}), 400
     db = get_db()
     row = db.execute("SELECT * FROM bets WHERE id = ? AND user_id = ?", (bet_id, g.user["id"])).fetchone()
     if not row:
         return jsonify({"error": "Pari introuvable."}), 404
-    db.execute("UPDATE bets SET result = ? WHERE id = ?", (result, bet_id))
-    db.commit()
+    # On ne modifie que les champs fournis.
+    updates = []
+    vals = []
+    if "r" in data:
+        result = data.get("r")
+        if result not in RESULTS:
+            return jsonify({"error": "Résultat invalide."}), 400
+        updates.append("result = ?"); vals.append(result)
+    # Champs edites via le formulaire (pour corriger un pari sans le supprimer).
+    for field, key, limit in (("date", "d", None), ("sport", "sp", 20), ("type", "ty", 20)):
+        if key in data:
+            v = (str(data.get(key) or "")).strip()
+            if field == "date" and not v:
+                return jsonify({"error": "Date invalide."}), 400
+            if limit and len(v) > limit:
+                v = v[:limit]
+            updates.append(f"{field} = ?"); vals.append(v or "-")
+    if any(k in data for k in ("s", "o", "b")):
+        try:
+            stake = float(data.get("s", row["stake"]))
+            odds = float(data.get("o", row["odds"]))
+            bonus = float(data.get("b", row["bonus"]))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Valeurs numériques invalides."}), 400
+        if stake <= 0 or odds < 0 or bonus < 0:
+            return jsonify({"error": "Valeurs numériques invalides."}), 400
+        updates.append("stake = ?"); vals.append(stake)
+        updates.append("odds = ?"); vals.append(odds)
+        updates.append("bonus = ?"); vals.append(bonus)
+    if updates:
+        vals.append(bet_id)
+        db.execute("UPDATE bets SET " + ", ".join(updates) + " WHERE id = ?", vals)
+        db.commit()
     row = db.execute("SELECT * FROM bets WHERE id = ?", (bet_id,)).fetchone()
     return jsonify(serialize_bet(row))
 
@@ -1056,7 +1084,19 @@ def list_picks():
             "SELECT * FROM pick_follows WHERE user_id = ?", (g.user["id"],)
         ).fetchall()
     }
-    return jsonify({"picks": [serialize_pick(r, follows.get(r["id"])) for r in rows]})
+    # Aggregations pour les statistiques des pronos partages
+    counts = {"won": 0, "lost": 0, "void": 0, "pending": 0, "total": 0}
+    for r in rows:
+        res = r["result"] or "pending"
+        counts[res] = counts.get(res, 0) + 1
+        counts["total"] += 1
+    settled = counts["won"] + counts["lost"] + counts["void"]
+    counts["settled"] = settled
+    counts["winrate"] = round(counts["won"] * 100 / settled, 1) if settled else None
+    return jsonify({
+        "picks": [serialize_pick(r, follows.get(r["id"])) for r in rows],
+        "pick_stats": counts,
+    })
 
 
 @app.post("/api/admin/picks")
@@ -1124,12 +1164,16 @@ def update_pick(pick_id):
         return jsonify({"error": "Prono introuvable."}), 404
     if result:
         db.execute("UPDATE picks SET result = ? WHERE id = ?", (result, pick_id))
+        bet_ids = [r["bet_id"] for r in db.execute(
+            "SELECT bet_id FROM pick_follows WHERE pick_id = ?", (pick_id,)
+        ).fetchall()]
         if result in ("won", "lost", "void"):
-            bet_ids = [r["bet_id"] for r in db.execute(
-                "SELECT bet_id FROM pick_follows WHERE pick_id = ?", (pick_id,)
-            ).fetchall()]
             for bet_id in bet_ids:
                 db.execute("UPDATE bets SET result = ? WHERE id = ?", (result, bet_id))
+        elif result == "pending" and bet_ids:
+            # Retour en arrière : annule la résolution chez les suiveurs.
+            for bet_id in bet_ids:
+                db.execute("UPDATE bets SET result = ? WHERE id = ?", ("pending", bet_id))
     if "advice_profile" in data:
         adv = (data.get("advice_profile") or "prudent").strip().lower()
         if adv in ("fun", "prudent", "confiance", "maxi"):
