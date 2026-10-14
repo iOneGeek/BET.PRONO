@@ -166,6 +166,11 @@ $('ebSave').addEventListener('click',async()=>{
     await loadBets();
   }catch(err){ alert('Erreur lors de la modification : '+(err&&err.message?err.message:err)); }
 });
+const ebCancel=document.getElementById('ebCancel');
+if(ebCancel){ ebCancel.addEventListener('click',()=>{ const d=document.getElementById('editBetDlg'); if(d&&typeof d.close==='function') d.close(); }); }
+// Fermer aussi en cliquant sur le fond grisé du dialog (hors de la boîte)
+const editDlg=document.getElementById('editBetDlg');
+if(editDlg){ editDlg.addEventListener('click',(ev)=>{ if(ev.target===editDlg && typeof editDlg.close==='function') editDlg.close(); }); }
 const betSearch=document.getElementById('betSearch'), betResultFilter=document.getElementById('betResultFilter');
 if(betSearch){ betSearch.addEventListener('input',()=>{ QS=betSearch.value; render(); }); }
 if(betResultFilter){ betResultFilter.addEventListener('change',()=>{ QR=betResultFilter.value; render(); }); }
@@ -709,7 +714,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.9.2', date='2026-10-14';
+  const v='1.9.3', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
