@@ -42,7 +42,6 @@ _load_local_env()
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
-SPORTMONKS_TOKEN = (os.getenv("SPORTMONKS_TOKEN") or "").strip()
 COOKIE_NAME = "bp_token"
 TOKEN_DAYS = 30
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_.-]{3,24}$")
@@ -1229,111 +1228,6 @@ def unfollow_pick(pick_id):
     db.execute("DELETE FROM bets WHERE id = ? AND user_id = ?", (follow["bet_id"], g.user["id"]))
     db.commit()
     return jsonify({"ok": True})
-
-
-# ---------- SportMonks : matchs du jour (affichage limité, lecture seule) ----------
-# Appel externe avec cache en mémoire (5 min), timeout court et dégradation propre :
-# si l'API est lente ou inaccessible, on renvoie une liste vide sans jamais bloquer
-# le worker ni lever d'erreur 500.
-
-_FIXTURES_CACHE = {"ts": 0, "data": None}
-_FIXTURES_LOCK = None
-_FIXTURES_TTL = 300  # 5 minutes
-
-
-def _fixtures_lock():
-    global _FIXTURES_LOCK
-    if _FIXTURES_LOCK is None:
-        import threading
-        _FIXTURES_LOCK = threading.Lock()
-    return _FIXTURES_LOCK
-
-
-def _sportmonks_day(day):
-    """Récupère les fixtures d'une journée via SportMonks. Ne lève pas s'échoue :
-    renvoie (list, error_flag)."""
-    if not SPORTMONKS_TOKEN:
-        return [], True
-    qs = urllib.parse.urlencode({
-        "api_token": SPORTMONKS_TOKEN,
-        "include": "sport;league;participants;state;scores;league.country;round",
-        "locale": "fr",
-    })
-    url = f"https://api.sportmonks.com/v3/football/fixtures/date/{day}?{qs}"
-    try:
-        with requests.get(url, timeout=6, headers={"Accept": "application/json"}) as r:
-            if r.status_code != 200:
-                return [], False
-            payload = r.json()
-    except Exception:
-        return [], True
-    out = []
-    for m in payload.get("data") or []:
-        parts = (m.get("participants") or []) if isinstance(m.get("participants"), list) else []
-        names = [p.get("name", "?") for p in parts]
-        st = m.get("state") or {}
-        state = st.get("name") if isinstance(st, dict) else "?"
-        lg = m.get("league") or {}
-        league = lg.get("name") if isinstance(lg, dict) else "?"
-        # Pays de la ligue (via include league.country)
-        _country = (lg.get("country") or {}) if isinstance(lg, dict) else {}
-        country = _country.get("name") if isinstance(_country, dict) else ""
-        # Tour / journée (via include round)
-        _round = m.get("round") or {}
-        round_no = _round.get("name") if isinstance(_round, dict) else (str(_round) if _round else "")
-        # Heure de coup d'envoi : on préfère l'horodatage (-> heure locale),
-        # sinon on retombe sur la chaîne fournie.
-        start = m.get("starting_at") or ""
-        ts = m.get("starting_at_timestamp")
-        dt = None
-        if ts:
-            try:
-                dt = datetime.fromtimestamp(int(ts), timezone.utc).astimezone(FR_TZ)
-            except Exception:
-                dt = None
-        if dt is None and start:
-            try:
-                dt = datetime.strptime(start, "%Y-%m-%d %H:%M:%S").astimezone(FR_TZ)
-            except Exception:
-                dt = None
-        kickoff = dt.strftime("%d/%m à %H:%M") if dt else ""
-        # Le champ scores est une liste ; certains plans renvoient le score sous
-        # une structure légèrement différente. On se limite à l'état et au nom.
-        out.append({
-            "id": m.get("id"),
-            "match": m.get("name") or (" vs ".join(names) if names else "?"),
-            "state": state,
-            "kickoff": kickoff,
-            "league": league or "?",
-            "country": country,
-            "round": round_no,
-            "teams": [{"name": p.get("name", "?"), "logo": p.get("image_path") or ""} for p in parts],
-        })
-    return out, False
-
-
-@app.get("/api/fixtures")
-@login_required
-def fixtures():
-    day = (request.args.get("date") or "").strip()
-    if not day:
-        day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    now = time.time()
-    if _FIXTURES_CACHE["data"] is not None and (now - _FIXTURES_CACHE["ts"]) < _FIXTURES_TTL:
-        return jsonify({"matches": _FIXTURES_CACHE["data"], "cached": True})
-    with _fixtures_lock():
-        # Re-vérification sous verrou (une seule requête réseau max toutes les 5 min)
-        if _FIXTURES_CACHE["data"] is not None and (time.time() - _FIXTURES_CACHE["ts"]) < _FIXTURES_TTL:
-            return jsonify({"matches": _FIXTURES_CACHE["data"], "cached": True})
-        data, err = _sportmonks_day(day)
-        # On ne met en cache que si l'appel a réussi (évite de servir du vide périmé)
-        if not err:
-            _FIXTURES_CACHE["ts"] = time.time()
-            _FIXTURES_CACHE["data"] = data
-        else:
-            # Si pas encore de cache sain, on renvoie vide avec un indicateur
-            return jsonify({"matches": [], "error": True, "cached": False})
-    return jsonify({"matches": data, "cached": False, "error": err})
 
 
 # ===========================================================================

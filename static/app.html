@@ -25,12 +25,8 @@ main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px;
   .topbar{flex-direction:column}
   .who{width:100%}
   #logout{margin-left:auto}
-  .fx-grid{grid-template-columns:repeat(2,1fr)}
-  .fx-tile{padding:9px 10px}
 }
-@media (max-width:360px){
-  .fx-grid{grid-template-columns:1fr}
-}
+
 .brand{display:flex;align-items:center;gap:12px}
 .logo-img{display:block;max-width:210px;height:auto}
 .brand .logo-img{max-width:200px}
@@ -139,23 +135,6 @@ details.panel:not([open]) summary h2{color:var(--accent)}
 /* Barre verticale orange avant les titres de section */
 h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background:var(--accent);margin-right:9px;vertical-align:-4px}
 .hist-title{display:flex;align-items:center;gap:8px;margin:14px 0 10px;font-size:1.05rem}
-/* Liste "Matchs du jour" (SportMonks) */
-.fixtures-list{display:flex;flex-direction:column;gap:16px}
-.fx-group-title{font-size:.8rem;font-weight:800;letter-spacing:.04em;color:var(--mute);margin:0 0 8px;text-transform:uppercase}
-.fx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.fs-label{grid-column:1/-1;display:block;text-align:center;color:var(--mute);font-size:.72rem;padding:8px 0 2px}
-.fx-tile{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.fx-tile-match{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
-.fx-tile-match .fx-team{min-width:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;max-width:100%;font-weight:700;font-size:.85rem;color:var(--text)}
-.fx-tile-match .fx-team-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fx-team-logo{width:20px;height:20px;object-fit:contain;border-radius:50%;background:var(--field);padding:1px;flex-shrink:0}
-.fx-tile-match .fx-vs{color:var(--accent);font-weight:800;font-size:.62rem;letter-spacing:.08em;flex-shrink:0;text-align:center;line-height:1}
-.fx-tile-single{font-weight:700;font-size:.85rem;color:var(--text)}
-.fx-tile-state{color:var(--mute);font-size:.72rem;font-weight:700}
-.fx-pill{display:inline-flex;align-items:center;gap:5px;align-self:center;color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent);border:1px solid var(--accent);border-radius:999px;padding:2px 9px;font-size:.7rem;font-weight:700;letter-spacing:.01em}
-.fx-pill svg{display:inline-block}
-.fixtures-empty{text-align:center;color:var(--mute);font-size:.82rem;padding:14px 10px}
-.fixtures-err{text-align:center;color:var(--mute);font-size:.82rem;padding:14px 10px;opacity:.8}
 
 .hist-sep{height:1px;background:var(--line);opacity:.35;margin:18px 0 4px}
 .hist-count{background:var(--field);border:1px solid var(--line);color:var(--mute);font-size:.75rem;font-weight:700;border-radius:999px;padding:2px 10px;line-height:1.4}
@@ -324,11 +303,6 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
     <div class="brand"><div><h2 style="display:block">Bienvenue 👋</h2><p class="sub" style="margin:0">BET.PRONO t'aide à gérer ta bankroll pari après pari. Suis des pronos partagés, fixe ta mise conseillée selon ton profil de jeu, et analyse tes résultats (sport, ROI, réussite) pour parier avec méthode.</p></div></div>
   </section>
 
-  <section class="panel" id="fixturesPanel">
-    <h2>Matchs du jour</h2>
-    <div id="fixturesList" class="fixtures-list"></div>
-  </section>
-
   <details class="panel" id="adminPanel">
     <summary><h2>Publier un prono <span class="admin-badge">Admin</span><b class="chev">▸</b></h2></summary>
     <p class="sub">Ce prono sera visible par tous les comptes, qui pourront le suivre et l'ajouter à leur bankroll.</p>
@@ -444,7 +418,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.8.5 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V1.8.7 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -467,6 +441,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=1.8.5"></script>
+    <script src="/static/app.js?v=1.8.7"></script>
 </body>
 </html>

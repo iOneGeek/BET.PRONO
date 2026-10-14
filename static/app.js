@@ -291,7 +291,6 @@ $('profileForm').addEventListener('submit',async ev=>{
     loadProfileForm();
     await loadBets();
     await loadPicks();
-    loadFixtures();  /* matchs du jour (SportMonks) - non bloquant */
     $('mainNav').hidden=false;
     $('viewHome').classList.add('active');
     window.__ready=true;
@@ -648,7 +647,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.8.5', date='2026-10-14';
+  const v='1.8.7', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
@@ -688,98 +687,6 @@ function data_normalize_picks(p){
 }
 
 // ---------- Matchs du jour (SportMonks, consultation seule) ----------
-async function loadFixtures(){
-  const list=$('fixturesList'); if(!list) return;
-  try{
-    list.innerHTML='<p class="fixtures-empty">Chargement des matchs...</p>';
-    const d=await api('/api/fixtures');
-    if(!d || !Array.isArray(d.matches)){
-      list.innerHTML='<p class="fixtures-empty">Matchs indisponibles pour le moment.</p>';
-      return;
-    }
-    if(d.error && d.matches.length===0){
-      list.innerHTML='<p class="fixtures-empty">SportMonks indisponible pour le moment. Réessaie dans quelques minutes.</p>';
-      return;
-    }
-    if(d.matches.length===0){
-      list.innerHTML='<p class="fixtures-empty">Aucun match pour cette journée.</p>';
-      return;
-    }
-    list.innerHTML='';
-    // Regrouper par ligue (ordre d'apparition conservé)
-    const groups=[];
-    const idx={};
-    for(const m of d.matches){
-      const lg=m.league||'?';
-      if(!(lg in idx)){ idx[lg]=groups.length; groups.push({league:lg,country:m.country||'',round:m.round||'',items:[]}); }
-      groups[idx[lg]].items.push(m);
-    }
-    const frag=document.createDocumentFragment();
-    for(const g of groups){
-      const gl=document.createElement('div');
-      gl.className='fx-group';
-      const gtitle=document.createElement('h3');
-      gtitle.className='fx-group-title';
-      let label=g.league;
-      if(g.country && g.country!==g.league){ label+=' · '+g.country; }
-      if(g.round){ label+=' · Journée '+g.round; }
-      gtitle.textContent=label;
-      gl.appendChild(gtitle);
-      const grid=document.createElement('div');
-      grid.className='fx-grid';
-      for(const m of g.items){
-        const tile=document.createElement('div');
-        tile.className='fx-tile';
-        // Équipes séparées par un badge VS
-        const teams=(m.teams&&m.teams.length>=2)?m.teams:null;
-        if(teams){
-          const mkTeam=function(t){
-            const span=document.createElement('span'); span.className='fx-team';
-            if(t && t.logo){
-              const img=document.createElement('img');
-              img.className='fx-team-logo'; img.src=t.logo; img.alt=''; img.loading='lazy';
-              img.onerror=function(){ this.remove(); };
-              span.appendChild(img);
-            }
-            const n=document.createElement('span'); n.className='fx-team-name'; n.textContent=(t&&t.name)?t.name:'?';
-            span.appendChild(n);
-            return span;
-          };
-          const tA=mkTeam(teams[0]);
-          const vs=document.createElement('span'); vs.className='fx-vs'; vs.textContent='VS';
-          const tB=mkTeam(teams[1]);
-          const row=document.createElement('div'); row.className='fx-tile-match';
-          row.appendChild(tA); row.appendChild(vs); row.appendChild(tB);
-          if(m.state && m.state.toLowerCase().indexOf('pas commenc')!==0 && m.state!=='NS'){
-            const st=document.createElement('span'); st.className='fx-tile-state'; st.textContent=m.state||'';
-            row.appendChild(st);
-          }
-          // Pastille calendrier + date/heure : on l'attache EN HAUT, avant les équipes
-          if(m.kickoff){
-            const pill=document.createElement('span');
-            pill.className='fx-pill';
-            pill.innerHTML='<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" style="flex-shrink:0"><rect x="1.5" y="3.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 6.3h13M5 2v3M11 2v3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span>'+m.kickoff+'</span>';
-            tile.appendChild(pill);
-          } else if(m.state){
-            const pill=document.createElement('span'); pill.className='fx-pill'; pill.textContent=m.state||'';
-            tile.appendChild(pill);
-          }
-          tile.appendChild(row);
-        } else {
-          const mt=document.createElement('div'); mt.className='fx-tile-single'; mt.textContent=m.match||'?';
-          tile.appendChild(mt);
-        }
-        grid.appendChild(tile);
-      }
-      gl.appendChild(grid);
-      frag.appendChild(gl);
-    }
-    list.appendChild(frag);
-  }catch(e){
-    list.innerHTML='<p class="fixtures-empty">Matchs indisponibles pour le moment.</p>';
-  }
-}
-
 // ---------- Mise conseillée (accueil) ----------
 const PROFILES={
   fun:{pct:1, emoji:'🎉', label:'Fun',
