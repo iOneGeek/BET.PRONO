@@ -647,7 +647,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.6.8', date='2026-10-14';
+  const v='1.6.9', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
@@ -753,20 +753,20 @@ async function loadFixtures(){
             const st=document.createElement('span'); st.className='fx-tile-state'; st.textContent=m.state||'';
             row.appendChild(st);
           }
+          // Pastille calendrier + date/heure : on l'attache EN HAUT, avant les équipes
+          if(m.kickoff){
+            const pill=document.createElement('span');
+            pill.className='fx-pill';
+            pill.innerHTML='<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" style="flex-shrink:0"><rect x="1.5" y="3.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 6.3h13M5 2v3M11 2v3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span>'+m.kickoff+'</span>';
+            tile.appendChild(pill);
+          } else if(m.state){
+            const pill=document.createElement('span'); pill.className='fx-pill'; pill.textContent=m.state||'';
+            tile.appendChild(pill);
+          }
           tile.appendChild(row);
         } else {
           const mt=document.createElement('div'); mt.className='fx-tile-single'; mt.textContent=m.match||'?';
           tile.appendChild(mt);
-        }
-        // Pastille calendrier + date/heure
-        if(m.kickoff){
-          const pill=document.createElement('span');
-          pill.className='fx-pill';
-          pill.innerHTML='<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" style="flex-shrink:0"><rect x="1.5" y="3.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.5 6.3h13M5 2v3M11 2v3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span>'+m.kickoff+'</span>';
-          tile.appendChild(pill);
-        } else if(m.state){
-          const pill=document.createElement('span'); pill.className='fx-pill'; pill.textContent=m.state||'';
-          tile.appendChild(pill);
         }
         grid.appendChild(tile);
       }
