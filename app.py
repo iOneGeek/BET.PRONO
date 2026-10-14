@@ -1209,12 +1209,29 @@ def _sportmonks_day(day):
         state = st.get("name") if isinstance(st, dict) else "?"
         lg = m.get("league") or {}
         league = lg.get("name") if isinstance(lg, dict) else "?"
+        # Heure de coup d'envoi : on préfère l'horodatage (-> heure locale),
+        # sinon on retombe sur la chaîne fournie.
+        start = m.get("starting_at") or ""
+        ts = m.get("starting_at_timestamp")
+        dt = None
+        if ts:
+            try:
+                dt = datetime.fromtimestamp(int(ts), timezone.utc).astimezone()
+            except Exception:
+                dt = None
+        if dt is None and start:
+            try:
+                dt = datetime.strptime(start, "%Y-%m-%d %H:%M:%S").astimezone()
+            except Exception:
+                dt = None
+        kickoff = dt.strftime("%d/%m à %H:%M") if dt else ""
         # Le champ scores est une liste ; certains plans renvoient le score sous
         # une structure légèrement différente. On se limite à l'état et au nom.
         out.append({
             "id": m.get("id"),
             "match": m.get("name") or (" vs ".join(names) if names else "?"),
             "state": state,
+            "kickoff": kickoff,
             "league": league or "?",
         })
     return out, False

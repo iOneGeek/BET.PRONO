@@ -647,7 +647,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.6.1', date='2026-10-14';
+  const v='1.6.2', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
@@ -714,7 +714,9 @@ async function loadFixtures(){
       row.className='fixtures-item';
       const state=document.createElement('span');
       state.className='fx-state';
-      state.textContent=m.state||'';
+      const isNS=(m.state||'').toLowerCase().indexOf('pas commenc')===0 || (m.state||'')==='NS';
+      state.textContent=(m.kickoff && isNS) ? 'Début '+m.kickoff : (m.state||'');
+      if(m.kickoff && isNS){ state.classList.add('fx-kickoff'); }
       const lg=document.createElement('span');
       lg.className='fx-league';
       lg.textContent=m.league||'';
