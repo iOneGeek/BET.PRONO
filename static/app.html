@@ -134,6 +134,16 @@ details.panel:not([open]) summary h2{color:var(--accent)}
 /* Barre verticale orange avant les titres de section */
 h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background:var(--accent);margin-right:9px;vertical-align:-4px}
 .hist-title{display:flex;align-items:center;gap:8px;margin:14px 0 10px;font-size:1.05rem}
+/* Liste "Matchs du jour" (SportMonks) */
+#fixturesPanel:not([open]) summary h2 .chev{transform:rotate(0deg)}
+.fixtures-list{display:grid;gap:7px;max-width:560px;margin:0 auto}
+.fixtures-item{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:10px;font-size:.88rem}
+.fixtures-item .fx-league{color:var(--mute);font-size:.72rem;font-weight:700;letter-spacing:.03em;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.fixtures-item .fx-match{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fixtures-item .fx-state{margin-left:auto;flex-shrink:0;font-size:.72rem;font-weight:700;color:var(--mute);background:var(--field);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+.fixtures-empty{text-align:center;color:var(--mute);font-size:.82rem;padding:14px 10px}
+.fixtures-err{text-align:center;color:var(--mute);font-size:.82rem;padding:14px 10px;opacity:.8}
+
 .hist-sep{height:1px;background:var(--line);opacity:.35;margin:18px 0 4px}
 .hist-count{background:var(--field);border:1px solid var(--line);color:var(--mute);font-size:.75rem;font-weight:700;border-radius:999px;padding:2px 10px;line-height:1.4}
 /* État vide des pronos */
@@ -301,6 +311,12 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
     <div class="brand"><div><h2 style="display:block">Bienvenue 👋</h2><p class="sub" style="margin:0">BET.PRONO t'aide à gérer ta bankroll pari après pari. Suis des pronos partagés, fixe ta mise conseillée selon ton profil de jeu, et analyse tes résultats (sport, ROI, réussite) pour parier avec méthode.</p></div></div>
   </section>
 
+  <details class="panel" id="fixturesPanel">
+    <summary><h2>Matchs du jour <b class="chev">▸</b></h2></summary>
+    <p class="sub" id="fixturesSub">Les fixtures du jour (scores fournis par SportMonks).</p>
+    <div id="fixturesList" class="fixtures-list"></div>
+  </details>
+
   <details class="panel" id="adminPanel" open>
     <summary><h2>Publier un prono <span class="admin-badge">Admin</span><b class="chev">▸</b></h2></summary>
     <p class="sub">Ce prono sera visible par tous les comptes, qui pourront le suivre et l'ajouter à leur bankroll.</p>
@@ -416,7 +432,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.6.0 · <span id="appVersionDate"></span></span></footer>
+<span style="opacity:.7">BET.PRONO V1.6.1 · <span id="appVersionDate"></span></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -439,6 +455,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-<script src="/static/app.js?v=1.6.0"></script>
+<script src="/static/app.js?v=1.6.1"></script>
 </body>
 </html>
