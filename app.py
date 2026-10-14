@@ -54,6 +54,9 @@ else:
     SECRET_KEY = secrets.token_hex(32)
     with open(SECRET_PATH, "w") as f:
         f.write(SECRET_KEY)
+    print("[AVERTISSEMENT] SECRET_KEY générée aléatoirement (instance/secret.key absent). "
+          "Configurer SECRET_KEY dans les variables d'environnement Render pour des sessions stables "
+          "à travers les redéploiements.", flush=True)
 
 app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 256 * 1024
