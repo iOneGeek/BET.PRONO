@@ -647,7 +647,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.6.6', date='2026-10-14';
+  const v='1.6.7', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
@@ -710,7 +710,7 @@ async function loadFixtures(){
     const idx={};
     for(const m of d.matches){
       const lg=m.league||'?';
-      if(!(lg in idx)){ idx[lg]=groups.length; groups.push({league:lg,items:[]}); }
+      if(!(lg in idx)){ idx[lg]=groups.length; groups.push({league:lg,country:m.country||'',round:m.round||'',items:[]}); }
       groups[idx[lg]].items.push(m);
     }
     const frag=document.createDocumentFragment();
@@ -719,7 +719,10 @@ async function loadFixtures(){
       gl.className='fx-group';
       const gtitle=document.createElement('h3');
       gtitle.className='fx-group-title';
-      gtitle.textContent=g.league;
+      let label=g.league;
+      if(g.country && g.country!==g.league){ label+=' · '+g.country; }
+      if(g.round){ label+=' · Journée '+g.round; }
+      gtitle.textContent=label;
       gl.appendChild(gtitle);
       const grid=document.createElement('div');
       grid.className='fx-grid';

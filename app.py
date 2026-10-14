@@ -1190,7 +1190,7 @@ def _sportmonks_day(day):
         return [], True
     qs = urllib.parse.urlencode({
         "api_token": SPORTMONKS_TOKEN,
-        "include": "sport;league;participants;state;scores",
+        "include": "sport;league;participants;state;scores;league.country;round",
         "locale": "fr",
     })
     url = f"https://api.sportmonks.com/v3/football/fixtures/date/{day}?{qs}"
@@ -1209,6 +1209,12 @@ def _sportmonks_day(day):
         state = st.get("name") if isinstance(st, dict) else "?"
         lg = m.get("league") or {}
         league = lg.get("name") if isinstance(lg, dict) else "?"
+        # Pays de la ligue (via include league.country)
+        _country = (lg.get("country") or {}) if isinstance(lg, dict) else {}
+        country = _country.get("name") if isinstance(_country, dict) else ""
+        # Tour / journée (via include round)
+        _round = m.get("round") or {}
+        round_no = _round.get("name") if isinstance(_round, dict) else (str(_round) if _round else "")
         # Heure de coup d'envoi : on préfère l'horodatage (-> heure locale),
         # sinon on retombe sur la chaîne fournie.
         start = m.get("starting_at") or ""
@@ -1233,6 +1239,8 @@ def _sportmonks_day(day):
             "state": state,
             "kickoff": kickoff,
             "league": league or "?",
+            "country": country,
+            "round": round_no,
             "teams": [{"name": p.get("name", "?"), "logo": p.get("image_path") or ""} for p in parts],
         })
     return out, False
