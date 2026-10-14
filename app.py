@@ -7,6 +7,8 @@ import sys
 import uuid
 import base64
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+FR_TZ = ZoneInfo("Europe/Paris")
 from functools import wraps
 
 import jwt
@@ -1222,12 +1224,12 @@ def _sportmonks_day(day):
         dt = None
         if ts:
             try:
-                dt = datetime.fromtimestamp(int(ts), timezone.utc).astimezone()
+                dt = datetime.fromtimestamp(int(ts), timezone.utc).astimezone(FR_TZ)
             except Exception:
                 dt = None
         if dt is None and start:
             try:
-                dt = datetime.strptime(start, "%Y-%m-%d %H:%M:%S").astimezone()
+                dt = datetime.strptime(start, "%Y-%m-%d %H:%M:%S").astimezone(FR_TZ)
             except Exception:
                 dt = None
         kickoff = dt.strftime("%d/%m à %H:%M") if dt else ""
