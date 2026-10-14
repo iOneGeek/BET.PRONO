@@ -158,13 +158,13 @@ if USE_PG:
     dsn = DATABASE_URL
     if "connect_timeout=" not in dsn:
         sep = "&" if "?" in dsn else "?"
-        dsn = f"{dsn}{sep}connect_timeout=10"
+        dsn = f"{dsn}{sep}connect_timeout=20"
     POOL = ConnectionPool(
         dsn,
         min_size=1,
         max_size=8,
         open=False,
-        timeout=8,
+        timeout=25,
     )
     POOL.open()
 
@@ -193,24 +193,26 @@ def get_db():
     if "db" not in g:
         if USE_PG:
             real = None
-            try:
-                real = POOL.getconn()
-            except Exception:
-                # Première tentative a échoué : on rouvre/commit le pool puis
-                # on réessaie. L'auto-reconnect permet de se rebrancher dès que
-                # l'hébergeur répond à nouveau.
-                if not _ensure_pool_open():
-                    pass
+            for attempt in range(3):
+                try:
+                    real = POOL.getconn()
+                    break
+                except Exception:
+                    # Le compute Neon peut mettre 15-30s à se réveiller
+                    # (scale-to-zero). On laisse une marge avant de réessayer.
+                    if attempt < 2:
+                        time.sleep(2 * (attempt + 1))
+                    if not _ensure_pool_open():
+                        pass
+            if real is None:
                 try:
                     real = POOL.getconn()
                 except Exception:
-                    real = POOL.getconn()
-                else:
                     try:
                         POOL.check()
                     except Exception:
                         pass
-                real = POOL.getconn()
+                    real = POOL.getconn()
             g._pg_conn = real
             g.db = Conn("pg", real)
         else:
