@@ -68,6 +68,7 @@ summary{cursor:pointer;font-weight:600}
 button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--field);color:var(--text);padding:8px 12px;transition:background .12s ease,box-shadow .12s ease,transform .06s ease}
 button:active{transform:translateY(1px)}
 .primary{background:linear-gradient(180deg,#ff8f3c,#ff7518);border-color:var(--accent);color:var(--on-accent);font-weight:600;box-shadow:0 4px 14px rgba(255,117,24,.35)}
+.primary.btn-check{background:linear-gradient(180deg,#2fbf71,#1e9e55);border-color:#1e9e55;color:#fff;animation:checkPop .5s cubic-bezier(.2,.9,.35,1.4)}
 .primary:hover:not(:disabled){filter:brightness(1.05);box-shadow:0 6px 18px rgba(255,117,24,.45);transform:translateY(-1px)}
 .primary:disabled{opacity:.6;cursor:wait}
 .primary.pub-ok{animation:pubOk .5s ease}
@@ -382,7 +383,8 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 </section>
 
 <section class="panel">
-  <details id="ed"><summary>Ajoutez vos paris</summary>
+  <section id="ed" class="panel">
+  <h2>Ajoutez vos paris</h2>
   <form id="f" class="form">
     <label>Date<input id="d" type="date" required></label>
     <label>Sport<select id="sp"><option value="Foot">⚽ Foot</option><option value="Mixte">🎯 Mixte</option><option value="Tennis">🎾 Tennis</option><option value="NBA">🏀 NBA</option><option value="F1">🏎️ F1</option><option value="MMA">🥊 MMA</option><option value="MLB">⚾ MLB</option><option value="NFL">🏈 NFL</option><option value="NHL">🏒 NHL</option></select></label>
@@ -394,7 +396,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
     <button class="primary" id="addBtn">Ajouter</button>
   </form>
   <p class="warn" id="warn" hidden></p>
-  </details>
+  </section>
   <p class="sub" style="margin-top:8px">Ajoutez vos paris : note bien tout ce que tu as misé aujourd'hui ou les jours précédents. N'oublie pas de modifier si un pari est encore en cours.</p>
 </section>
 
@@ -441,7 +443,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.9.1 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V1.9.2 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -478,6 +480,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=1.9.1"></script>
+    <script src="/static/app.js?v=1.9.2"></script>
 </body>
 </html>

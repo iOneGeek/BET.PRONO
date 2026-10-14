@@ -118,9 +118,17 @@ $('f').addEventListener('submit', async ev=>{
     await api('/api/bets',{method:'POST',body:JSON.stringify(payload)});
     await loadBets();
     $('s').value=$('o').value=$('bo').value='';
+    playBetCheck(btn);
   }catch(e){$('msg').textContent=e.message}
   btn.disabled=false;
 });
+
+function playBetCheck(btn){
+  const txt=btn.textContent;
+  btn.classList.add('btn-check');
+  btn.textContent='✓';
+  setTimeout(()=>{ btn.classList.remove('btn-check'); btn.textContent=txt; }, 1200);
+}
 
 $('t').addEventListener('click', async ev=>{
   const e=ev.target.dataset.e;if(e){
@@ -701,7 +709,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.9.1', date='2026-10-14';
+  const v='1.9.2', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
