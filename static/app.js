@@ -515,6 +515,7 @@ function renderPicksInner(el,hist){
       <button type="button" data-settle="${p.id}" data-result="won">Gagné</button>
       <button type="button" data-settle="${p.id}" data-result="lost">Perdu</button>
       <button type="button" data-settle="${p.id}" data-result="void">Remboursé</button>
+      ${p.result==='pending'?`<button type="button" class="resolve-btn" data-resolve="${p.id}" title="Trouver le résultat automatiquement via OpenLigaDB">⚡ Résoudre auto</button>`:''}
       <button type="button" data-setscore="${p.id}">Modifier score</button>
     </div>`:'';
     const delBtn=IS_ADMIN?`<button type="button" class="pick-del" data-delpick="${p.id}" aria-label="Supprimer ce prono" title="Supprimer">×</button>`:'';
@@ -583,6 +584,7 @@ async function handlePicksClick(ev){
   const follow=ev.target.dataset.follow;
   const unfollow=ev.target.dataset.unfollow;
   const settle=ev.target.dataset.settle;
+  const resolve=ev.target.dataset.resolve;
   const setscore=ev.target.dataset.setscore;
   const del=ev.target.dataset.delpick;
   const toggleEl=ev.target.closest('.won-collapsed');
@@ -591,6 +593,28 @@ async function handlePicksClick(ev){
       if(!confirm('Supprimer ce prono publié ?'))return;
       await api('/api/admin/picks/'+del,{method:'DELETE'});
       await loadPicks();
+    }else if(resolve){
+      if(!confirm('Résoudre automatiquement ce prono via OpenLigaDB ?\nLe résultat sera calculé d\'après les scores des matchs terminés, puis appliqué aux suivis.'))return;
+      const btn=ev.target;const oldHtml=btn.innerHTML;
+      btn.innerHTML='Recherche…';btn.disabled=true;
+      try{
+        const r=await api('/api/admin/picks/'+resolve+'/resolve',{method:'POST'});
+        if(r.applied){
+          const lb=(LB[r.proposed]||r.proposed);
+          await loadPicks();await loadBets();
+          alert('Résolution automatique terminée ✔\nProno : '+lb);
+        }else{
+          const notes=(r.legs||[]).map(l=>l.note||'').filter(Boolean).join(' ');
+          const resume=(r.legs||[]).map(l=>`• ${l.match}${l.api_match?' → '+l.api_match:''} (${LB[l.outcome]&&l.outcome?LB[l.outcome]:l.outcome||'?'})`).join('\n');
+          alert(r.proposed
+            ?'Résultat proposé (à confirmer) : '+LB[r.proposed]+'\n\n'+notes+'\n\n'+resume
+            :'Match(s) non retrouvé(s)/terminé(s) dans OpenLigaDB.\n'+notes);
+        }
+      }catch(e){
+        alert('Erreur lors de la résolution automatique.');
+      }finally{
+        btn.innerHTML=oldHtml;btn.disabled=false;
+      }
     }else if(settle){
       const result=ev.target.dataset.result;
       const pick=PICKS.find(p=>p.id==settle);
@@ -646,7 +670,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.5.0', date='2026-10-13';
+  const v='1.5.1', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

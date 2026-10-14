@@ -907,6 +907,236 @@ def reset_bets():
 PICK_RESULTS = {"pending", "won", "lost", "void"}
 
 
+# ==========================================================================
+# Résolution automatique via OpenLigaDB (api.openligadb.de)
+# ==========================================================================
+
+OPENLIGADB_BASE = "https://api.openligadb.de"
+
+# Court-circuits de championnats suportés par OpenLigaDB (données récentes).
+# NB : la base tient surtout Bundesliga + Champions League. Ligue 1 et
+# Serie A n'ont PAS de saison récente exploitable (données arrêtées).
+OPENLIGADB_LEAGUES = {
+    "bl1": "Bundesliga",
+    "bl2": "Bundesliga 2",
+    "ucl": "Champions League",
+    "pl": "Premier League",
+    "la1": "LaLiga",
+    "laliga1": "LaLiga",
+    "lg1": "Ligue 1",
+    "seriea": "Serie A",
+}
+
+
+def _norm_team(name):
+    """Normalise un nom d'équipe pour comparaison floue entre l'entrée
+    utilisateur (« Atalanta Bergame ») et le nom OpenLigaDB (« Atalanta »)."""
+    s = (name or "").lower()
+    s = re.sub(r"fc\b|ac\b|cf\b|sc\b|ud\b|cd\b|ca\b|ssc\b|stadion", " ", s)
+    s = re.sub(r"[-_.,'()\[\]]", " ", s)
+    s = re.sub(r"\b(football|club|deportivo|sporting|atletico|atlético|real)\b", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def _team_key(name):
+    """Clé de similarité : mots significatifs (>=3 lettres) triés."""
+    return {w for w in _norm_team(name).split() if len(w) >= 3}
+
+
+def _char_sim(a, b):
+    """Similarité au niveau caractère entre deux mots (0..1)."""
+    if not a or not b:
+        return 0.0
+    a, b = a.lower(), b.lower()
+    if a == b:
+        return 1.0
+    n, m = len(a), len(b)
+    prev = list(range(m + 1))
+    for i in range(1, n + 1):
+        cur = [i] + [0] * m
+        for j in range(1, m + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+        prev = cur
+    return 1.0 - prev[m] / max(n, m)
+
+
+def _fuzzy_score(a, b):
+    """Score de similarité entre deux noms d'équipe (0..2).
+    2 = un des mots de l'un est identique à un mot de l'autre ;
+    1 = exact match d'un mot court OU très forte proximité de caractères
+        (ex. « barcelone » vs « barcelona ») ; 0 = aucun rapprochement."""
+    ka, kb = _team_key(a), _team_key(b)
+    if not ka or not kb:
+        return 0
+    inter = ka & kb
+    if inter:
+        return 2
+    # Aucun mot identique : tente la proximité de caractères
+    best_char = max(
+        (_char_sim(wa, wb) for wa in ka for wb in kb),
+        default=0.0,
+    )
+    if best_char >= 0.75:
+        return 1
+    return 0
+
+
+def _find_league_match(team1, team2, finished_matches):
+    """Retrouve le match OpenLigaDB correspondant à un duel d'équipes.
+    Retourne le match ou None. Match terminé requis."""
+    best, best_score = None, 0
+    for m in finished_matches:
+        a = m.get("team1", {}).get("teamName", "")
+        b = m.get("team2", {}).get("teamName", "")
+        s1 = _fuzzy_score(team1, a) + _fuzzy_score(team2, b)
+        s2 = _fuzzy_score(team1, b) + _fuzzy_score(team2, a)
+        s = max(s1, s2)
+        if s > best_score:
+            best_score = s
+            best = m
+    if best_score >= 4:  # 2 duels de 2 confirmés
+        return best
+    return None
+
+
+def _result_points(match):
+    for r in match.get("matchResults", []):
+        if r.get("resultTypeKind") == "After90Minutes":
+            return r.get("pointsTeam1"), r.get("pointsTeam2")
+    return None, None
+
+
+def _leg_outcome(leg, match):
+    """Détermine si le pari d'une jambe est gagné, perdu ou nul (void).
+    leg['pick'] est la sélection en texte libre ex. « Victoire Feyenoord »,
+    « Homme 1 ». Retourne 'won'|'lost'|'void'."""
+    p1, p2 = _result_points(match)
+    if p1 is None or p2 is None:
+        return "void"
+    raw_pick = (leg.get("pick") or "").strip().lower()
+    pick_norm = _norm_team(raw_pick)
+    home = (match.get("team1", {}).get("teamName", "")).lower()
+    away = (match.get("team2", {}).get("teamName", "")).lower()
+
+    # Qualificatif de victoire/défaite explicite ex. « Victoire Barcelone »,
+    # « Défaite Leipzig », « Barcelone gagne »
+    neg = any(w in raw_pick for w in ("defaite", "def ", "perd", "perte de", "l emporte pas"))
+    # Sélections génériques fréquentes
+    if any(w in pick_norm for w in ("1", "equipe a la maison", "victoire maison", "domicile", "equipe 1", "team 1")):
+        if neg:
+            return "lost" if p1 > p2 else ("won" if p1 < p2 else "void")
+        return "won" if p1 > p2 else ("lost" if p1 < p2 else "void")
+    if any(w in pick_norm for w in ("2", "equipe visiteuse", "exterieur", "equipe a l exterieur", "equipe 2", "team 2")):
+        if neg:
+            return "lost" if p2 > p1 else ("won" if p2 < p1 else "void")
+        return "won" if p2 > p1 else ("lost" if p2 < p1 else "void")
+    if any(w in pick_norm for w in ("nul", "remise", "x")):
+        return "won" if p1 == p2 else "lost"
+    # Sélection par nom d'équipe (en retirant le mot « victoire » si présent)
+    team_pick = re.sub(r"\b(victoire|gagne|win|vainqueur)\b", " ", pick_norm)
+    home_score = _fuzzy_score(team_pick, home)
+    away_score = _fuzzy_score(team_pick, away)
+    if home_score > away_score:
+        return "won" if p1 > p2 else ("lost" if p1 < p2 else "void")
+    if away_score > home_score:
+        return "won" if p2 > p1 else ("lost" if p2 < p1 else "void")
+    return "void"
+
+
+def _openligadb_request(url, timeout=12):
+    try:
+        r = requests.get(url, timeout=timeout, headers={"User-Agent": "BET.PRONO/1.5"})
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return None
+
+
+@app.post("/api/admin/picks/<int:pick_id>/resolve")
+@login_required
+@admin_required
+def resolve_pick(pick_id):
+    """Déclenche la résolution automatique d'un prono via OpenLigaDB.
+    Retourne l'état du scoring (matches retrouvés, résultat proposé) et
+    applique le résultat si un match unique et fiable est trouvé."""
+    db = get_db()
+    pick = db.execute("SELECT * FROM picks WHERE id = ? AND author_id = ?", (pick_id, g.user["id"])).fetchone()
+    if not pick:
+        return jsonify({"error": "Prono introuvable."}), 404
+    if pick["result"] != "pending":
+        return jsonify({"error": "Ce prono est déjà réglé."}), 400
+    try:
+        legs = json.loads(pick["legs"] or "[]")
+    except (TypeError, ValueError):
+        legs = []
+    if not legs:
+        return jsonify({"error": "Prono sans jambes."}), 400
+
+    details = {"legs": [], "founded": 0, "applied": False}
+    outcomes = []
+    for leg in legs:
+        tm = (leg.get("match") or "").split(" vs ")
+        if len(tm) != 2:
+            details["legs"].append({"match": leg.get("match"), "note": "format non reconnu (attendu 'Équipe A vs Équipe B')"})
+            outcomes.append("void")
+            continue
+        team1, team2 = tm[0].strip(), tm[1].strip()
+        found = None
+        # Panier de ligues prises en charge, d'abord les plus couvrantes
+        now = datetime.now(timezone.utc)
+        season = now.year if now.month >= 7 else now.year - 1  # saison en cours (juillet→juin)
+        for shortcut in ("bl1", "ucl", "pl", "la1", "bl2", "lg1", "seriea", "laliga1"):
+            finished = []
+            # tente la saison en cours puis la précédente
+            for s in (season, season - 1):
+                data = _openligadb_request(f"{OPENLIGADB_BASE}/getmatchdata/{shortcut}/{s}")
+                if data is None:
+                    continue
+                finished = [m for m in data if m.get("matchIsFinished")]
+                if finished:
+                    break
+            found = _find_league_match(team1, team2, finished)
+            if found:
+                break
+        if found:
+            outcome = _leg_outcome(leg, found)
+            p1, p2 = _result_points(found)
+            details["legs"].append({
+                "match": leg.get("match"),
+                "api_match": f"{found['team1']['teamName']} {p1 or '-'} - {p2 or '-'} {found['team2']['teamName']}",
+                "outcome": outcome,
+            })
+            outcomes.append(outcome)
+            details["founded"] += 1
+        else:
+            details["legs"].append({"match": leg.get("match"), "note": "match non retrouvé/terminé dans OpenLigaDB"})
+            outcomes.append("void")
+
+    proposed = None
+    if len(outcomes) == len(legs) and outcomes:
+        if any(o == "lost" for o in outcomes):
+            proposed = "lost"
+        elif all(o == "won" for o in outcomes):
+            proposed = "won"
+        elif any(o == "void" for o in outcomes):
+            proposed = "void"
+
+    if proposed and details["founded"] == len(legs):
+        db.execute("UPDATE picks SET result = ? WHERE id = ?", (proposed, pick_id))
+        bet_ids = [r["bet_id"] for r in db.execute(
+            "SELECT bet_id FROM pick_follows WHERE pick_id = ?", (pick_id,)
+        ).fetchall()]
+        for bet_id in bet_ids:
+            db.execute("UPDATE bets SET result = ? WHERE id = ?", (proposed, bet_id))
+        db.commit()
+        details["applied"] = True
+
+    details["proposed"] = proposed
+    return jsonify(details)
+
+
 def validate_legs(legs):
     if not isinstance(legs, list) or not (1 <= len(legs) <= 6):
         return None, "Un prono doit contenir entre 1 et 6 paris."
