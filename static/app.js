@@ -44,6 +44,7 @@ const eur=n=>n.toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
 const pct=n=>n.toLocaleString('fr-FR',{maximumFractionDigits:2})+' %';
 const LB={won:'Gagné',lost:'Perdu',void:'Remboursé',pending:'En cours',wd:'Retrait'};
 let PER='all';
+let QS='', QR='all';
 const cut=()=>{if(PER==='all')return'';const d=new Date();d.setDate(d.getDate()-({d:0,w:6,m:29})[PER]);return d.toISOString().slice(0,10)};
 const pl=b=>b.r==='won'?b.s*(b.o-1)+(b.b||0):b.r==='lost'?-b.s:0;
 
@@ -81,8 +82,10 @@ function render(){
   $('plan').innerHTML=[['FUN',1],['Prudente',5],['Confiance',7],['Maximum',10]].map(p=>`<div><span>${p[0]} (${p[1]} %)</span><b>${eur(bk*p[1]/100)}</b></div>`).join('');
   [...$('per').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===PER));
   chart(bets.filter(b=>b.r!=='pending'));
-  $('t').innerHTML='<thead><tr><th>Date</th><th>Sport</th><th>Type</th><th>Mise</th><th>Cote</th><th>Résultat</th><th>Gain</th><th></th></tr></thead><tbody>'+[...all].reverse().map(b=>{const p=pl(b),w=b.r==='wd';
-    return `<tr><td>${b.d.slice(8)}/${b.d.slice(5,7)}</td><td>${b.sp}</td><td>${b.ty}</td><td>${eur(b.s)}</td><td>${w?'–':b.o}</td><td>${w?LB[b.r]:`<span class="v">${LB[b.r]}</span><select class="x" data-i="${b.id}" aria-label="Résultat">${['won','lost','void','pending'].map(k=>`<option value="${k}"${k===b.r?' selected':''}>${LB[k]}</option>`).join('')}</select>`}</td><td class="${p>0?'g':p<0?'l':''}">${w||b.r==='pending'?'–':eur(p)}</td><td>${w?'':`<button class="row-edit-btn" data-e="${b.id}" aria-label="Modifier le résultat" title="Modifier le résultat">✎</button>`}<button class="x" data-x="${b.id}" aria-label="Supprimer">✕</button></td></tr>`}).join('')+'</tbody>';
+  const q=(QS||'').trim().toLowerCase(), qr=(QR)||'all';
+  const shown=all.filter(b=>(qr==='all'||b.r===qr)&&(!q||b.sp.toLowerCase().includes(q)||b.ty.toLowerCase().includes(q)||b.d.includes(q)));
+  $('t').innerHTML='<thead><tr><th>Date</th><th>Sport</th><th>Type</th><th>Mise</th><th>Cote</th><th>Résultat</th><th>Gain</th><th></th></tr></thead><tbody>'+(shown.length?[...shown].reverse().map(b=>{const p=pl(b),w=b.r==='wd';
+    return `<tr><td>${b.d.slice(8)}/${b.d.slice(5,7)}</td><td>${b.sp}</td><td>${b.ty}</td><td>${eur(b.s)}</td><td>${w?'–':b.o}</td><td>${w?LB[b.r]:`<span class="v">${LB[b.r]}</span><select class="x" data-i="${b.id}" aria-label="Résultat">${['won','lost','void','pending'].map(k=>`<option value="${k}"${k===b.r?' selected':''}>${LB[k]}</option>`).join('')}</select>`}</td><td class="${p>0?'g':p<0?'l':''}">${w||b.r==='pending'?'–':eur(p)}</td><td>${w?'':`<button class="row-edit-btn" data-e="${b.id}" aria-label="Modifier le pari" title="Modifier le pari">✎</button>`}<button class="x" data-x="${b.id}" aria-label="Supprimer">✕</button></td></tr>`}).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--mute)">Aucun pari ne correspond à la recherche.</td></tr>')+'</tbody>';
   $('initBk').value=INIT;
   renderPendingPicker();
 }
@@ -120,8 +123,19 @@ $('f').addEventListener('submit', async ev=>{
 });
 
 $('t').addEventListener('click', async ev=>{
-  const e=ev.target.dataset.e;
-  if(e){const tr=ev.target.closest('tr');if(tr){tr.classList.toggle('row-edit');}return}
+  const e=ev.target.dataset.e;if(e){
+    const b=BETS.find(x=>String(x.id)===String(e)); if(!b) return;
+    const dlg=document.getElementById('editBetDlg');
+    if(!dlg){ return; }
+    document.getElementById('ebDate').value=b.d;
+    document.getElementById('ebSport').value=b.sp;
+    document.getElementById('ebType').value=b.ty;
+    document.getElementById('ebStake').value=b.s;
+    document.getElementById('ebOdds').value=b.o||'';
+    dlg._betId=b.id;
+    if(typeof dlg.showModal==='function') dlg.showModal();
+    return;
+  }
   const x=ev.target.dataset.x;if(!x)return;
   if(!confirm('Supprimer ce pari ?'))return;
   await api('/api/bets/'+x,{method:'DELETE'});
@@ -133,6 +147,20 @@ $('t').addEventListener('change', async ev=>{
   await loadBets();
 });
 $('per').addEventListener('click',ev=>{if(ev.target.dataset.p){PER=ev.target.dataset.p;render()}});
+
+$('ebSave').addEventListener('click',async()=>{
+  const dlg=document.getElementById('editBetDlg');
+  if(!dlg||!dlg._betId) return;
+  const body={d:document.getElementById('ebDate').value,sp:document.getElementById('ebSport').value,ty:document.getElementById('ebType').value,s:document.getElementById('ebStake').value,o:document.getElementById('ebOdds').value};
+  try{
+    await api('/api/bets/'+dlg._betId,{method:'PATCH',body:JSON.stringify(body)});
+    if(typeof dlg.close==='function') dlg.close();
+    await loadBets();
+  }catch(err){ alert('Erreur lors de la modification : '+(err&&err.message?err.message:err)); }
+});
+const betSearch=document.getElementById('betSearch'), betResultFilter=document.getElementById('betResultFilter');
+if(betSearch){ betSearch.addEventListener('input',()=>{ QS=betSearch.value; render(); }); }
+if(betResultFilter){ betResultFilter.addEventListener('change',()=>{ QR=betResultFilter.value; render(); }); }
 $('s').addEventListener('input',()=>{const w=$('warn'),lim=(window.BK||0)*0.1;w.hidden=!(+$('s').value>lim&&$('r').value!=='wd');w.textContent=`Cette mise dépasse 10 % de votre bankroll (maximum conseillé : ${eur(lim)}).`});
 $('r').addEventListener('change',()=>$('s').dispatchEvent(new Event('input')));
 
@@ -673,7 +701,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.9.0', date='2026-10-14';
+  const v='1.9.1', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

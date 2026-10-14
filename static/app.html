@@ -77,6 +77,9 @@ button:active{transform:translateY(1px)}
 .wrap::-webkit-scrollbar-track{background:rgba(255,255,255,.04);border-radius:99px}
 .wrap::-webkit-scrollbar-thumb{background:rgba(255,117,24,.45);border-radius:99px}
 .wrap::-webkit-scrollbar-thumb:hover{background:rgba(255,117,24,.7)}
+.bet-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.bet-toolbar input[type=search]{flex:1;min-width:160px}
+.bet-toolbar select{background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:.88rem}
 *::-webkit-scrollbar{width:8px;height:8px}
 *::-webkit-scrollbar-track{background:rgba(255,255,255,.04);border-radius:99px}
 *::-webkit-scrollbar-thumb{background:rgba(255,117,24,.4);border-radius:99px}
@@ -364,6 +367,17 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <section class="panel">
   <h2>Mes paris <button type="button" class="info-btn" data-help="history" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-history" hidden>Mes paris : l'historique complet de tes mises et de leurs résultats.</p>
+  <div class="bet-toolbar">
+    <input id="betSearch" type="search" placeholder="Rechercher (sport, type…)" aria-label="Rechercher un pari">
+    <select id="betResultFilter" aria-label="Filtrer par résultat">
+      <option value="all">Tous les résultats</option>
+      <option value="won">Gagnés</option>
+      <option value="lost">Perdus</option>
+      <option value="void">Remboursés</option>
+      <option value="pending">En attente</option>
+      <option value="wd">Annulés</option>
+    </select>
+  </div>
   <div class="wrap"><table id="t"></table></div>
 </section>
 
@@ -427,7 +441,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.9.0 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V1.9.1 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -464,6 +478,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=1.9.0"></script>
+    <script src="/static/app.js?v=1.9.1"></script>
 </body>
 </html>
