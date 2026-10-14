@@ -193,26 +193,37 @@ def get_db():
     if "db" not in g:
         if USE_PG:
             real = None
-            for attempt in range(3):
-                try:
-                    real = POOL.getconn()
-                    break
-                except Exception:
-                    # Le compute Neon peut mettre 15-30s à se réveiller
-                    # (scale-to-zero). On laisse une marge avant de réessayer.
-                    if attempt < 2:
-                        time.sleep(2 * (attempt + 1))
-                    if not _ensure_pool_open():
-                        pass
-            if real is None:
-                try:
-                    real = POOL.getconn()
-                except Exception:
+            for attempt in range(4):
+                if real is None:
+                    try:
+                        real = POOL.getconn()
+                    except Exception:
+                        if not _ensure_pool_open():
+                            pass
+                if real is not None:
+                    # Le compute Neon peut redémarrer (maintenance, changement
+                    # de réglages) : le pool renvoie alors des connexions mortes.
+                    # On vérifie que la connexion est vivante avant de l'utiliser.
+                    try:
+                        cur = real.cursor()
+                        cur.execute("SELECT 1")
+                        cur.fetchone()
+                        cur.close()
+                        break
+                    except Exception:
+                        try:
+                            POOL.putconn(real, close=True)
+                        except Exception:
+                            pass
+                        real = None
+                if attempt < 3:
+                    time.sleep(2 * (attempt + 1))
                     try:
                         POOL.check()
                     except Exception:
                         pass
-                    real = POOL.getconn()
+            if real is None:
+                real = POOL.getconn()
             g._pg_conn = real
             g.db = Conn("pg", real)
         else:
