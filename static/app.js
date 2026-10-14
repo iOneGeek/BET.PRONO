@@ -647,7 +647,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.6.4', date='2026-10-14';
+  const v='1.6.5', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
@@ -689,7 +689,6 @@ function data_normalize_picks(p){
 // ---------- Matchs du jour (SportMonks, consultation seule) ----------
 async function loadFixtures(){
   const list=$('fixturesList'); if(!list) return;
-  const sub=$('fixturesSub');
   try{
     list.innerHTML='<p class="fixtures-empty">Chargement des matchs...</p>';
     const d=await api('/api/fixtures');
@@ -699,12 +698,10 @@ async function loadFixtures(){
     }
     if(d.error && d.matches.length===0){
       list.innerHTML='<p class="fixtures-empty">SportMonks indisponible pour le moment. Réessaie dans quelques minutes.</p>';
-      if(sub) sub.textContent='Scores fournis par SportMonks (indisponible à l\'instant).';
       return;
     }
     if(d.matches.length===0){
       list.innerHTML='<p class="fixtures-empty">Aucun match pour cette journée.</p>';
-      if(sub) sub.textContent='Les fixtures du jour (scores fournis par SportMonks).';
       return;
     }
     list.innerHTML='';
@@ -730,11 +727,23 @@ async function loadFixtures(){
         const tile=document.createElement('div');
         tile.className='fx-tile';
         // Équipes séparées par un badge VS
-        const teams=(m.teams&&m.teams.length>=2)?[m.teams[0],m.teams[1]]:null;
+        const teams=(m.teams&&m.teams.length>=2)?m.teams:null;
         if(teams){
-          const tA=document.createElement('span'); tA.className='fx-team'; tA.textContent=teams[0];
+          const mkTeam=function(t){
+            const span=document.createElement('span'); span.className='fx-team';
+            if(t && t.logo){
+              const img=document.createElement('img');
+              img.className='fx-team-logo'; img.src=t.logo; img.alt=''; img.loading='lazy';
+              img.onerror=function(){ this.remove(); };
+              span.appendChild(img);
+            }
+            const n=document.createElement('span'); n.className='fx-team-name'; n.textContent=(t&&t.name)?t.name:'?';
+            span.appendChild(n);
+            return span;
+          };
+          const tA=mkTeam(teams[0]);
           const vs=document.createElement('span'); vs.className='fx-vs'; vs.textContent='VS';
-          const tB=document.createElement('span'); tB.className='fx-team'; tB.textContent=teams[1];
+          const tB=mkTeam(teams[1]);
           const row=document.createElement('div'); row.className='fx-tile-match';
           row.appendChild(tA); row.appendChild(vs); row.appendChild(tB);
           if(m.state && m.state.toLowerCase().indexOf('pas commenc')!==0 && m.state!=='NS'){
@@ -762,7 +771,6 @@ async function loadFixtures(){
       frag.appendChild(gl);
     }
     list.appendChild(frag);
-    if(sub) sub.textContent='Les fixtures du jour ('+d.matches.length+' matchs, scores fournis par SportMonks).';
   }catch(e){
     list.innerHTML='<p class="fixtures-empty">Matchs indisponibles pour le moment.</p>';
   }

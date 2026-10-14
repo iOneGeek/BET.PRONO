@@ -1233,7 +1233,7 @@ def _sportmonks_day(day):
             "state": state,
             "kickoff": kickoff,
             "league": league or "?",
-            "teams": names,
+            "teams": [{"name": p.get("name", "?"), "logo": p.get("image_path") or ""} for p in parts],
         })
     return out, False
 
