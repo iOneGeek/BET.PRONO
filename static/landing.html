@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BET.PRONO — Suivi de bankroll pour paris sportifs &amp; pronostics</title>
+<meta name="description" content="Application gratuite de suivi de bankroll pour parieurs sportifs : note tes mises, suis des pronostics partagés et mesure ton ROI pour parier avec méthode. Chacun son compte, chacun sa bankroll.">
+<meta name="keywords" content="pronostics sportifs, paris sportifs, suivi de bankroll, bankroll parieur, ROI paris sportifs, pronos gratuits, gestion de bankroll">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:title" content="BET.PRONO — Suivi de bankroll pour paris sportifs">
+<meta property="og:description" content="Note tes mises, suis des pronostics partagés et mesure ton ROI pour parier avec méthode. Gratuit.">
+<meta property="og:image" content="/static/landing/prono-tete.png">
+<meta name="theme-color" content="#0A1729">
+<style>
+:root{--bg:#0A1729;--bg2:#0D1F36;--card:#122A4A;--card2:#162F52;--line:#1E3A5F;--text:#E8EEF6;--mute:#9FB2C8;--accent:#F97316;--accent2:#ff8f3c;--green:#2fbf71;--radius:14px}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+img{max-width:100%;height:auto;display:block}
+a{color:var(--accent);text-decoration:none}
+.container{max-width:1200px;margin:0 auto;padding:0 24px}
+section{padding:64px 0}
+.badge{display:inline-block;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.35);color:var(--accent2);font-size:.72rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;padding:6px 14px;border-radius:999px}
+h1,h2,h3{line-height:1.2}
+h2{font-size:2rem;margin:14px 0 10px}
+h2 b{color:var(--accent)}
+.sub{color:var(--mute);font-size:1.05rem;max-width:640px}
+.btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;border-radius:10px;padding:14px 26px;font-size:1rem;transition:transform .2s,box-shadow .2s;cursor:pointer}
+.btn:hover{transform:translateY(-2px)}
+.btn-primary{background:linear-gradient(180deg,#ff8f3c,#F97316);color:#fff;box-shadow:0 6px 18px rgba(249,115,22,.35)}
+.btn-ghost{border:1px solid var(--line);background:var(--card);color:var(--text)}
+.btn-ghost:hover{border-color:var(--accent)}
+/* ===== HERO ===== */
+.hero{position:relative;overflow:hidden;padding:56px 0 72px;background:radial-gradient(1200px 500px at 80% -10%,rgba(249,115,22,.14),transparent),radial-gradient(900px 400px at 10% 10%,rgba(47,191,113,.08),transparent)}
+.hero-inner{display:flex;align-items:center;gap:56px}
+.hero .logo{width:220px;margin-bottom:24px}
+.hero h1{font-size:2.6rem;font-weight:800;letter-spacing:-.02em}
+.hero h1 span{color:var(--accent)}
+.hero p.lead{margin:18px 0 28px;font-size:1.15rem;color:var(--mute)}
+.pillars{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0 14px;list-style:none}
+.pillars li{background:rgba(18,42,74,.7);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:.88rem;color:var(--text)}
+.hero-note{font-size:.78rem;color:var(--mute)}
+.hero-visual{flex:0 0 340px}
+.hero-visual img{width:100%;border-radius:24px}
+.animate-float{animation:float 4s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+/* ===== WHAT IS ===== */
+.whatis-inner{display:flex;align-items:center;gap:56px}
+.whatis-visual{flex:0 0 320px}
+.whatis-visual img{border-radius:20px}
+.whatis-items{list-style:none;margin-top:24px;display:grid;gap:14px}
+.whatis-items li{display:flex;gap:16px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;transition:border-color .2s,transform .2s}
+.whatis-items li:hover{border-color:var(--accent);transform:translateY(-2px)}
+.whatis-items .ic{flex:0 0 44px;height:44px;border-radius:10px;background:rgba(249,115,22,.15);color:var(--accent);display:flex;align-items:center;justify-content:center}
+.whatis-items strong{color:var(--text)}
+.whatis-items p{color:var(--mute);font-size:.95rem}
+.tip{margin-top:22px;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.3);border-radius:10px;padding:14px 18px;font-size:.92rem;color:var(--text)}
+/* ===== FEATURES ===== */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:44px}
+.fcard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px;transition:transform .2s,border-color .2s}
+.fcard:hover{transform:translateY(-4px);border-color:rgba(249,115,22,.5)}
+.fcard img{width:110px;background:#0D1F36;border-radius:14px;padding:6px;margin-bottom:16px}
+.fcard h3{font-size:1.15rem;margin-bottom:8px}
+.fcard p{color:var(--mute);font-size:.9rem}
+/* ===== STEPS ===== */
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:48px}
+.step{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 22px 22px}
+.step .n{position:absolute;top:-18px;left:24px;width:40px;height:40px;border-radius:10px;background:linear-gradient(180deg,#ff8f3c,#F97316);color:#fff;font-weight:800;font-size:1.2rem;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(249,115,22,.4)}
+.step h3{font-size:1.05rem;margin-bottom:8px}
+.step p{color:var(--mute);font-size:.9rem}
+/* ===== GUIDE ===== */
+.guide-inner{display:grid;grid-template-columns:1.5fr 1fr;gap:48px;align-items:start}
+.guide-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px;margin-top:20px}
+.guide-card h3{font-size:1.15rem;margin-bottom:10px}
+.guide-card p{color:var(--mute);font-size:.95rem}
+.formula{background:var(--bg2);border-radius:8px;padding:14px 18px;font-family:monospace;font-size:.95rem;margin-top:12px;color:var(--text)}
+.guide-card ul{list-style:none;margin-top:12px;display:grid;gap:8px}
+.guide-card ul li{color:var(--mute);font-size:.92rem;display:flex;gap:8px}
+.guide-card ul li::before{content:"•";color:var(--accent)}
+.sticky{position:sticky;top:24px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;text-align:center}
+.sticky img{width:170px;margin:0 auto 14px}
+.sticky h3{margin-bottom:8px}
+.sticky p{color:var(--mute);font-size:.9rem}
+.sticky .disclaimer{font-size:.75rem;color:var(--mute);margin-top:14px}
+/* ===== FAQ ===== */
+.faq-list{list-style:none;margin-top:36px;display:grid;gap:12px;max-width:820px}
+.faq-item{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);overflow:hidden}
+.faq-q{width:100%;text-align:left;background:none;border:none;color:var(--text);font-size:1rem;font-weight:600;padding:18px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.faq-q::after{content:"+";font-size:1.4rem;color:var(--accent);transition:transform .25s}
+.faq-item.open .faq-q::after{transform:rotate(45deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease;color:var(--mute);font-size:.95rem}
+.faq-a div{padding:0 20px 18px}
+/* ===== COMMUNITY ===== */
+.comm-card{display:flex;align-items:center;gap:40px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:40px}
+.comm-card img{width:200px;border-radius:18px}
+.comm-card h2{margin:8px 0}
+.comm-card p{color:var(--mute)}
+.comm-btns{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+.btn-tg{background:#2AABEE;color:#fff;border:none;padding:12px 22px;border-radius:10px;font-weight:600;display:inline-flex;gap:8px;align-items:center}
+.btn-ig{background:linear-gradient(90deg,#F58529,#DD2A7B,#8134AF);color:#fff;border:none;padding:12px 22px;border-radius:10px;font-weight:600;display:inline-flex;gap:8px;align-items:center}
+/* ===== FOOTER ===== */
+footer{border-top:1px solid var(--line);background:var(--bg);padding:56px 0 24px}
+.footer-inner{display:flex;gap:48px;flex-wrap:wrap;justify-content:space-between}
+footer .logo{width:170px;margin-bottom:12px}
+footer p.about{color:var(--mute);font-size:.9rem;max-width:280px}
+.footer-nav ul{list-style:none;display:grid;gap:8px;font-size:.92rem}
+.footer-nav a{color:var(--mute)}
+.footer-nav a:hover{color:var(--accent)}
+.legal{margin-top:36px;background:rgba(255,92,92,.08);border:1px solid rgba(255,92,92,.35);border-radius:10px;padding:14px;text-align:center;font-size:.88rem}
+.copyright{text-align:center;color:var(--mute);font-size:.78rem;margin-top:20px}
+/* ===== RESPONSIVE ===== */
+@media(max-width:1024px){
+  .hero-inner,.whatis-inner{gap:36px}
+  .hero h1{font-size:2.1rem}
+  .features-grid,.steps-grid{grid-template-columns:repeat(2,1fr)}
+  .guide-inner{grid-template-columns:1fr}
+  .sticky{position:static}
+}
+@media(max-width:768px){
+  section{padding:48px 0}
+  .hero-inner{flex-direction:column;gap:40px;text-align:center}
+  .hero .logo{margin:0 auto 20px}
+  .hero p.lead{margin:16px auto 24px}
+  .pillars{justify-content:center}
+  .hero-visual{flex:0 0 240px}
+  .whatis-inner{flex-direction:column;gap:32px}
+  .whatis-items li{text-align:left}
+  .comm-card{flex-direction:column;text-align:center;padding:28px}
+  .comm-btns{justify-content:center}
+  .footer-inner{flex-direction:column;gap:28px}
+}
+@media(max-width:520px){
+  .features-grid,.steps-grid{grid-template-columns:1fr}
+  .hero h1{font-size:1.8rem}
+  .hero-visual{flex:0 0 200px}
+  .btn{width:100%;justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="container hero-inner">
+    <div>
+      <img class="logo" src="/static/landing/logo-betprono.png" alt="Logo BET.PRONO — le renard Prono, mascotte">
+      <h1>Suivi de bankroll personnel pour <span>paris sportifs</span></h1>
+      <p class="lead">Chacun son compte, chacun sa bankroll. Note tes mises, suis des pronostics partagés et mesure ton ROI pour parier avec méthode.</p>
+      <div>
+        <a class="btn btn-primary" href="/login?mode=signup">Créer un compte</a>
+        <a class="btn btn-ghost" href="/login">Se connecter</a>
+      </div>
+      <ul class="pillars" aria-label="Les trois piliers de BET.PRONO">
+        <li>📊 Gérer sa bankroll</li>
+        <li>🎯 Suivre des pronos partagés</li>
+        <li>⚖️ Parier avec méthode</li>
+      </ul>
+      <p class="hero-note">Application gratuite · Aucun gain garanti · Réservé aux adultes</p>
+    </div>
+    <div class="hero-visual animate-float">
+      <img src="/static/landing/prono/tablette.png" alt="Prono, le renard analyste de BET.PRONO, présente une tablette avec un graphique en hausse">
+    </div>
+  </div>
+</section>
+
+<!-- ===== WHAT IS ===== -->
+<section id="a-propos">
+  <div class="container whatis-inner">
+    <div class="whatis-visual">
+      <img src="/static/landing/prono/explique.png" alt="Prono lève l'index pour expliquer le fonctionnement de BET.PRONO">
+    </div>
+    <div>
+      <span class="badge">Présentation</span>
+      <h2>C'est quoi BET.<b>PRONO</b> ?</h2>
+      <p class="sub">BET.PRONO est une application web de suivi de bankroll pour les paris sportifs. Elle ne prend aucun pari : elle t'aide à garder le contrôle de ton capital, pari après pari, et à savoir avec précision si ta méthode est rentable.</p>
+      <ul class="whatis-items">
+        <li>
+          <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg></span>
+          <p><strong>Gérer sa bankroll :</strong> note tes mises, tes cotes et tes résultats pour suivre si tu es gagnant sur la durée.</p>
+        </li>
+        <li>
+          <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+          <p><strong>Suivre des pronos partagés :</strong> des paris conseillés avec mise recommandée, ajoutés en un clic à ta bankroll.</p>
+        </li>
+        <li>
+          <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M4 7h16"/><path d="M6 7l-3 7a3 3 0 0 0 6 0L6 7Z"/><path d="M18 7l-3 7a3 3 0 0 0 6 0l-3-7Z"/></svg></span>
+          <p><strong>Parier avec méthode :</strong> analyse tes performances par sport, par type de pari et ton retour sur investissement (ROI).</p>
+        </li>
+      </ul>
+      <p class="tip">💡 Conçu pour les parieurs qui veulent miser plus intelligemment et tenir leur capital de façon sérieuse.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FEATURES ===== -->
+<section id="fonctionnalites">
+  <div class="container">
+    <span class="badge">Fonctionnalités</span>
+    <h2>Tout pour suivre tes paris sportifs avec rigueur</h2>
+    <p class="sub">Un outil de gestion de bankroll pensé pour les parieurs qui veulent des chiffres fiables, pas des promesses.</p>
+    <div class="features-grid">
+      <article class="fcard">
+        <img src="/static/landing/prono/bankroll.png" alt="Prono tient une pile de pièces, symbole de la bankroll">
+        <h3>Bankroll personnelle</h3>
+        <p>Fixe ton capital de départ en euros, enregistre chaque mise et visualise l'évolution de ta bankroll en temps réel. Chaque compte a sa propre bankroll, rien n'est mélangé.</p>
+      </article>
+      <article class="fcard">
+        <img src="/static/landing/prono/prono_du_jour.png" alt="Prono annonce le prono du jour">
+        <h3>Pronos partagés</h3>
+        <p>Publie ou suis des pronostics sportifs : simple ou combiné, sport, équipes, cote et lien vers le pari. Chaque prono indique un niveau de confiance (Fun, Prudent, Confiance, Maxi).</p>
+      </article>
+      <article class="fcard">
+        <img src="/static/landing/prono/valide.png" alt="Prono valide un pari avec un signe de la main">
+        <h3>Mise conseillée automatique</h3>
+        <p>La mise recommandée est calculée en pourcentage de ta bankroll, pas de celle de l'auteur du prono. Tu l'ajoutes en un clic, à la bonne taille pour ton capital.</p>
+      </article>
+      <article class="fcard">
+        <img src="/static/landing/prono/pouce_leve.png" alt="Prono lève le pouce, satisfait de ses statistiques">
+        <h3>Statistiques &amp; ROI</h3>
+        <p>Taux de réussite, bénéfice net, retour sur investissement par sport et par type de pari : tu sais exactement où tu es performant et où tu perds de l'argent.</p>
+      </article>
+      <article class="fcard">
+        <img src="/static/landing/prono/gagne.png" alt="Prono célèbre un pari gagné">
+        <h3>Historique complet</h3>
+        <p>Chaque pari est marqué gagné, perdu ou remboursé. Ton historique reste consultable et exportable pour analyser tes séries et éviter de répéter les mêmes erreurs.</p>
+      </article>
+      <article class="fcard">
+        <img src="/static/landing/prono/concentre.png" alt="Prono concentré, la main sur le menton">
+        <h3>Jeu responsable intégré</h3>
+        <p>Des mises proportionnées, des rappels de prudence et aucune promesse de gain. L'objectif est la discipline sur la durée, pas le coup de poker.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== HOW IT WORKS ===== -->
+<section id="comment-ca-marche">
+  <div class="container">
+    <span class="badge">Comment ça marche</span>
+    <h2>Trois étapes pour parier avec méthode</h2>
+    <div class="steps-grid">
+      <div class="step">
+        <span class="n">1</span>
+        <h3>Crée ton compte et fixe ta bankroll</h3>
+        <p>Inscris-toi gratuitement, puis indique ton capital de départ en euros : c'est la somme que tu acceptes de dédier aux paris sportifs, et rien de plus.</p>
+      </div>
+      <div class="step">
+        <span class="n">2</span>
+        <h3>Enregistre tes paris ou suis un prono partagé</h3>
+        <p>Saisis tes mises, cotes et résultats, ou ajoute en un clic un prono partagé avec sa mise conseillée, calculée selon ta propre bankroll.</p>
+      </div>
+      <div class="step">
+        <span class="n">3</span>
+        <h3>Analyse tes résultats et ajuste ta méthode</h3>
+        <p>Consulte ton ROI, ton taux de réussite et tes performances par sport. Garde ce qui marche, corrige ce qui perd, et progresse pari après pari.</p>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:44px">
+      <a class="btn btn-primary" href="/login?mode=signup">Créer un compte</a>
+      <a class="btn btn-ghost" href="/login">Se connecter</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== BANKROLL GUIDE ===== -->
+<section id="guide-bankroll">
+  <div class="container">
+    <div class="guide-inner">
+      <article>
+        <span class="badge">Guide</span>
+        <h2>Gestion de bankroll pour les paris sportifs : les bases</h2>
+        <p class="sub">La gestion de bankroll est la compétence la plus sous-estimée des parieurs. Avant de chercher le bon pronostic, il faut savoir combien miser, et pourquoi. Voici les notions essentielles que BET.PRONO t'aide à appliquer au quotidien.</p>
+
+        <div class="guide-card">
+          <h3>Qu'est-ce qu'une bankroll ?</h3>
+          <p>La bankroll est la somme d'argent que tu réserves exclusivement aux paris sportifs. Elle doit être séparée de ton budget courant et correspondre à un montant que tu peux perdre sans conséquence sur ta vie quotidienne. Par exemple, une bankroll de 300 € signifie que tu ne mises jamais plus que ces 300 € au total, quels que soient les résultats. Fixer cette limite est la première règle du jeu responsable.</p>
+        </div>
+
+        <div class="guide-card">
+          <h3>Qu'est-ce qu'une unité de mise ?</h3>
+          <p>L'unité est un pourcentage fixe de ta bankroll, généralement entre 1 % et 5 %. Avec une bankroll de 300 € et une unité à 2 %, chaque pari « standard » vaut 6 €. Miser en unités plutôt qu'en montants arbitraires permet d'absorber les mauvaises séries sans ruiner son capital, et d'adapter automatiquement ses mises quand la bankroll monte ou descend. C'est exactement ce que fait la mise conseillée des pronos partagés sur BET.PRONO.</p>
+        </div>
+
+        <div class="guide-card">
+          <h3>Comment calculer le ROI d'un parieur ?</h3>
+          <p>Le ROI (retour sur investissement) mesure la rentabilité réelle de tes paris. La formule est simple :</p>
+          <p class="formula">ROI = (gains nets ÷ total des mises) × 100</p>
+          <p>Si tu as misé 500 € au total et que ton bénéfice net est de 25 €, ton ROI est de 5 %. Un ROI positif sur plusieurs centaines de paris est le véritable signe d'une méthode rentable ; un taux de réussite élevé ne suffit pas si tes cotes sont trop faibles. BET.PRONO calcule ton ROI global, par sport et par type de pari.</p>
+        </div>
+
+        <div class="guide-card">
+          <h3>Pourquoi suivre ses paris sportifs ?</h3>
+          <ul>
+            <li>Parce que la mémoire est sélective : on retient ses gros gains et on oublie ses petites pertes.</li>
+            <li>Pour identifier les sports et les types de pari où tu es réellement rentable.</li>
+            <li>Pour détecter le tilt, c'est-à-dire les mises impulsives après une perte.</li>
+            <li>Pour respecter ta limite de bankroll et jouer de façon responsable sur la durée.</li>
+          </ul>
+        </div>
+      </article>
+      <aside class="sticky">
+        <img src="/static/landing/prono/reflechit.png" alt="Prono réfléchit, la main sur le menton, avant de miser">
+        <h3>Le conseil de Prono</h3>
+        <p>« Décide de ta mise avant de regarder la cote, jamais après. Une bankroll bien tenue survit aux mauvaises semaines ; une bankroll improvisée, non. »</p>
+        <p class="disclaimer">Aucune méthode ne garantit de gains. Parie uniquement ce que tu peux te permettre de perdre.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FAQ ===== -->
+<section id="faq">
+  <div class="container">
+    <span class="badge">FAQ</span>
+    <h2>Questions fréquentes</h2>
+    <ul class="faq-list" id="faqList">
+      <li class="faq-item">
+        <button class="faq-q" type="button">BET.PRONO, c'est quoi exactement ?</button>
+        <div class="faq-a"><div>BET.PRONO est une application web de suivi de bankroll pour parieurs sportifs. Tu notes tes mises, tes cotes et tes résultats, et l'application calcule automatiquement ton bilan, ton ROI et tes performances par sport et par type de pari. Chacun son compte, chacun sa bankroll.</div></div>
+      </li>
+      <li class="faq-item">
+        <button class="faq-q" type="button">L'application est-elle gratuite ?</button>
+        <div class="faq-a"><div>Oui. La création de compte et le suivi de bankroll sont gratuits. Il suffit de créer un compte pour commencer à enregistrer tes paris.</div></div>
+      </li>
+      <li class="faq-item">
+        <button class="faq-q" type="button">BET.PRONO est-il un site de paris ou un bookmaker ?</button>
+        <div class="faq-a"><div>Non. BET.PRONO ne prend aucun pari et ne manipule aucun argent. C'est un outil de suivi et d'analyse : tu continues à parier chez l'opérateur agréé de ton choix, et tu consignes tes paris dans BET.PRONO pour garder le contrôle de ta bankroll.</div></div>
+      </li>
+      <li class="faq-item">
+        <button class="faq-q" type="button">Qu'est-ce qu'un prono partagé ?</button>
+        <div class="faq-a"><div>Un prono partagé est un pari conseillé publié par un membre, avec le sport, la sélection, la cote et une mise recommandée exprimée en pourcentage de ta bankroll. Si le prono te convient, tu l'ajoutes à ta bankroll en un clic : la mise est automatiquement adaptée à ton capital.</div></div>
+      </li>
+      <li class="faq-item">
+        <button class="faq-q" type="button">Comment est calculée la mise conseillée ?</button>
+        <div class="faq-a"><div>Chaque prono partagé porte un niveau de confiance (Fun, Prudent, Confiance ou Maxi). La mise conseillée correspond à un pourcentage fixe de ta bankroll selon ce niveau, par exemple 5 % pour un pari Prudent. Cela t'aide à miser proportionnellement à ton capital et à éviter les mises impulsives.</div></div>
+      </li>
+      <li class="faq-item">
+        <button class="faq-q" type="button">BET.PRONO garantit-il des gains ?</button>
+        <div class="faq-a"><div>Non, et aucun outil ne le peut. Les paris sportifs comportent toujours un risque de perte. BET.PRONO sert à mesurer tes résultats avec méthode pour que tu prennes des décisions éclairées, pas à promettre des gains.</div></div>
+      </li>
+      <li class="faq-item">
+        <button class="faq-q" type="button">Quels sports sont pris en charge ?</button>
+        <div class="faq-a"><div>Tu peux enregistrer des paris sur tous les sports : football, tennis, basket, rugby, sports américains, e-sport, etc. Le sport est une simple catégorie que tu choisis lors de la saisie, ce qui permet ensuite d'analyser ton ROI sport par sport.</div></div>
+      </li>
+      <li class="faq-item">
+        <button class="faq-q" type="button">Mes données sont-elles privées ?</button>
+        <div class="faq-a"><div>Ta bankroll, tes mises et tes résultats sont rattachés à ton compte personnel et ne sont pas visibles des autres membres. Seuls les pronos que tu choisis de publier sont partagés avec la communauté.</div></div>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== COMMUNITY ===== -->
+<section id="rejoins-nous">
+  <div class="container comm-card">
+    <img src="/static/landing/prono/celebration.png" alt="Prono lève les poings sous une pluie de confettis pour accueillir la communauté">
+    <div>
+      <span class="badge">Communauté</span>
+      <h2>Rejoins-nous</h2>
+      <p>Retrouve les pronos du jour, les bilans de bankroll et les coulisses de BET.PRONO sur Telegram et Instagram.</p>
+      <div class="comm-btns">
+        <a class="btn-tg" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer">Telegram</a>
+        <a class="btn-ig" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer">Instagram</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div>
+        <img class="logo" src="/static/landing/logo-betprono.png" alt="BET.PRONO">
+        <p class="about">Suivi de bankroll personnel — chacun son compte, chacun sa bankroll.</p>
+      </div>
+      <nav class="footer-nav" aria-label="Navigation du site">
+        <ul>
+          <li><a href="#a-propos">Présentation</a></li>
+          <li><a href="#fonctionnalites">Fonctionnalités</a></li>
+          <li><a href="#comment-ca-marche">Comment ça marche</a></li>
+          <li><a href="#guide-bankroll">Guide bankroll</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="/login">Se connecter</a></li>
+          <li><a href="/login?mode=signup" style="font-weight:600;color:var(--accent)">Créer un compte</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="legal"><strong>Interdit aux mineurs.</strong> Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? 09 74 75 13 13 (appel non surtaxé).</div>
+    <p class="copyright">© 2026 BET.PRONO. Outil de suivi et d'analyse, pas un opérateur de paris. Aucun gain n'est garanti.</p>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll('.faq-q').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var item=btn.parentElement, open=item.classList.contains('open'), ans=item.querySelector('.faq-a');
+    document.querySelectorAll('.faq-item.open').forEach(function(o){if(o!==item){o.classList.remove('open');o.querySelector('.faq-a').style.maxHeight=null}});
+    item.classList.toggle('open',!open);
+    ans.style.maxHeight=open?null:ans.scrollHeight+'px';
+  });
+});
+</script>
+</body>
+</html>

@@ -480,7 +480,7 @@ if _PgOperational is not None:
 
 @app.get("/")
 def root():
-    return send_from_directory(STATIC_DIR, "login.html")
+    return send_from_directory(STATIC_DIR, "landing.html")
 
 
 @app.get("/login")
