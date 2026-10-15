@@ -682,7 +682,9 @@ async function handlePicksClick(ev){
       const stake=+stakeEl.value;
       if(!(stake>0)){alert('Indique une mise valide.');return}
       const sport=sportEl.value||'Pronostic';
-      await api('/api/picks/'+follow+'/follow',{method:'POST',body:JSON.stringify({stake,sport})});
+      const pick=PICKS.find(p=>p.id==follow);
+      const type=(pick&&pick.title)||'';
+      await api('/api/picks/'+follow+'/follow',{method:'POST',body:JSON.stringify({stake,sport,type})});
       await loadPicks();await loadBets();
     }else if(unfollow){
       if(!confirm('Annuler ce pari ? Sa mise sera retirée de ta bankroll.'))return;
@@ -717,7 +719,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='2.1.0', date='2026-10-15';
+  const v='2.1.1', date='2026-10-15';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

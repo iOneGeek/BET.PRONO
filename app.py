@@ -1183,9 +1183,6 @@ def follow_pick(pick_id):
         return jsonify({"error": "Mise invalide."}), 400
     if stake <= 0:
         return jsonify({"error": "La mise doit être supérieure à 0."}), 400
-    # Sport choisi par le compte qui suit (sinon sport du prono, sinon générique)
-    sport = (data.get("sport") or "").strip()[:20] or "Pronostic"
-    bet_type = (data.get("type") or "").strip()[:20] or "Simple"
 
     db = get_db()
     pick = db.execute("SELECT * FROM picks WHERE id = ?", (pick_id,)).fetchone()
@@ -1196,6 +1193,12 @@ def follow_pick(pick_id):
     ).fetchone()
     if existing:
         return jsonify({"error": "Tu suis déjà ce prono."}), 409
+
+    # Sport choisi par le compte qui suit (sinon sport du prono, sinon générique)
+    sport = (data.get("sport") or "").strip()[:20] or pick["sport"] or "Pronostic"
+    # Type : explicite, sinon le type du prono (son titre : Combiné, Fun, x4...),
+    # sinon "Simple" par défaut.
+    bet_type = (data.get("type") or "").strip()[:20] or pick["title"] or "Simple"
 
     now = datetime.now(timezone.utc).isoformat()
     today = datetime.now(timezone.utc).date().isoformat()
