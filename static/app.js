@@ -140,6 +140,7 @@ $('t').addEventListener('click', async ev=>{
     document.getElementById('ebType').value=b.ty;
     document.getElementById('ebStake').value=b.s;
     document.getElementById('ebOdds').value=b.o||'';
+    document.getElementById('ebResult').value=b.r||'pending';
     dlg._betId=b.id;
     if(typeof dlg.showModal==='function') dlg.showModal();
     return;
@@ -159,7 +160,7 @@ $('per').addEventListener('click',ev=>{if(ev.target.dataset.p){PER=ev.target.dat
 $('ebSave').addEventListener('click',async()=>{
   const dlg=document.getElementById('editBetDlg');
   if(!dlg||!dlg._betId) return;
-  const body={d:document.getElementById('ebDate').value,sp:document.getElementById('ebSport').value,ty:document.getElementById('ebType').value,s:document.getElementById('ebStake').value,o:document.getElementById('ebOdds').value};
+  const body={d:document.getElementById('ebDate').value,sp:document.getElementById('ebSport').value,ty:document.getElementById('ebType').value,s:document.getElementById('ebStake').value,o:document.getElementById('ebOdds').value,r:document.getElementById('ebResult').value};
   try{
     await api('/api/bets/'+dlg._betId,{method:'PATCH',body:JSON.stringify(body)});
     if(typeof dlg.close==='function') dlg.close();
