@@ -512,6 +512,20 @@ def service_worker():
     return resp
 
 
+@app.get("/robots.txt")
+def robots_txt():
+    resp = send_from_directory(STATIC_DIR, "robots.txt")
+    resp.headers["Content-Type"] = "text/plain; charset=utf-8"
+    return resp
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    resp = send_from_directory(STATIC_DIR, "sitemap.xml")
+    resp.headers["Content-Type"] = "application/xml; charset=utf-8"
+    return resp
+
+
 @app.get("/static/<path:filename>")
 def static_files(filename):
     return send_from_directory(STATIC_DIR, filename)

@@ -3,3 +3,5 @@ Allow: /
 Allow: /login
 Disallow: /app
 Disallow: /admin
+
+Sitemap: https://bet-prono.onrender.com/sitemap.xml
