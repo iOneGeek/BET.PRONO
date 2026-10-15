@@ -176,6 +176,7 @@ if USE_PG:
         max_size=8,
         open=False,
         timeout=5,
+        check=ConnectionPool.check_connection,
     )
     POOL.open()
 
