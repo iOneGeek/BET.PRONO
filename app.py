@@ -119,42 +119,19 @@ class Conn:
         args = tuple(args or ())
         if self.backend == "pg":
             sql = self._translate(sql)
-            try:
-                return self._pg_execute(sql, args)
-            except Exception:
-                # Connexion probablement morte en plein milieu (restart Neon,
-                # coupure réseau) : on la jette et on rejoue UNE fois.
-                # Une seule tentative supplémentaire -> pas de boucle infinie.
-                try:
-                    if self._c:
-                        POOL.putconn(self._c, close=True)
-                except Exception:
-                    pass
-                self._c = None
-                try:
-                    self._c = POOL.getconn()
-                except Exception:
-                    self._c = None
-                if self._c is None:
-                    raise ConnectionError("Base de données indisponible")
-                return self._pg_execute(sql, args)
+            cur = self._c.cursor(row_factory=_make_pg_row)
+            if sql.lstrip().upper().startswith("INSERT INTO"):
+                sql = sql.rstrip(";") + " RETURNING id"
+                cur.execute(sql, args)
+                row = cur.fetchone()
+                self._lastid = row[0] if row else None
+            else:
+                cur.execute(sql, args)
+                self._lastid = None
         else:
             cur = self._c.cursor()
             cur.execute(sql, args)
             self._lastid = cur.lastrowid if cur.lastrowid else None
-            self._cur = cur
-            return self
-
-    def _pg_execute(self, sql, args):
-        cur = self._c.cursor(row_factory=_make_pg_row)
-        if sql.lstrip().upper().startswith("INSERT INTO"):
-            sql = sql.rstrip(";") + " RETURNING id"
-            cur.execute(sql, args)
-            row = cur.fetchone()
-            self._lastid = row[0] if row else None
-        else:
-            cur.execute(sql, args)
-            self._lastid = None
         self._cur = cur
         return self
 
@@ -192,13 +169,13 @@ if USE_PG:
     dsn = DATABASE_URL
     if "connect_timeout=" not in dsn:
         sep = "&" if "?" in dsn else "?"
-        dsn = f"{dsn}{sep}connect_timeout=20"
+        dsn = f"{dsn}{sep}connect_timeout=5"
     POOL = ConnectionPool(
         dsn,
         min_size=1,
         max_size=8,
         open=False,
-        timeout=10,
+        timeout=5,
     )
     POOL.open()
 
@@ -276,7 +253,13 @@ def close_db(exception=None):
     db = g.pop("db", None)
     if db is not None:
         if USE_PG:
-            POOL.putconn(g.pop("_pg_conn", db._c))
+            try:
+                POOL.putconn(g.pop("_pg_conn", db._c), close=False)
+            except Exception:
+                try:
+                    POOL.putconn(db._c, close=True)
+                except Exception:
+                    pass
         else:
             db.close()
 
