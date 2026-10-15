@@ -717,7 +717,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.9.5', date='2026-10-14';
+  const v='1.9.8', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
