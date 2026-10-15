@@ -443,24 +443,35 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V1.9.3 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V1.9.4 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
   <b>La page a rencontré une erreur.</b><span id="jsErrMsg"></span>
   <button type="button" id="jsErrorFix">Recharger proprement</button>
 </div>
-<dialog id="editBetDlg">
+<style id="bpDialogCss">
+.bp-dialog{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:14px;padding:22px;width:min(480px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.bp-dialog h3{margin:0 0 14px;color:var(--text)}
+.bp-dialog input,.bp-dialog select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:.95rem;width:100%}
+.bp-dialog .share-form label{color:var(--mute);font-size:.82rem;font-weight:600;display:grid;gap:5px}
+.bp-dialog::backdrop{background:rgba(2,8,18,.72);backdrop-filter:blur(3px)}
+.bp-dialog .eb-actions{display:flex;gap:8px;margin-top:6px;align-items:center}
+.bp-dialog .danger{background:linear-gradient(180deg,#ff5c5c,#e03131);border:1px solid #e03131;color:#fff;font-weight:700;border-radius:9px;padding:10px 14px;cursor:pointer}
+</style>
+<dialog id="editBetDlg" class="bp-dialog">
   <h3 id="editBetTitle">Modifier le pari</h3>
   <form method="dialog" class="share-form" id="editBetForm">
     <label>Date<input type="date" id="ebDate"></label>
-    <label>Sport<input id="ebSport" maxlength="20"></label>
-    <label>Type de pari<input id="ebType" maxlength="20"></label>
+    <label>Sport<select id="ebSport"><option value="Foot">⚽ Foot</option><option value="Mixte">🎯 Mixte</option><option value="Tennis">🎾 Tennis</option><option value="NBA">🏀 NBA</option><option value="F1">🏎️ F1</option><option value="MMA">🥊 MMA</option><option value="MLB">⚾ MLB</option><option value="NFL">🏈 NFL</option><option value="NHL">🏒 NHL</option></select></label>
+    <label>Type de pari<select id="ebType"><option>Simple</option><option>Combiné</option><option>Combiné FUN</option><option>Combiné x4</option><option>Combiné x5</option></select></label>
     <label>Mise (€)<input type="number" id="ebStake" min="0.1" step="0.5"></label>
     <label>Cote<input type="number" id="ebOdds" min="1" step="0.01"></label>
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <button type="button" class="primary" id="ebSave">Enregistrer</button>
+    <div class="eb-actions">
+      <button type="button" class="danger" id="ebDelete">Supprimer</button>
+      <span style="flex:1"></span>
       <button type="button" class="ghost" id="ebCancel">Annuler</button>
+      <button type="button" class="primary" id="ebSave">Enregistrer</button>
     </div>
   </form>
 </dialog>
@@ -480,6 +491,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=1.9.3"></script>
+    <script src="/static/app.js?v=1.9.4"></script>
 </body>
 </html>

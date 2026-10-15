@@ -168,6 +168,8 @@ $('ebSave').addEventListener('click',async()=>{
 });
 const ebCancel=document.getElementById('ebCancel');
 if(ebCancel){ ebCancel.addEventListener('click',()=>{ const d=document.getElementById('editBetDlg'); if(d&&typeof d.close==='function') d.close(); }); }
+const ebDelete=document.getElementById('ebDelete');
+if(ebDelete){ ebDelete.addEventListener('click',async()=>{ const d=document.getElementById('editBetDlg'); if(!d||!d._betId) return; if(!confirm('Supprimer définitivement ce pari ?')) return; try{ await api('/api/bets/'+d._betId,{method:'DELETE'}); if(typeof d.close==='function') d.close(); await loadBets(); }catch(err){ alert('Erreur lors de la suppression : '+(err&&err.message?err.message:err)); } }); }
 // Fermer aussi en cliquant sur le fond grisé du dialog (hors de la boîte)
 const editDlg=document.getElementById('editBetDlg');
 if(editDlg){ editDlg.addEventListener('click',(ev)=>{ if(ev.target===editDlg && typeof editDlg.close==='function') editDlg.close(); }); }
@@ -714,7 +716,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='1.9.3', date='2026-10-14';
+  const v='1.9.4', date='2026-10-14';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
