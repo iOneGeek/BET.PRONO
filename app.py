@@ -75,8 +75,8 @@ DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 USE_PG = DATABASE_URL.startswith("postgres")
 
 if USE_PG:
-    from psycopg_pool import ConnectionPool
     try:
+        import psycopg
         from psycopg import OperationalError as _PgOperational
     except Exception:
         _PgOperational = None
@@ -161,85 +161,17 @@ class Conn:
         return sql.replace("?", "%s")
 
 
-POOL = None
-_POOL_LOCK = None
-if USE_PG:
-    import threading
-    _POOL_LOCK = threading.Lock()
-    dsn = DATABASE_URL
-    if "connect_timeout=" not in dsn:
-        sep = "&" if "?" in dsn else "?"
-        dsn = f"{dsn}{sep}connect_timeout=5"
-    POOL = ConnectionPool(
-        dsn,
-        min_size=1,
-        max_size=8,
-        open=False,
-        timeout=5,
-        check=ConnectionPool.check_connection,
-    )
-    POOL.open()
-
-
-def _ensure_pool_open():
-    """Garantit que le pool est ouvert. L'auto-reconnect règle les coupures
-    temporaires (maintenances Render/Neon, pause du compute) : dès que la base
-    redevient joignable, le pool se rouvre tout seul, sans erreur ni blocage."""
-    if not USE_PG or POOL is None:
-        return True
-    if not POOL.closed:
-        return True
-    try:
-        with _POOL_LOCK:
-            if POOL.closed:
-                try:
-                    POOL.open()
-                except Exception:
-                    return False
-        return not POOL.closed
-    except Exception:
-        return False
-
-
 def get_db():
     if "db" not in g:
         if USE_PG:
             real = None
             for attempt in range(2):
-                if real is None:
-                    try:
-                        real = POOL.getconn()
-                    except Exception:
-                        if not _ensure_pool_open():
-                            pass
-                if real is not None:
-                    # Le compute Neon peut redémarrer (maintenance, changement
-                    # de réglages) : le pool renvoie alors des connexions mortes.
-                    # On vérifie que la connexion est vivante avant de l'utiliser.
-                    try:
-                        cur = real.cursor()
-                        cur.execute("SELECT 1")
-                        cur.fetchone()
-                        cur.close()
-                        break
-                    except Exception:
-                        try:
-                            POOL.putconn(real, close=True)
-                        except Exception:
-                            pass
-                        real = None
-                if attempt < 1:
-                    time.sleep(2)
-                    try:
-                        POOL.check()
-                    except Exception:
-                        pass
-            if real is None:
                 try:
-                    real = POOL.getconn()
+                    real = psycopg.connect(DATABASE_URL, connect_timeout=5)
+                    break
                 except Exception:
-                    real = None
-            g._pg_conn = real
+                    if attempt < 1:
+                        time.sleep(1)
             g.db = Conn("pg", real)
         else:
             real = sqlite3.connect(DB_PATH)
@@ -253,16 +185,10 @@ def get_db():
 def close_db(exception=None):
     db = g.pop("db", None)
     if db is not None:
-        if USE_PG:
-            try:
-                POOL.putconn(g.pop("_pg_conn", db._c), close=False)
-            except Exception:
-                try:
-                    POOL.putconn(db._c, close=True)
-                except Exception:
-                    pass
-        else:
+        try:
             db.close()
+        except Exception:
+            pass
 
 
 def _run_ddl(conn, ddl):
@@ -282,7 +208,7 @@ def init_db():
 
 
 def init_pg_db():
-    conn = POOL.getconn()
+    conn = psycopg.connect(DATABASE_URL, connect_timeout=5)
     try:
         _run_ddl(conn, """
             CREATE TABLE IF NOT EXISTS users (
@@ -360,7 +286,7 @@ def init_pg_db():
             CREATE INDEX IF NOT EXISTS idx_admin_logs_created ON admin_logs(created_at);
         """)
     finally:
-        POOL.putconn(conn)
+        conn.close()
 
 
 def init_sqlite_db():
