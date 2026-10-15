@@ -108,6 +108,8 @@ class Conn:
         self._lastid = None
 
     def execute(self, sql, args=()):
+        if self._c is None:
+            raise ConnectionError("Base de données indisponible")
         args = tuple(args or ())
         if self.backend == "pg":
             sql = self._translate(sql)
@@ -167,7 +169,7 @@ if USE_PG:
         min_size=1,
         max_size=8,
         open=False,
-        timeout=25,
+        timeout=10,
     )
     POOL.open()
 
@@ -196,7 +198,7 @@ def get_db():
     if "db" not in g:
         if USE_PG:
             real = None
-            for attempt in range(4):
+            for attempt in range(2):
                 if real is None:
                     try:
                         real = POOL.getconn()
@@ -219,14 +221,17 @@ def get_db():
                         except Exception:
                             pass
                         real = None
-                if attempt < 3:
-                    time.sleep(2 * (attempt + 1))
+                if attempt < 1:
+                    time.sleep(2)
                     try:
                         POOL.check()
                     except Exception:
                         pass
             if real is None:
-                real = POOL.getconn()
+                try:
+                    real = POOL.getconn()
+                except Exception:
+                    real = None
             g._pg_conn = real
             g.db = Conn("pg", real)
         else:
@@ -521,6 +526,11 @@ def _err500(e):
     traceback.print_exc()
     msg = getattr(e, "original_exception", e)
     return jsonify({"error": f"Erreur serveur: {msg}"}), 500
+
+
+@app.errorhandler(ConnectionError)
+def _err_conn(e):
+    return jsonify({"error": "Base de données indisponible. Réessayez dans quelques instants."}), 503
 
 
 @app.get("/")
