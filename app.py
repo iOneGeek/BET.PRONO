@@ -76,6 +76,12 @@ USE_PG = DATABASE_URL.startswith("postgres")
 
 if USE_PG:
     from psycopg_pool import ConnectionPool
+    try:
+        from psycopg import OperationalError as _PgOperational
+    except Exception:
+        _PgOperational = None
+else:
+    _PgOperational = None
 
 
 class SmartRow(dict):
@@ -113,19 +119,42 @@ class Conn:
         args = tuple(args or ())
         if self.backend == "pg":
             sql = self._translate(sql)
-            cur = self._c.cursor(row_factory=_make_pg_row)
-            if sql.lstrip().upper().startswith("INSERT INTO"):
-                sql = sql.rstrip(";") + " RETURNING id"
-                cur.execute(sql, args)
-                row = cur.fetchone()
-                self._lastid = row[0] if row else None
-            else:
-                cur.execute(sql, args)
-                self._lastid = None
+            try:
+                return self._pg_execute(sql, args)
+            except Exception:
+                # Connexion probablement morte en plein milieu (restart Neon,
+                # coupure réseau) : on la jette et on rejoue UNE fois.
+                # Une seule tentative supplémentaire -> pas de boucle infinie.
+                try:
+                    if self._c:
+                        POOL.putconn(self._c, close=True)
+                except Exception:
+                    pass
+                self._c = None
+                try:
+                    self._c = POOL.getconn()
+                except Exception:
+                    self._c = None
+                if self._c is None:
+                    raise ConnectionError("Base de données indisponible")
+                return self._pg_execute(sql, args)
         else:
             cur = self._c.cursor()
             cur.execute(sql, args)
             self._lastid = cur.lastrowid if cur.lastrowid else None
+            self._cur = cur
+            return self
+
+    def _pg_execute(self, sql, args):
+        cur = self._c.cursor(row_factory=_make_pg_row)
+        if sql.lstrip().upper().startswith("INSERT INTO"):
+            sql = sql.rstrip(";") + " RETURNING id"
+            cur.execute(sql, args)
+            row = cur.fetchone()
+            self._lastid = row[0] if row else None
+        else:
+            cur.execute(sql, args)
+            self._lastid = None
         self._cur = cur
         return self
 
@@ -531,6 +560,12 @@ def _err500(e):
 @app.errorhandler(ConnectionError)
 def _err_conn(e):
     return jsonify({"error": "Base de données indisponible. Réessayez dans quelques instants."}), 503
+
+
+if _PgOperational is not None:
+    @app.errorhandler(_PgOperational)
+    def _err_pg_operational(e):
+        return jsonify({"error": "Base de données momentanément indisponible. Réessayez dans quelques instants."}), 503
 
 
 @app.get("/")
