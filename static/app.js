@@ -75,7 +75,8 @@ function render(){
   const recOddsBet=bets.filter(b=>b.r==='won').reduce((a,b)=>(+b.o||0)>((a&&+a.o)||0)?b:a,null);
   const recGainBet=done.reduce((a,b)=>pl(b)>((a&&pl(a))||0)?b:a,null);
   const recDetail=b=>b?`<em>${b.d.slice(5,10)} · ${b.sp}</em>`:'';
-  const cells=[['Paris',bets.length,'',''],['Bénéfice',eur(profit),profit,''],['ROI',staked?pct(profit/staked*100):'–',profit,''],['Progression',INIT?pct(profit/INIT*100):'–',profit,''],['Réussite',done.length?pct(wins/done.length*100):'–','',''],['Record côte max',maxOdds?('× '+maxOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'–','',recDetail(recOddsBet)],['Record gain max',maxGain>0?eur(maxGain):'–','',recDetail(recGainBet)],['Bankroll',eur(bk),'','']];
+  const oddsDone=bets.filter(b=>+b.o>0).map(b=>+b.o),avgOdds=oddsDone.length?oddsDone.reduce((a,x)=>a+x,0)/oddsDone.length:0;
+  const cells=[['Paris',bets.length,'',''],['Bénéfice',eur(profit),profit,''],['ROI',staked?pct(profit/staked*100):'–',profit,''],['Moyenne côte',avgOdds?('× '+avgOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'–','',''],['Réussite',done.length?pct(wins/done.length*100):'–','',''],['Record côte max',maxOdds?('× '+maxOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'–','',recDetail(recOddsBet)],['Record gain max',maxGain>0?eur(maxGain):'–','',recDetail(recGainBet)],['Bankroll',eur(bk),'','']];
   $('stats').innerHTML=cells.map(c=>`<div class="card"><span>${c[0]}</span><b class="${c[2]>0?'g':c[2]<0?'l':''}">${c[1]}</b>${c[3]}</div>`).join('');
   window.BK=bk;
   $('bs').innerHTML=grp(done,'sp');$('bt').innerHTML=grp(done,'ty');
