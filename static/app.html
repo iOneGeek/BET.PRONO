@@ -20,11 +20,14 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;background-image:radial-gradient(ellipse at 55% 0%,rgba(32,74,125,.10),transparent 48%),radial-gradient(ellipse at 100% 45%,rgba(255,111,0,.08),transparent 30%)}
 main{max-width:760px;margin:0 auto;padding:20px 16px 40px;display:grid;gap:16px;position:relative;z-index:1}
-.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 4px 4px;z-index:10;position:relative}
+main>*{min-width:0}
 @media (max-width:560px){
   .topbar{flex-direction:column}
-  .who{width:100%}
-  #logout{margin-left:auto}
+  .who{width:100%;justify-content:center;row-gap:8px}
+  .who>span:first-child{flex:1 1 100%;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .who-social{flex-shrink:0}
+  #goProfile,#logout{flex:1 1 40%}
+  #logout{margin-left:0}
 }
 
 .brand{display:flex;align-items:center;gap:12px}
@@ -441,7 +444,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V2.2.0 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V2.2.1 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -490,6 +493,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=2.2.0"></script>
+    <script src="/static/app.js?v=2.2.1"></script>
 </body>
 </html>
