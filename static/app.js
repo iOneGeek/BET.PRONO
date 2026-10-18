@@ -104,9 +104,17 @@ async function loadBets(){
   const data=await api('/api/bets');
   BETS=data.bets;
   INIT=data.initial_bankroll;
+  refresh();
+}
+function refresh(){
   render();
   renderAdvice();
   if(Array.isArray(PICKS)&&PICKS.length&&(!document.activeElement||!document.activeElement.id||!/^stake-|^sport-/.test(document.activeElement.id))) renderPicks();
+}
+function insertBet(bet){
+  BETS.push(bet);
+  BETS.sort((a,b)=>(a.d<b.d?-1:a.d>b.d?1:(a.id||0)-(b.id||0)));
+  refresh();
 }
 
 $('f').addEventListener('submit', async ev=>{
@@ -116,8 +124,8 @@ $('f').addEventListener('submit', async ev=>{
   const payload={d:$('d').value,sp:w?'-':$('sp').value,ty:w?'Retrait':$('ty').value,s:+$('s').value,o:w?0:+$('o').value,r,b:+$('bo').value||0};
   btn.disabled=true;
   try{
-    await api('/api/bets',{method:'POST',body:JSON.stringify(payload)});
-    await loadBets();
+    const bet=await api('/api/bets',{method:'POST',body:JSON.stringify(payload)});
+    insertBet(bet);
     $('s').value=$('o').value=$('bo').value='';
     playBetCheck(btn);
   }catch(e){$('msg').textContent=e.message}
@@ -132,8 +140,8 @@ $('pokerForm').addEventListener('submit', async ev=>{
   const payload={d:$('d').value,sp:'Poker',ty:'Poker',s:net>0?net:net<0?-net:buy,o:2,r:net>0?'won':net<0?'lost':'void',b:0};
   btn.disabled=true;
   try{
-    await api('/api/bets',{method:'POST',body:JSON.stringify(payload)});
-    await loadBets();
+    const bet=await api('/api/bets',{method:'POST',body:JSON.stringify(payload)});
+    insertBet(bet);
     $('pkBuy').value=$('pkOut').value='';
     playBetCheck(btn);
   }catch(e){$('msg').textContent=e.message}
@@ -165,12 +173,15 @@ $('t').addEventListener('click', async ev=>{
   const x=ev.target.dataset.x;if(!x)return;
   if(!confirm('Supprimer ce pari ?'))return;
   await api('/api/bets/'+x,{method:'DELETE'});
-  await loadBets();
+  BETS=BETS.filter(b=>String(b.id)!==String(x));
+  refresh();
 });
 $('t').addEventListener('change', async ev=>{
   const i=ev.target.dataset.i;if(!i)return;
-  await api('/api/bets/'+i,{method:'PATCH',body:JSON.stringify({r:ev.target.value})});
-  await loadBets();
+  const bet=await api('/api/bets/'+i,{method:'PATCH',body:JSON.stringify({r:ev.target.value})});
+  const k=BETS.findIndex(b=>String(b.id)===String(i));
+  if(k>=0) BETS[k]=bet;
+  refresh();
 });
 $('per').addEventListener('click',ev=>{if(ev.target.dataset.p){PER=ev.target.dataset.p;render()}});
 
@@ -206,7 +217,7 @@ function clickButton(){
   const b=$('button');
   b.classList.add('loading'); b.classList.remove('ready');
   const doPatch=async()=>{
-    try{ await api('/api/settings',{method:'PATCH',body:JSON.stringify({initial_bankroll:+$('initBk').value})}); await loadBets(); msg.textContent='Bankroll de départ mise à jour.'; if(fb){fb.hidden=false;fb.style.animation='none';void fb.offsetWidth;fb.style.animation='';setTimeout(()=>{fb.hidden=true;},2000);} return true; }
+    try{ const payload={initial_bankroll:+$('initBk').value}; await api('/api/settings',{method:'PATCH',body:JSON.stringify(payload)}); INIT=payload.initial_bankroll; refresh(); msg.textContent='Bankroll de départ mise à jour.'; if(fb){fb.hidden=false;fb.style.animation='none';void fb.offsetWidth;fb.style.animation='';setTimeout(()=>{fb.hidden=true;},2000);} return true; }
     catch(e){ msg.textContent=e.message; return false; }
   };
   doPatch().then(ok=>{
