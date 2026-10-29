@@ -50,6 +50,38 @@ input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visi
 .gl{stroke:rgba(255,255,255,.22)}.gl.z{stroke:rgba(255,255,255,.65)}
 .ln{stroke:#fff;stroke-width:3;fill:none;stroke-linejoin:round;stroke-linecap:round}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+
+.advanced-analytics{display:grid;gap:16px;overflow:hidden}
+.analytics-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.analytics-head h2{margin-bottom:6px}
+.analytics-periods{display:flex;gap:6px;flex-wrap:wrap}
+.analytics-periods button{border-radius:999px;padding:6px 11px;font-size:.78rem;color:var(--mute);white-space:nowrap}
+.analytics-periods button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700;box-shadow:0 3px 10px rgba(255,117,24,.25)}
+.analytics-summary{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}
+.analytics-metric{border:1px solid var(--line);border-radius:12px;padding:12px;background:linear-gradient(145deg,var(--field),var(--panel));display:grid;gap:3px;min-width:0}
+.analytics-metric span,.analytics-metric small{color:var(--mute);font-size:.78rem}
+.analytics-metric b{font-size:1.25rem;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.analytics-content{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(220px,.75fr);gap:14px;align-items:stretch}
+.analytics-chart{min-height:238px;background:linear-gradient(145deg,#1d2a45,#2e416a);border-radius:14px;padding:10px 8px 4px;box-shadow:inset 0 1px 0 rgba(255,255,255,.09)}
+.analytics-chart svg{width:100%;height:auto;display:block}
+.analytics-chart text{fill:rgba(255,255,255,.82);font-size:10px}
+.analytics-chart .analytics-grid{stroke:rgba(255,255,255,.18);stroke-width:1}
+.analytics-chart .analytics-line{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.analytics-chart .analytics-area{fill:rgba(255,117,24,.18)}
+.analytics-chart .analytics-dot{fill:#ff9c55;stroke:#fff;stroke-width:2}
+.analytics-sports{border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--field);display:grid;align-content:start;gap:10px}
+.analytics-sports h3{margin:0;font-size:.92rem}
+.analytics-sport-list{display:grid;gap:10px}
+.analytics-sport-row{display:grid;gap:5px}
+.analytics-sport-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline;font-size:.82rem}
+.analytics-sport-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.analytics-sport-meta{color:var(--mute);font-size:.72rem}
+.analytics-sport-profit{font-weight:800;font-size:.82rem}
+.analytics-sport-track{height:6px;background:var(--panel);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+.analytics-sport-bar{display:block;height:100%;width:var(--bar);background:var(--bar-color);border-radius:inherit;min-width:3px}
+.analytics-empty{margin:0;color:var(--mute);font-size:.84rem}
+@media (max-width:600px){.analytics-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-content{grid-template-columns:1fr}.analytics-chart{min-height:210px}}
+
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:2px;box-shadow:var(--shadow-sm);transition:transform .12s ease,box-shadow .12s ease}
 .card em{font-style:normal;color:var(--mute);font-size:.72rem;opacity:.85}
 .pick-date{color:var(--mute);font-size:.8rem;white-space:nowrap}
@@ -366,6 +398,29 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 <section class="chart"><svg id="svg" viewBox="0 0 640 300" role="img" aria-label="Évolution du bénéfice pari après pari"></svg>
 <div class="per" id="per"><button data-p="d">1 j</button><button data-p="w">1 sem.</button><button data-p="m">1 mois</button><button data-p="all" aria-pressed="true">Tout</button></div></section>
 <section class="stats" id="stats"></section>
+  <section class="panel advanced-analytics" aria-labelledby="analyticsTitle">
+  <div class="analytics-head">
+    <div>
+      <h2 id="analyticsTitle">Analyse avancée</h2>
+      <p class="sub">ROI, réussite et bénéfice sur les paris réglés de la période.</p>
+    </div>
+    <div class="analytics-periods" id="analyticsPeriod" aria-label="Période des statistiques avancées">
+      <button type="button" data-analytics-period="week" aria-pressed="false">7 jours</button>
+      <button type="button" data-analytics-period="month" aria-pressed="true">30 jours</button>
+      <button type="button" data-analytics-period="quarter" aria-pressed="false">90 jours</button>
+      <button type="button" data-analytics-period="all" aria-pressed="false">Tout</button>
+    </div>
+  </div>
+  <p class="sub" id="analyticsRangeLabel" aria-live="polite"></p>
+  <div class="analytics-summary" id="analyticsMetrics"></div>
+  <div class="analytics-content">
+    <div class="analytics-chart"><svg id="analyticsBankrollChart" viewBox="0 0 640 230" role="img" aria-label="Évolution de la bankroll"></svg></div>
+    <section class="analytics-sports" aria-labelledby="analyticsSportsTitle">
+      <h3 id="analyticsSportsTitle">Performance par sport</h3>
+      <div class="analytics-sport-list" id="analyticsSports"></div>
+    </section>
+  </div>
+</section>
 <section class="panel"><h2>Mises conseillées <button type="button" class="info-btn" data-help="advice" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-advice" hidden>Mises conseillées selon ta bankroll : respecte la mise préconisée pour améliorer ta bankroll sur la durée.</p><div class="plan" id="plan"></div></section>
 <section class="panel"><h2>Par sport <button type="button" class="info-btn" data-help="sport" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-sport" hidden>Chaque sport est différent : fais des catégories pour savoir quel sport te convient le mieux et sur lequel tu gagnes le plus.</p><div class="wrap"><table id="bs"></table></div></section>
 <section class="panel"><h2>Par type de pari <button type="button" class="info-btn" data-help="type" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-type" hidden>Chaque type de pari a ses particularités : consulte tes résultats pour savoir quel type te convient le mieux.</p><div class="wrap"><table id="bt"></table></div></section>
@@ -441,6 +496,16 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
       <button class="primary" id="pfSave" type="submit">Enregistrer</button>
       <p class="sub" id="pfMsg"></p>
     </form>
+  </section>
+
+  <section class="panel" id="widgetPairingPanel">
+    <h2>Widget bureau</h2>
+    <p class="sub">Connecte ton widget sans partager ton mot de passe. Génère un code temporaire, puis saisis-le dans le widget dans les 5 minutes.</p>
+    <div class="row">
+      <button class="primary" id="widgetPairBtn" type="button">Générer un code</button>
+      <output id="widgetPairCode" class="sub" hidden aria-live="polite"></output>
+    </div>
+    <p class="sub" id="widgetPairMsg"></p>
   </section>
 </div>
 
