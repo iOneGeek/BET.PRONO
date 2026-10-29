@@ -460,6 +460,25 @@ function loadProfileForm(){
   $('pfPassword').value='';
   $('pfMsg').textContent='';
 }
+$('widgetPairBtn').addEventListener('click',async()=>{
+  const button=$('widgetPairBtn'), output=$('widgetPairCode'), msg=$('widgetPairMsg');
+  button.disabled=true;
+  msg.textContent='Création du code sécurisé…';
+  try{
+    const data=await api('/api/widget/pairing-code',{method:'POST'});
+    output.hidden=false;
+    output.textContent=data.code;
+    msg.textContent='Code valable 5 minutes et utilisable une seule fois. Il a aussi été copié.';
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(data.code).catch(()=>{});
+    }
+  }catch(error){
+    msg.textContent=error.message||'Impossible de créer le code.';
+  }finally{
+    button.disabled=false;
+  }
+});
+
 $('profileForm').addEventListener('submit',async ev=>{
   ev.preventDefault();
   const msg=$('pfMsg');
