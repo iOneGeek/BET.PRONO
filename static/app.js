@@ -43,14 +43,14 @@ async function api(path, opts={}){
 const eur=n=>n.toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
 const pct=n=>n.toLocaleString('fr-FR',{maximumFractionDigits:2})+' %';
 const LB={won:'Gagné',lost:'Perdu',void:'Remboursé',pending:'En cours',wd:'Retrait'};
-let PER='all';
-let ANALYTICS_PERIOD='month';
+let PER='month';
 let QS='', QR='all';
-const cut=()=>{if(PER==='all')return'';const d=new Date();d.setDate(d.getDate()-({d:0,w:6,m:29})[PER]);return d.toISOString().slice(0,10)};
+const cut=()=>{if(PER==='all')return'';const d=new Date();d.setDate(d.getDate()-({week:6,month:29,quarter:89})[PER]);return d.toISOString().slice(0,10)};
 const pl=b=>b.r==='won'?b.s*(b.o-1)+(b.b||0):b.r==='lost'?-b.s:0;
+const balanceDelta=b=>b.r==='wd'?-(Number(b.s)||0):pl(b);
 
 function chart(L){
-  let c=0;const pts=[0,...L.map(b=>c+=pl(b))];
+  let balance=INIT;const pts=[balance,...L.map(b=>balance+=balanceDelta(b))];
   const lo=Math.min(...pts),hi=Math.max(...pts),rng=(hi-lo)||1;
   const st=[10,25,50,100,250,500,1000,2500,5000].find(s=>rng/s<=5)||10000;
   const a=Math.floor(lo/st)*st,z=Math.ceil(hi/st)*st||st;
@@ -58,7 +58,7 @@ function chart(L){
   let g='';
   for(let v=a;v<=z;v+=st)g+=`<line x1="56" x2="624" y1="${Y(v)}" y2="${Y(v)}" class="gl${v===0?' z':''}"/><text x="48" y="${Y(v)+4}" text-anchor="end">${v.toLocaleString('fr-FR')} €</text>`;
   const d=pts.map((v,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join('');
-  $('svg').innerHTML=g+(pts.length>1?`<path d="${d}" class="ln"/>`:`<text x="340" y="150" text-anchor="middle" class="hint">Aucun pari résolu pour l'instant</text>`);
+  $('svg').innerHTML=g+(pts.length>1?`<path d="${d}" class="ln"/>`:`<text x="340" y="150" text-anchor="middle" class="hint">Aucun mouvement de bankroll sur cette période</text>`);
 }
 
 const grp=(L,k)=>{const m={};L.forEach(b=>(m[b[k]]=m[b[k]]||[]).push(b));
@@ -66,92 +66,22 @@ const grp=(L,k)=>{const m={};L.forEach(b=>(m[b[k]]=m[b[k]]||[]).push(b));
   const cl=v=>v>0?'g':v<0?'l':'';
   return L.length?'<thead><tr><th>'+(k==='sp'?'Sport':'Type')+'</th><th>Paris</th><th>Réussite</th><th>Bénéfice</th><th>ROI</th></tr></thead><tbody>'+rows.map(r=>`<tr><td>${r.n}</td><td>${r.c}</td><td>${pct(r.w)}</td><td class="${cl(r.p)}">${eur(r.p)}</td><td class="${cl(r.p)}">${pct(r.r)}</td></tr>`).join('')+'</tbody>':'<tbody><tr><td>Aucun pari résolu sur la période</td></tr></tbody>'};
 
-function analyticsPeriodCut(){
-  if(ANALYTICS_PERIOD==='all')return '';
-  const days={week:6,month:29,quarter:89}[ANALYTICS_PERIOD]||29;
-  const date=new Date();
-  date.setDate(date.getDate()-days);
-  return date.toISOString().slice(0,10);
-}
-function analyticsProfit(bet){
-  const stake=Number(bet.s)||0,odds=Number(bet.o)||0,bonus=Number(bet.b)||0;
-  if(bet.r==='won')return stake*(odds-1)+bonus;
-  if(bet.r==='lost')return-stake;
-  return 0;
-}
-function analyticsBalanceDelta(bet){
-  return bet.r==='wd'?-(Number(bet.s)||0):analyticsProfit(bet);
-}
 function analyticsClass(value){return value>0?'g':value<0?'l':''}
 function analyticsEscape(value){
   return String(value==null?'':value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 }
-function analyticsDate(value){
-  return value&&value.length>=10?value.slice(8,10)+'/'+value.slice(5,7):'—';
-}
-function renderAnalyticsChart(points){
-  const svg=document.getElementById('analyticsBankrollChart');
-  if(!svg)return;
-  const first=points[0],last=points[points.length-1];
-  if(!first||points.length<2){
-    svg.innerHTML='<text x="320" y="116" text-anchor="middle">Ajoutez des paris réglés pour suivre votre bankroll.</text>';
-    svg.setAttribute('aria-label','Évolution de la bankroll : aucune donnée sur la période');
-    return;
-  }
-  const values=points.map(point=>point.value);
-  const rawMin=Math.min(...values),rawMax=Math.max(...values);
-  const margin=Math.max((rawMax-rawMin)*.12,1);
-  const min=rawMin-margin,max=rawMax+margin,range=max-min||1;
-  const x=index=>52+(index/(points.length-1))*560;
-  const y=value=>190-((value-min)/range)*150;
-  const grid=[0,.5,1].map(step=>{
-    const value=min+range*step,coord=y(value);
-    return '<line class="analytics-grid" x1="52" x2="612" y1="'+coord+'" y2="'+coord+'"/><text x="45" y="'+(coord+4)+'" text-anchor="end">'+eur(value)+'</text>';
-  }).join('');
-  const line=points.map((point,index)=>(index?'L':'M')+x(index).toFixed(1)+' '+y(point.value).toFixed(1)).join(' ');
-  const area='M52 190 '+points.map((point,index)=>'L'+x(index).toFixed(1)+' '+y(point.value).toFixed(1)).join(' ')+' L612 190 Z';
-  const dotX=x(points.length-1),dotY=y(last.value);
-  svg.innerHTML=grid+'<path class="analytics-area" d="'+area+'"/><path class="analytics-line" d="'+line+'"/><circle class="analytics-dot" cx="'+dotX+'" cy="'+dotY+'" r="4"/><text x="52" y="216">'+analyticsDate(first.date)+'</text><text x="612" y="216" text-anchor="end">'+analyticsDate(last.date)+'</text><text x="612" y="26" text-anchor="end">'+eur(last.value)+'</text>';
-  svg.setAttribute('aria-label','Évolution de la bankroll de '+eur(first.value)+' à '+eur(last.value));
-}
 function renderAnalytics(){
-  const metrics=document.getElementById('analyticsMetrics');
   const sports=document.getElementById('analyticsSports');
-  const rangeLabel=document.getElementById('analyticsRangeLabel');
-  if(!metrics||!sports||!rangeLabel)return;
-  const all=[...BETS].sort((left,right)=>left.d.localeCompare(right.d)||(left.id||0)-(right.id||0));
-  const start=analyticsPeriodCut();
-  const before=start?all.filter(bet=>bet.d<start):[];
-  const period=all.filter(bet=>(!start||bet.d>=start)&&bet.r!=='wd');
+  if(!sports)return;
+  const start=cut();
+  const period=BETS.filter(bet=>(!start||bet.d>=start)&&bet.r!=='wd');
   const settled=period.filter(bet=>bet.r==='won'||bet.r==='lost'||bet.r==='void');
-  const decisive=settled.filter(bet=>bet.r==='won'||bet.r==='lost');
-  const staked=decisive.reduce((sum,bet)=>sum+(Number(bet.s)||0),0);
-  const profit=settled.reduce((sum,bet)=>sum+analyticsProfit(bet),0);
-  const wins=decisive.filter(bet=>bet.r==='won').length;
-  const pending=period.filter(bet=>bet.r==='pending').length;
-  const roi=staked?profit/staked*100:null;
-  const winRate=decisive.length?wins/decisive.length*100:null;
-  const cards=[
-    ['ROI',roi==null?'—':pct(roi),roi,'Bénéfice net / mises'],
-    ['Réussite',winRate==null?'—':pct(winRate),winRate,decisive.length?wins+' gagnés sur '+decisive.length:'Aucun pari décisif'],
-    ['Bénéfice',eur(profit),profit,'Paris réglés uniquement'],
-    ['Paris réglés',String(settled.length),'',pending?pending+' en attente':'Aucun en attente']
-  ];
-  metrics.innerHTML=cards.map(card=>'<article class="analytics-metric"><span>'+card[0]+'</span><b class="'+analyticsClass(card[2])+'">'+card[1]+'</b><small>'+card[3]+'</small></article>').join('');
-  const startBalance=INIT+before.reduce((sum,bet)=>sum+analyticsBalanceDelta(bet),0);
-  let balance=startBalance;
-  const points=[{date:start||((all[0]&&all[0].d)||null),value:balance}];
-  all.filter(bet=>(!start||bet.d>=start)&&(bet.r==='won'||bet.r==='lost'||bet.r==='void'||bet.r==='wd')).forEach(bet=>{
-    balance+=analyticsBalanceDelta(bet);
-    points.push({date:bet.d,value:balance});
-  });
-  renderAnalyticsChart(points);
   const grouped={};
   settled.forEach(bet=>{
     const sport=bet.sp||'Autre';
     const row=grouped[sport]||(grouped[sport]={sport,bets:0,wins:0,decisive:0,staked:0,profit:0});
     row.bets++;
-    row.profit+=analyticsProfit(bet);
+    row.profit+=pl(bet);
     if(bet.r==='won'||bet.r==='lost'){
       row.decisive++;
       row.staked+=Number(bet.s)||0;
@@ -170,10 +100,6 @@ function renderAnalytics(){
       return '<div class="analytics-sport-row"><div class="analytics-sport-top"><span class="analytics-sport-name">'+analyticsEscape(row.sport)+' <small class="analytics-sport-meta">· '+row.bets+' réglé'+(row.bets>1?'s':'')+' · '+rate+'</small></span><span class="analytics-sport-profit '+analyticsClass(row.profit)+'">'+eur(row.profit)+'</span></div><div class="analytics-sport-track" aria-hidden="true"><span class="analytics-sport-bar" style="--bar:'+width+'%;--bar-color:'+color+'"></span></div></div>';
     }).join('');
   }
-  const labels={week:'7 derniers jours',month:'30 derniers jours',quarter:'90 derniers jours',all:"tout l'historique"};
-  rangeLabel.textContent='Période analysée : '+labels[ANALYTICS_PERIOD]+'.';
-  const periodControl=document.getElementById('analyticsPeriod');
-  if(periodControl)Array.from(periodControl.querySelectorAll('button')).forEach(button=>button.setAttribute('aria-pressed',button.dataset.analyticsPeriod===ANALYTICS_PERIOD?'true':'false'));
 }
 
 function render(){
@@ -181,19 +107,13 @@ function render(){
   const c0=cut(),bets=all.filter(b=>b.d>=c0&&b.r!=='wd'),done=bets.filter(b=>b.r==='won'||b.r==='lost');
   const profit=bets.reduce((a,b)=>a+pl(b),0),staked=done.reduce((a,b)=>a+b.s,0);
   const wd=all.filter(b=>b.r==='wd').reduce((a,b)=>a+b.s,0),bk=INIT+all.reduce((a,b)=>a+pl(b),0)-wd,wins=done.filter(b=>b.r==='won').length;
-  const maxOdds=Math.max(0,...bets.filter(b=>b.r==='won').map(b=>+b.o||0));
-  const maxGain=bets.length?Math.max(...bets.map(b=>pl(b))):0;
-  const recOddsBet=bets.filter(b=>b.r==='won').reduce((a,b)=>(+b.o||0)>((a&&+a.o)||0)?b:a,null);
-  const recGainBet=done.reduce((a,b)=>pl(b)>((a&&pl(a))||0)?b:a,null);
-  const recDetail=b=>b?`<em>${b.d.slice(5,10)} · ${b.sp}</em>`:'';
-  const oddsDone=bets.filter(b=>b.r==='won'&&+b.o>0&&b.ty!=='Poker').map(b=>+b.o),avgOdds=oddsDone.length?oddsDone.reduce((a,x)=>a+x,0)/oddsDone.length:0;
-  const cells=[['Paris',bets.length,'',''],['Bénéfice',eur(profit),profit,''],['ROI',staked?pct(profit/staked*100):'–',profit,''],['Moyenne côte',avgOdds?('× '+avgOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'–','',''],['Réussite',done.length?pct(wins/done.length*100):'–','',''],['Record côte max',maxOdds?('× '+maxOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'–','',recDetail(recOddsBet)],['Record gain max',maxGain>0?eur(maxGain):'–','',recDetail(recGainBet)],['Bankroll',eur(bk),'','']];
+  const cells=[['Paris',bets.length,'',''],['Bénéfice',eur(profit),profit,''],['ROI',staked?pct(profit/staked*100):'–',profit,''],['Réussite',done.length?pct(wins/done.length*100):'–','',''],['Bankroll',eur(bk),'','']];
   $('stats').innerHTML=cells.map(c=>`<div class="card"><span>${c[0]}</span><b class="${c[2]>0?'g':c[2]<0?'l':''}">${c[1]}</b>${c[3]}</div>`).join('');
   window.BK=bk;
-  $('bs').innerHTML=grp(done,'sp');$('bt').innerHTML=grp(done,'ty');
+  $('bt').innerHTML=grp(done,'ty');
   $('plan').innerHTML=[['FUN',1],['Prudente',5],['Confiance',7],['Maximum',10]].map(p=>`<div><span>${p[0]} (${p[1]} %)</span><b>${eur(bk*p[1]/100)}</b></div>`).join('');
   [...$('per').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===PER));
-  chart(bets.filter(b=>b.r!=='pending'));
+  chart(all.filter(b=>b.d>=c0&&b.r!=='pending'));
   renderAnalytics();
   const q=(QS||'').trim().toLowerCase(), qr=(QR)||'all';
   const shown=all.filter(b=>(qr==='all'||b.r===qr)&&(!q||b.sp.toLowerCase().includes(q)||b.ty.toLowerCase().includes(q)||b.d.includes(q)));
@@ -296,13 +216,6 @@ $('t').addEventListener('change', async ev=>{
   refresh();
 });
 $('per').addEventListener('click',ev=>{if(ev.target.dataset.p){PER=ev.target.dataset.p;render()}});
-const analyticsPeriod=document.getElementById('analyticsPeriod');
-if(analyticsPeriod)analyticsPeriod.addEventListener('click',event=>{
-  const period=event.target.dataset.analyticsPeriod;
-  if(!period)return;
-  ANALYTICS_PERIOD=period;
-  renderAnalytics();
-});
 
 $('ebSave').addEventListener('click',async()=>{
   const dlg=document.getElementById('editBetDlg');
