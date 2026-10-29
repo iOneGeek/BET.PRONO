@@ -30,6 +30,8 @@ input{font:inherit;color:var(--text);background:var(--field);border:1px solid va
 input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button.primary{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);font-weight:700;padding:11px;margin-top:4px}
 button.primary:disabled{opacity:.6;cursor:wait}
+.widget-download{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;text-decoration:none}
+.widget-download small{font-weight:400;opacity:.78}
 .err{color:var(--loss);font-size:.88rem;min-height:1.2em;margin:0}
 footer{color:var(--mute);font-size:.78rem;margin-top:18px;text-align:center}
 .login-social{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:18px}
@@ -80,6 +82,8 @@ footer{color:var(--mute);font-size:.78rem;margin-top:18px;text-align:center}
       Connexion avec Google
     </button>
   </form>
+  <a class="primary widget-download" href="/static/downloads/BET.PRONO%20Widget.pyw" download="BET.PRONO Widget.pyw">⬇ Télécharger le widget <small>Windows</small></a>
+  <p class="sub" style="text-align:center;margin:8px 0 0;font-size:.78rem">Pour suivre ta bankroll depuis ton bureau. Python 3 est nécessaire.</p>
   <div class="login-social"><span class="lbl">Rejoins-nous :</span><a class="soc-mini soc-tg" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow" title="Telegram @bet_prono_fr"><img src="/static/icons/telegram.png" width="18" height="18" alt="Telegram"></a><a class="soc-mini soc-ig" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow" title="Instagram @bet.prono"><img src="/static/icons/insta.png" width="18" height="18" alt="Instagram"></a></div>
   <footer>Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? 09 74 75 13 13 (appel non surtaxé).</footer>
 </div>
