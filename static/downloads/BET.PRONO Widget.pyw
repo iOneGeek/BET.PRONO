@@ -420,38 +420,10 @@ class BetPronoWidget(tk.Tk):
             self._set_connected_badge(False)
             messagebox.showerror(APP_NAME, error, parent=self)
 
-    def connect(self) -> None:
-        address = simpledialog.askstring(
-            APP_NAME,
-            "Adresse de BET.PRONO (site en ligne ou serveur local) :",
-            initialvalue=self.base_url or "http://127.0.0.1:5000",
-            parent=self,
-        )
-        if not address:
-            return
-        if "://" not in address:
-            address = "https://" + address
-        username = simpledialog.askstring(APP_NAME, "Identifiant BET.PRONO :", parent=self)
-        if not username:
-            return
-        password = simpledialog.askstring(APP_NAME, "Mot de passe BET.PRONO :", show="*", parent=self)
-        if not password:
-            return
-        try:
-            client = BetPronoApi(address)
-            client.login(username.strip(), password)
-            self.client = client
-            self.base_url = address.rstrip("/")
-            self._save_url()
-            self._set_connected_badge(True)
-            self.refresh()
-        except RuntimeError as error:
-            self._set_connected_badge(False)
-            messagebox.showerror(APP_NAME, str(error), parent=self)
-
     def refresh(self) -> None:
         if not self.client:
-            self.connect()
+            self._set_status("Connecte-toi via Google, puis choisis « Entrer le code » pour afficher tes statistiques.")
+            messagebox.showinfo(APP_NAME, "Utilise « Connexion Google », puis « Entrer le code » pour lier le widget sans mot de passe.", parent=self)
             return
         try:
             data = self.client.bets()
