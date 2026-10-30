@@ -43,14 +43,15 @@ async function api(path, opts={}){
 const eur=n=>n.toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
 const pct=n=>n.toLocaleString('fr-FR',{maximumFractionDigits:2})+' %';
 const LB={won:'Gagné',lost:'Perdu',void:'Remboursé',pending:'En cours',wd:'Retrait'};
-let PER='all';
+let PER='month';
 let ANALYTICS_PERIOD='month';
 let QS='', QR='all';
-const cut=()=>{if(PER==='all')return'';const d=new Date();d.setDate(d.getDate()-({d:0,w:6,m:29})[PER]);return d.toISOString().slice(0,10)};
+const cut=()=>{if(PER==='all')return'';const d=new Date();d.setDate(d.getDate()-({week:6,month:29,quarter:89})[PER]);return d.toISOString().slice(0,10)};
 const pl=b=>b.r==='won'?b.s*(b.o-1)+(b.b||0):b.r==='lost'?-b.s:0;
+const balanceDelta=b=>b.r==='wd'?-(Number(b.s)||0):pl(b);
 
 function chart(L){
-  let c=0;const pts=[0,...L.map(b=>c+=pl(b))];
+  let c=INIT;const pts=[c,...L.map(b=>c+=balanceDelta(b))];
   const lo=Math.min(...pts),hi=Math.max(...pts),rng=(hi-lo)||1;
   const st=[10,25,50,100,250,500,1000,2500,5000].find(s=>rng/s<=5)||10000;
   const a=Math.floor(lo/st)*st,z=Math.ceil(hi/st)*st||st;
@@ -58,7 +59,8 @@ function chart(L){
   let g='';
   for(let v=a;v<=z;v+=st)g+=`<line x1="56" x2="624" y1="${Y(v)}" y2="${Y(v)}" class="gl${v===0?' z':''}"/><text x="48" y="${Y(v)+4}" text-anchor="end">${v.toLocaleString('fr-FR')} €</text>`;
   const d=pts.map((v,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join('');
-  $('svg').innerHTML=g+(pts.length>1?`<path d="${d}" class="ln"/>`:`<text x="340" y="150" text-anchor="middle" class="hint">Aucun pari résolu pour l'instant</text>`);
+  const area='M'+X(0).toFixed(1)+' 276 '+pts.map((v,i)=>'L'+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join(' ')+' L'+X(pts.length-1).toFixed(1)+' 276 Z';
+  $('svg').innerHTML=`<defs><linearGradient id="chartArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ff7518" stop-opacity=".42"/><stop offset="1" stop-color="#ff7518" stop-opacity="0"/></linearGradient></defs>`+g+(pts.length>1?`<path d="${area}" class="area"/><path d="${d}" class="ln"/>`:`<text x="340" y="150" text-anchor="middle" class="hint">Ajoutez des paris réglés pour faire apparaître votre courbe</text>`);
 }
 
 const grp=(L,k)=>{const m={};L.forEach(b=>(m[b[k]]=m[b[k]]||[]).push(b));
@@ -176,9 +178,46 @@ function renderAnalytics(){
   if(periodControl)Array.from(periodControl.querySelectorAll('button')).forEach(button=>button.setAttribute('aria-pressed',button.dataset.analyticsPeriod===ANALYTICS_PERIOD?'true':'false'));
 }
 
+function dashboardMetric(label,value,tone,note,icon,metric){
+  return `<article class="card" data-metric="${metric}"><div class="metric-head"><span class="metric-icon" aria-hidden="true">${icon}</span>${label}</div><b class="${tone>0?'positive':tone<0?'negative':''}">${value}</b><small>${note}</small></article>`;
+}
+
+function renderDashboardInsights(period,settled){
+  const donut=document.getElementById('resultsDonut');
+  const totalEl=document.getElementById('resultsTotal');
+  const legend=document.getElementById('resultsLegend');
+  const sports=document.getElementById('sportsOverview');
+  if(!donut||!totalEl||!legend||!sports)return;
+  const outcomes={won:period.filter(b=>b.r==='won').length,lost:period.filter(b=>b.r==='lost').length,void:period.filter(b=>b.r==='void').length,pending:period.filter(b=>b.r==='pending').length};
+  const total=outcomes.won+outcomes.lost+outcomes.void+outcomes.pending;
+  const percent=value=>total?Math.round(value/total*100):0;
+  const values=total?{won:percent(outcomes.won),lost:percent(outcomes.lost),void:percent(outcomes.void),pending:percent(outcomes.pending)}:{won:25,lost:25,void:25,pending:25};
+  donut.style.setProperty('--won',values.won);donut.style.setProperty('--lost',values.lost);donut.style.setProperty('--void',values.void);donut.style.setProperty('--pending',values.pending);
+  totalEl.textContent=String(total);
+  const labels=[['won','Gagnés','legend-won'],['lost','Perdus','legend-lost'],['void','Remboursés','legend-void'],['pending','En cours','legend-pending']];
+  legend.innerHTML=labels.map(([key,label,className])=>`<div><span><i class="legend-dot ${className}"></i>${label}</span><b>${outcomes[key]} · ${total?percent(outcomes[key])+' %':'—'}</b></div>`).join('');
+
+  const grouped={};
+  settled.forEach(bet=>{
+    const sport=bet.sp||'Autre';
+    const row=grouped[sport]||(grouped[sport]={sport,bets:0,wins:0,decisive:0,profit:0});
+    row.bets++;row.profit+=pl(bet);
+    if(bet.r==='won'||bet.r==='lost'){row.decisive++;if(bet.r==='won')row.wins++;}
+  });
+  const rows=Object.values(grouped).sort((a,b)=>b.profit-a.profit||b.bets-a.bets).slice(0,4);
+  if(!rows.length){sports.innerHTML='<p class="sub">Aucun pari réglé sur cette période.</p>';return;}
+  const maximum=Math.max(1,...rows.map(row=>Math.abs(row.profit)));
+  sports.innerHTML=rows.map(row=>{
+    const color=row.profit>0?'var(--gain)':row.profit<0?'var(--loss)':'var(--mute)';
+    const progress=Math.max(4,Math.round(Math.abs(row.profit)/maximum*100));
+    const rate=row.decisive?Math.round(row.wins/row.decisive*100)+' %':'—';
+    return `<div class="sport-overview-row"><div><span class="sport-overview-name">${analyticsEscape(row.sport)}</span><span class="sport-overview-meta">${row.bets} réglé${row.bets>1?'s':''} · ${rate}</span></div><div class="sport-overview-track" aria-hidden="true"><span class="sport-overview-bar" style="--progress:${progress}%;--sport-color:${color}"></span></div><span class="sport-overview-profit ${analyticsClass(row.profit)}">${eur(row.profit)}</span></div>`;
+  }).join('');
+}
+
 function render(){
   const all=[...BETS].sort((a,b)=>a.d.localeCompare(b.d)||a.id-b.id);
-  const c0=cut(),bets=all.filter(b=>b.d>=c0&&b.r!=='wd'),done=bets.filter(b=>b.r==='won'||b.r==='lost');
+  const c0=cut(),bets=all.filter(b=>(!c0||b.d>=c0)&&b.r!=='wd'),done=bets.filter(b=>b.r==='won'||b.r==='lost');
   const profit=bets.reduce((a,b)=>a+pl(b),0),staked=done.reduce((a,b)=>a+b.s,0);
   const wd=all.filter(b=>b.r==='wd').reduce((a,b)=>a+b.s,0),bk=INIT+all.reduce((a,b)=>a+pl(b),0)-wd,wins=done.filter(b=>b.r==='won').length;
   const maxOdds=Math.max(0,...bets.filter(b=>b.r==='won').map(b=>+b.o||0));
@@ -187,13 +226,25 @@ function render(){
   const recGainBet=done.reduce((a,b)=>pl(b)>((a&&pl(a))||0)?b:a,null);
   const recDetail=b=>b?`<em>${b.d.slice(5,10)} · ${b.sp}</em>`:'';
   const oddsDone=bets.filter(b=>b.r==='won'&&+b.o>0&&b.ty!=='Poker').map(b=>+b.o),avgOdds=oddsDone.length?oddsDone.reduce((a,x)=>a+x,0)/oddsDone.length:0;
-  const cells=[['Paris',bets.length,'',''],['Bénéfice',eur(profit),profit,''],['ROI',staked?pct(profit/staked*100):'–',profit,''],['Moyenne côte',avgOdds?('× '+avgOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'–','',''],['Réussite',done.length?pct(wins/done.length*100):'–','',''],['Record côte max',maxOdds?('× '+maxOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'–','',recDetail(recOddsBet)],['Record gain max',maxGain>0?eur(maxGain):'–','',recDetail(recGainBet)],['Bankroll',eur(bk),'','']];
-  $('stats').innerHTML=cells.map(c=>`<div class="card"><span>${c[0]}</span><b class="${c[2]>0?'g':c[2]<0?'l':''}">${c[1]}</b>${c[3]}</div>`).join('');
+  const rate=done.length?wins/done.length*100:null;
+  const periodLabel={week:'7 derniers jours',month:'30 derniers jours',quarter:'90 derniers jours',all:"tout l'historique"}[PER];
+  $('stats').innerHTML=[
+    dashboardMetric('Bankroll actuelle',eur(bk),bk-INIT,`Initiale : ${eur(INIT)}`,'◉','bankroll'),
+    dashboardMetric('Bénéfice net',eur(profit),profit,`Sur ${periodLabel}`,'▥','profit'),
+    dashboardMetric('ROI',staked?pct(profit/staked*100):'—',profit,'Bénéfice net / mises','%','roi'),
+    dashboardMetric('Taux de réussite',rate==null?'—':pct(rate),rate==null?0:rate-50,done.length?`${wins} gagnés / ${done.length}`:'Aucun pari décisif','◎','rate')
+  ].join('');
+  const secondary=[['◫','Paris réglés',String(bets.filter(b=>b.r==='won'||b.r==='lost'||b.r==='void').length)],['◈','Mises totales',eur(staked)],['⌁','Cote moyenne',avgOdds?('× '+avgOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'—'],['★','Record gain',maxGain>0?eur(maxGain):'—']];
+  const secondaryEl=document.getElementById('secondaryStats');
+  if(secondaryEl)secondaryEl.innerHTML=secondary.map(item=>`<article class="secondary-stat"><i aria-hidden="true">${item[0]}</i><div><span>${item[1]}</span><b>${item[2]}</b></div></article>`).join('');
   window.BK=bk;
   $('bs').innerHTML=grp(done,'sp');$('bt').innerHTML=grp(done,'ty');
   $('plan').innerHTML=[['FUN',1],['Prudente',5],['Confiance',7],['Maximum',10]].map(p=>`<div><span>${p[0]} (${p[1]} %)</span><b>${eur(bk*p[1]/100)}</b></div>`).join('');
   [...$('per').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===PER));
-  chart(bets.filter(b=>b.r!=='pending'));
+  chart(all.filter(b=>(!c0||b.d>=c0)&&b.r!=='pending'));
+  const chartValue=document.getElementById('chartBankrollValue');if(chartValue)chartValue.textContent=eur(bk);
+  const chartLabel=document.getElementById('chartPeriodLabel');if(chartLabel)chartLabel.textContent='Capital réel — '+periodLabel+'.';
+  renderDashboardInsights(bets,bets.filter(b=>b.r==='won'||b.r==='lost'||b.r==='void'));
   renderAnalytics();
   const q=(QS||'').trim().toLowerCase(), qr=(QR)||'all';
   const shown=all.filter(b=>(qr==='all'||b.r===qr)&&(!q||b.sp.toLowerCase().includes(q)||b.ty.toLowerCase().includes(q)||b.d.includes(q)));
@@ -424,33 +475,34 @@ $('logout').onclick=async()=>{await api('/api/logout',{method:'POST'});location.
 
 $('d').value=new Date().toISOString().slice(0,10);
 
-$('mainNav').addEventListener('click',ev=>{
-  const v=ev.target.dataset.view;if(!v)return;
-  showView(v);
-});
-
 function showView(v){
-  const btns=[...$('mainNav').children].filter(b=>b.dataset&&b.dataset.view);
-  btns.forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
   $('viewHome').classList.toggle('active',v==='home');
   $('viewBankroll').classList.toggle('active',v==='bankroll');
   $('viewProfile').classList.toggle('active',v==='profile');
-  moveNavSelector();
 }
-function moveNavSelector(){
-  const nav=$('mainNav'), sel=document.getElementById('navSelector');
-  if(!nav||!sel) return;
-  const active=[...nav.children].find(b=>b.dataset&&b.dataset.view&&b.getAttribute('aria-pressed')==='true');
-  if(!active) return;
-  if(!sel._w) sel._w=active.offsetWidth;
-  sel.style.width=sel._w+'px';
-  sel.style.left=active.offsetLeft+'px';
+function setActiveRoute(route){
+  document.querySelectorAll('[data-route]').forEach(button=>{
+    const active=button.dataset.route===route;
+    button.setAttribute('aria-current',active?'true':'false');
+  });
 }
+function navigate(route,shouldScroll=true){
+  const routes={dashboard:{view:'bankroll',target:'dashboardTop'},bets:{view:'bankroll',target:'betsSection'},'add-bet':{view:'bankroll',target:'ed'},analysis:{view:'bankroll',target:'analysisSection'},community:{view:'home',target:'viewHome'},settings:{view:'profile',target:'viewProfile'}};
+  const current=routes[route]||routes.dashboard;
+  showView(current.view);setActiveRoute(route in routes?route:'dashboard');
+  if(shouldScroll){requestAnimationFrame(()=>{const target=document.getElementById(current.target);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});});}
+}
+function bindRouteNavigation(container){
+  if(!container)return;
+  container.addEventListener('click',event=>{const button=event.target.closest('[data-route]');if(button)navigate(button.dataset.route);});
+}
+bindRouteNavigation(document.getElementById('mainNav'));
+bindRouteNavigation(document.getElementById('sideNav'));
 
 let IS_ADMIN=false;
 
 // ---------- Profil ----------
-$('goProfile').addEventListener('click',()=>showView('profile'));
+$('goProfile').addEventListener('click',()=>navigate('settings'));
 
 function loadProfileForm(){
   const me=window.__me;
@@ -500,7 +552,7 @@ $('profileForm').addEventListener('submit',async ev=>{
 
 (async()=>{
   $('mainNav').hidden=false;   /* navigable meme si une API echoue ensuite */
-  showView("home");
+  navigate("dashboard",false);
   if(MISSING.length){ __fatal("l\u2019interface en cache est p\u00e9rim\u00e9e ("+MISSING.slice(0,3).join(", ")+") \u2014 r\u00e9paration automatique\u2026"); __heal(); return; }
   try{
     const me=await api('/api/me');
@@ -513,7 +565,7 @@ $('profileForm').addEventListener('submit',async ev=>{
     await loadBets();
     await loadPicks();
     $('mainNav').hidden=false;
-    $('viewHome').classList.add('active');
+    navigate("dashboard",false);
     window.__ready=true;
   }catch(e){ /* redirect already handled by api() on 401 */ }
 })();
@@ -885,7 +937,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='2.2.0', date='2026-10-15';
+  const v='2.3.0', date='2026-10-29';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
@@ -1019,4 +1071,3 @@ setInterval(()=>{ if(window.__ready) renderAdvice(); }, 1000);
   document.addEventListener('visibilitychange',()=>{document.hidden?pause():play();});
   resize();seed();play();
 }());
-
