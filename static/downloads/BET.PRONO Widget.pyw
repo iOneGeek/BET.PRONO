@@ -9,6 +9,9 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import shutil
+import subprocess
+import sys
 import threading
 import urllib.error
 import urllib.parse
@@ -22,11 +25,16 @@ from tkinter import messagebox, simpledialog
 
 
 APP_NAME = "BET.PRONO Widget"
+WIDGET_VERSION = "V2.5.0"
 CONFIG_PATH = Path(os.environ.get("APPDATA", str(Path.home()))) / APP_NAME / "config.json"
 BRAND_IMAGE_NAME = "bet-prono-widget-logo.png"
 BRAND_IMAGE_PATH = CONFIG_PATH.parent / BRAND_IMAGE_NAME
 BUNDLED_BRAND_IMAGE_PATH = Path(__file__).with_name(BRAND_IMAGE_NAME)
 BRAND_IMAGE_URL = f"/static/downloads/{BRAND_IMAGE_NAME}"
+BRAND_ICON_NAME = "bet-prono-widget-logo.ico"
+BRAND_ICON_PATH = CONFIG_PATH.parent / BRAND_ICON_NAME
+BUNDLED_BRAND_ICON_PATH = Path(__file__).with_name(BRAND_ICON_NAME)
+BRAND_ICON_URL = f"/static/downloads/{BRAND_ICON_NAME}"
 DEFAULT_SITE_URL = "https://bet-prono.onrender.com"
 BG = "#111827"
 PANEL = "#1f2937"
@@ -119,6 +127,10 @@ def compute_metrics(
         "win_rate": (wins / len(decisive) * 100) if decisive else None,
         "settled": len(settled),
         "pending": sum(bet.get("r") == "pending" for bet in visible),
+        "wins": wins,
+        "losses": sum(bet.get("r") == "lost" for bet in decisive),
+        "decisive": len(decisive),
+        "staked": staked,
         "sports": sorted(sports.items(), key=lambda item: item[1], reverse=True),
         "curve": curve,
     }
@@ -181,7 +193,7 @@ class BetPronoWidget(tk.Tk):
         self.configure(bg=BG)
         self.resizable(False, False)
         self.attributes("-topmost", True)
-        self.geometry("410x664+48+96")
+        self.geometry("480x860+48+48")
         self.client: BetPronoApi | None = None
         self.base_url = self._load_url()
         self.period_days: int | None = 30
@@ -192,102 +204,168 @@ class BetPronoWidget(tk.Tk):
         self._sparkline_job: str | None = None
         self._brand_image_full: tk.PhotoImage | None = None
         self._brand_image: tk.PhotoImage | None = None
+        self.metric_details: dict[str, tk.Label] = {}
 
         self._build()
         self.after(80, self._load_brand_image)
         self._set_status("Connecte ton compte pour afficher tes statistiques.")
 
     def _build(self) -> None:
-        header = tk.Frame(self, bg=HEADER, height=78)
+        header = tk.Frame(self, bg=HEADER, height=88)
         header.pack(fill="x")
         header.pack_propagate(False)
         for widget in (header,):
             widget.bind("<ButtonPress-1>", self._start_drag)
             widget.bind("<B1-Motion>", self._drag)
 
-        accent = tk.Frame(header, bg=ACCENT, width=5)
+        accent = tk.Frame(header, bg=ACCENT, width=6)
         accent.pack(side="left", fill="y")
         brand = tk.Frame(header, bg=HEADER)
-        brand.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=10)
-        self.brand_mark = tk.Label(brand, text="🦊", bg=HEADER, fg=ACCENT, font=("Segoe UI Emoji", 26), width=2)
-        self.brand_mark.pack(side="left", padx=(0, 8))
+        brand.pack(side="left", fill="both", expand=True, padx=(14, 0), pady=10)
+        self.brand_mark = tk.Label(brand, text="🦊", bg=HEADER, fg=ACCENT, font=("Segoe UI Emoji", 30), width=2)
+        self.brand_mark.pack(side="left", padx=(0, 10))
         brand_copy = tk.Frame(brand, bg=HEADER)
         brand_copy.pack(side="left", fill="y")
-        tk.Label(brand_copy, text="BET.PRONO", bg=HEADER, fg=TEXT, font=("Segoe UI", 15, "bold")).pack(anchor="w", pady=(4, 0))
-        tk.Label(brand_copy, text="TON TABLEAU DE BORD • BUREAU", bg=HEADER, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(1, 0))
-        self.connection_badge = tk.Label(header, text="● HORS LIGNE", bg="#172235", fg=MUTED, font=("Segoe UI", 8, "bold"), padx=8, pady=4)
-        self.connection_badge.pack(side="right", padx=(0, 4), pady=20)
-        close = tk.Button(header, text="×", command=self.destroy, bg=HEADER, fg=MUTED, bd=0, font=("Segoe UI", 17), activebackground=HEADER, activeforeground=TEXT)
-        close.pack(side="right", padx=7)
+        tk.Label(brand_copy, text="BET.PRONO", bg=HEADER, fg=TEXT, font=("Segoe UI", 17, "bold")).pack(anchor="w", pady=(3, 0))
+        tk.Label(brand_copy, text=f"WIDGET BUREAU • {WIDGET_VERSION}", bg=HEADER, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(1, 0))
+        close = tk.Button(header, text="×", command=self.destroy, bg=HEADER, fg=MUTED, bd=0, font=("Segoe UI", 18), activebackground=HEADER, activeforeground=TEXT, cursor="hand2")
+        close.pack(side="right", padx=(6, 10))
+        self.connection_badge = tk.Label(header, text="● HORS LIGNE", bg="#172235", fg=MUTED, font=("Segoe UI", 8, "bold"), padx=10, pady=5)
+        self.connection_badge.pack(side="right", padx=(0, 2), pady=22)
 
         periods = tk.Frame(self, bg=BG)
-        periods.pack(fill="x", padx=14, pady=(15, 6))
-        tk.Label(periods, text="PÉRIODE", bg=BG, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(side="left", padx=(0, 10))
-        for label, days in (("7 j", 7), ("30 j", 30), ("90 j", 90), ("Tout", None)):
-            button = tk.Button(periods, text=label, command=lambda value=days: self._set_period(value), relief="flat", bd=0, padx=10, pady=5, font=("Segoe UI", 9, "bold"), cursor="hand2")
+        periods.pack(fill="x", padx=16, pady=(13, 4))
+        tk.Label(periods, text="PÉRIODE", bg=BG, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(side="left", padx=(0, 11))
+        for label, days in (("7 jours", 7), ("30 jours", 30), ("90 jours", 90), ("Tout", None)):
+            button = tk.Button(periods, text=label, command=lambda value=days: self._set_period(value), relief="flat", bd=0, padx=11, pady=6, font=("Segoe UI", 9, "bold"), cursor="hand2")
             button.pack(side="left", padx=(0, 5))
             self.period_buttons[days] = button
         self._paint_periods()
 
         cards = tk.Frame(self, bg=BG)
-        cards.pack(fill="x", padx=14)
-        self.bankroll = self._metric(cards, "BANKROLL", "—", 0, 0, "#38bdf8")
-        self.profit = self._metric(cards, "BÉNÉFICE", "—", 0, 1, GOOD)
-        self.roi = self._metric(cards, "ROI", "—", 1, 0, ACCENT)
-        self.win_rate = self._metric(cards, "RÉUSSITE", "—", 1, 1, "#a78bfa")
+        cards.pack(fill="x", padx=16)
+        self.bankroll = self._metric(cards, "BANKROLL", "—", 0, 0, "#38bdf8", "bankroll", "◉")
+        self.profit = self._metric(cards, "BÉNÉFICE", "—", 0, 1, GOOD, "profit", "▥")
+        self.roi = self._metric(cards, "ROI", "—", 1, 0, ACCENT, "roi", "%")
+        self.win_rate = self._metric(cards, "RÉUSSITE", "—", 1, 1, "#a78bfa", "win_rate", "◎")
 
-        chart_box = tk.Frame(self, bg=PANEL, highlightbackground=LINE, highlightthickness=1)
-        chart_box.pack(fill="x", padx=14, pady=(7, 7))
+        chart_box = tk.Frame(self, bg=PANEL, highlightbackground="#35516d", highlightthickness=1)
+        chart_box.pack(fill="x", padx=16, pady=(8, 7))
         chart_head = tk.Frame(chart_box, bg=PANEL)
-        chart_head.pack(fill="x", padx=12, pady=(9, 0))
-        tk.Label(chart_head, text="ÉVOLUTION", bg=PANEL, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(side="left")
-        self.chart_value = tk.Label(chart_head, text="—", bg=PANEL, fg="#38bdf8", font=("Segoe UI", 10, "bold"))
+        chart_head.pack(fill="x", padx=13, pady=(10, 0))
+        tk.Label(chart_head, text="↗  ÉVOLUTION DE LA BANKROLL", bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold")).pack(side="left")
+        self.chart_value = tk.Label(chart_head, text="—", bg=PANEL, fg=GOOD, font=("Segoe UI", 12, "bold"))
         self.chart_value.pack(side="right")
-        self.sparkline = tk.Canvas(chart_box, height=92, bg=PANEL, highlightthickness=0, bd=0)
-        self.sparkline.pack(fill="x", padx=6, pady=(2, 0))
+        self.sparkline = tk.Canvas(chart_box, height=132, bg=PANEL, highlightthickness=0, bd=0)
+        self.sparkline.pack(fill="x", padx=7, pady=(4, 0))
         self.sparkline.bind("<Configure>", self._redraw_sparkline)
         self.chart_caption = tk.Label(chart_box, text="Connecte ton compte pour voir ta courbe.", bg=PANEL, fg=MUTED, font=("Segoe UI", 8), anchor="w")
-        self.chart_caption.pack(fill="x", padx=12, pady=(0, 9))
+        self.chart_caption.pack(fill="x", padx=13, pady=(0, 10))
 
-        sport_box = tk.Frame(self, bg=PANEL, highlightbackground=LINE, highlightthickness=1)
-        sport_box.pack(fill="x", padx=14, pady=(0, 7))
-        tk.Label(sport_box, text="MEILLEURS SPORTS", bg=PANEL, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=12, pady=(10, 3))
-        self.sports = tk.Label(sport_box, text="Aucune donnée réglée pour cette période.", bg=PANEL, fg=TEXT, font=("Segoe UI", 9), justify="left", anchor="w", wraplength=348)
-        self.sports.pack(fill="x", padx=12, pady=(0, 10))
+        summary_box = tk.Frame(self, bg="#142238", highlightbackground="#263b55", highlightthickness=1)
+        summary_box.pack(fill="x", padx=16, pady=(0, 7))
+        tk.Label(summary_box, text="BILAN DE PÉRIODE", bg="#142238", fg=MUTED, font=("Segoe UI", 8, "bold")).pack(side="left", padx=12, pady=9)
+        self.summary = tk.Label(summary_box, text="Aucune statistique disponible", bg="#142238", fg=TEXT, font=("Segoe UI", 8, "bold"), anchor="e")
+        self.summary.pack(side="right", padx=12)
 
-        self.status = tk.Label(self, bg=BG, fg=MUTED, font=("Segoe UI", 8), justify="left", anchor="w", wraplength=376)
-        self.status.pack(fill="x", padx=16, pady=(4, 9))
+        sport_box = tk.Frame(self, bg=PANEL, highlightbackground="#30445f", highlightthickness=1)
+        sport_box.pack(fill="x", padx=16, pady=(0, 7))
+        sport_head = tk.Frame(sport_box, bg=PANEL)
+        sport_head.pack(fill="x", padx=12, pady=(9, 3))
+        tk.Label(sport_head, text="🏆  MEILLEURS SPORTS", bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold")).pack(side="left")
+        tk.Label(sport_head, text="Performance réelle", bg=PANEL, fg=MUTED, font=("Segoe UI", 8)).pack(side="right")
+        self.sports_rows = tk.Frame(sport_box, bg=PANEL)
+        self.sports_rows.pack(fill="x", padx=12, pady=(0, 9))
+        self._render_sports([])
+
+        status_box = tk.Frame(self, bg="#101d30")
+        status_box.pack(fill="x", padx=16, pady=(0, 8))
+        self.status = tk.Label(status_box, bg="#101d30", fg=MUTED, font=("Segoe UI", 8), justify="left", anchor="w", wraplength=438)
+        self.status.pack(fill="x", padx=11, pady=8)
 
         actions = tk.Frame(self, bg=BG)
-        actions.pack(fill="x", padx=14, pady=(0, 13))
-        self._action(actions, "G  Connexion Google", self.open_google_login, ACCENT, "#ffffff", fill=True).pack(fill="x")
+        actions.pack(fill="x", padx=16, pady=(0, 14))
+        self._action(actions, "G   Connexion Google sécurisée", self.open_google_login, ACCENT, "#ffffff", fill=True).pack(fill="x")
         secondary = tk.Frame(actions, bg=BG)
         secondary.pack(fill="x", pady=(7, 0))
-        self._action(secondary, "Entrer le code", self.connect_with_code, PANEL_ALT, TEXT).pack(side="left")
-        self._action(secondary, "Actualiser", self.refresh, PANEL_ALT, TEXT).pack(side="left", padx=7)
-        self._action(secondary, "Ouvrir le site", self.open_site, PANEL_ALT, TEXT).pack(side="right")
+        self._action(secondary, "Code", self.connect_with_code, PANEL_ALT, TEXT).pack(side="left", expand=True, fill="x")
+        self._action(secondary, "Bureau", self.create_desktop_shortcut, PANEL_ALT, TEXT).pack(side="left", expand=True, fill="x", padx=6)
+        self._action(secondary, "Actualiser", self.refresh, PANEL_ALT, TEXT).pack(side="left", expand=True, fill="x", padx=(0, 6))
+        self._action(secondary, "Site", self.open_site, PANEL_ALT, TEXT).pack(side="left", expand=True, fill="x")
 
-    def _metric(self, parent: tk.Frame, label: str, value: str, row: int, column: int, accent: str) -> tk.Label:
+    def _metric(self, parent: tk.Frame, label: str, value: str, row: int, column: int, accent: str, key: str, icon: str) -> tk.Label:
         parent.grid_columnconfigure(column, weight=1)
-        card = tk.Frame(parent, bg=PANEL, highlightbackground=LINE, highlightthickness=1)
-        card.grid(row=row, column=column, padx=(0, 6) if column == 0 else (6, 0), pady=6, sticky="nsew")
-        marker = tk.Frame(card, bg=accent, height=3)
+        parent.grid_rowconfigure(row, weight=1)
+        card = tk.Frame(parent, bg=PANEL, highlightbackground=accent, highlightthickness=1, height=82)
+        card.grid(row=row, column=column, padx=(0, 5) if column == 0 else (5, 0), pady=5, sticky="nsew")
+        card.grid_propagate(False)
+        marker = tk.Frame(card, bg=accent, height=2)
         marker.pack(fill="x")
-        tk.Label(card, text=label, bg=PANEL, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=12, pady=(8, 0))
-        shown = tk.Label(card, text=value, bg=PANEL, fg=TEXT, font=("Segoe UI", 17, "bold"))
-        shown.pack(anchor="w", padx=12, pady=(1, 10))
+        body = tk.Frame(card, bg=PANEL)
+        body.pack(fill="both", expand=True, padx=10, pady=(5, 6))
+        tk.Label(body, text=icon, bg="#182943", fg=accent, font=("Segoe UI Symbol", 14, "bold"), width=2).pack(side="left", anchor="n", padx=(0, 8))
+        copy = tk.Frame(body, bg=PANEL)
+        copy.pack(side="left", fill="both", expand=True)
+        tk.Label(copy, text=label, bg=PANEL, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        shown = tk.Label(copy, text=value, bg=PANEL, fg=TEXT, font=("Segoe UI", 15, "bold"))
+        shown.pack(anchor="w", pady=(1, 0))
+        detail = tk.Label(copy, text="En attente de données", bg=PANEL, fg=MUTED, font=("Segoe UI", 7))
+        detail.pack(anchor="w")
+        self.metric_details[key] = detail
         return shown
+
+    def _render_sports(self, sports: list[tuple[str, float]]) -> None:
+        """Affiche uniquement les meilleurs sports présents dans les données du compte."""
+        for child in self.sports_rows.winfo_children():
+            child.destroy()
+
+        top_sports = sports[:3]
+        if not top_sports:
+            tk.Label(
+                self.sports_rows,
+                text="Aucun pari réglé pour cette période.",
+                bg=PANEL,
+                fg=MUTED,
+                font=("Segoe UI", 8),
+                anchor="w",
+            ).pack(fill="x", pady=(3, 5))
+            return
+
+        maximum = max(1.0, *(abs(profit) for _, profit in top_sports))
+        for index, (sport, profit) in enumerate(top_sports):
+            row = tk.Frame(self.sports_rows, bg=PANEL)
+            row.pack(fill="x", pady=(2 if index else 0, 5))
+
+            title = tk.Label(row, text=sport, bg=PANEL, fg=TEXT, font=("Segoe UI", 8, "bold"), anchor="w")
+            title.pack(side="left")
+            amount = tk.Label(
+                row,
+                text=eur(profit),
+                bg=PANEL,
+                fg=GOOD if profit >= 0 else BAD,
+                font=("Segoe UI", 8, "bold"),
+                anchor="e",
+            )
+            amount.pack(side="right")
+
+            bar = tk.Canvas(self.sports_rows, height=5, bg=PANEL, highlightthickness=0, bd=0)
+            bar.pack(fill="x", pady=(0, 2))
+            bar.update_idletasks()
+            width = max(bar.winfo_width(), 280)
+            bar.create_rectangle(0, 0, width, 5, fill="#20344d", outline="")
+            fill_width = max(7, int(width * abs(profit) / maximum))
+            bar.create_rectangle(0, 0, fill_width, 5, fill=GOOD if profit >= 0 else BAD, outline="")
 
     def _redraw_sparkline(self, _event=None) -> None:
         canvas = self.sparkline
         canvas.delete("all")
         width = max(canvas.winfo_width(), 360)
-        height = max(canvas.winfo_height(), 92)
-        left, right, top, bottom = 10, width - 10, 10, height - 12
+        height = max(canvas.winfo_height(), 132)
+        left, right, top, bottom = 14, width - 14, 12, height - 18
 
-        for fraction in (0.25, 0.5, 0.75):
+        for fraction in (0.2, 0.4, 0.6, 0.8):
             y = top + (bottom - top) * fraction
-            canvas.create_line(left, y, right, y, fill="#2c3c55", dash=(2, 4))
+            canvas.create_line(left, y, right, y, fill="#263b55", dash=(2, 4))
 
         if len(self._sparkline_values) < 2:
             canvas.create_text(
@@ -313,12 +391,13 @@ class BetPronoWidget(tk.Tk):
             for index, value in enumerate(values)
         ]
         flat = [coordinate for point in points for coordinate in point]
-        color = GOOD if self._sparkline_values[-1] >= self._sparkline_values[0] else BAD
+        color = ACCENT if self._sparkline_values[-1] >= self._sparkline_values[0] else BAD
         area = [left, bottom, *flat, points[-1][0], bottom]
-        canvas.create_polygon(area, fill="#173f48" if color == GOOD else "#492635", outline="")
+        canvas.create_polygon(area, fill="#372a25" if color == ACCENT else "#422432", outline="")
+        canvas.create_line(*flat, fill="#68432e" if color == ACCENT else "#5e3040", width=7, smooth=True, splinesteps=20)
         canvas.create_line(*flat, fill=color, width=3, smooth=True, splinesteps=20)
         x, y = points[-1]
-        canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill=color, outline=PANEL, width=2)
+        canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill=color, outline=PANEL, width=2)
 
     def _animate_sparkline(self, values: list[float]) -> None:
         if self._sparkline_job:
@@ -351,11 +430,33 @@ class BetPronoWidget(tk.Tk):
 
     def _load_brand_image(self) -> None:
         """Affiche le renard fourni, localement ou après un téléchargement discret."""
+        image_found = False
         for path in (BUNDLED_BRAND_IMAGE_PATH, BRAND_IMAGE_PATH):
             if path.is_file():
                 self._apply_brand_image(path)
-                return
-        threading.Thread(target=self._download_brand_image, daemon=True).start()
+                image_found = True
+                break
+        if not image_found:
+            threading.Thread(target=self._download_brand_image, daemon=True).start()
+        self._set_window_icon()
+        if not self._brand_icon_path():
+            threading.Thread(target=self._download_brand_icon, daemon=True).start()
+
+    @staticmethod
+    def _brand_icon_path() -> Path | None:
+        for path in (BUNDLED_BRAND_ICON_PATH, BRAND_ICON_PATH):
+            if path.is_file():
+                return path
+        return None
+
+    def _set_window_icon(self) -> None:
+        icon_path = self._brand_icon_path()
+        if not icon_path:
+            return
+        try:
+            self.iconbitmap(default=str(icon_path))
+        except tk.TclError:
+            pass
 
     def _download_brand_image(self) -> None:
         """Met en cache le visuel public pour garder le widget autonome ensuite."""
@@ -363,7 +464,7 @@ class BetPronoWidget(tk.Tk):
             base_url = (self.base_url or DEFAULT_SITE_URL).rstrip("/")
             request = urllib.request.Request(
                 base_url + BRAND_IMAGE_URL,
-                headers={"User-Agent": "BET.PRONO-Widget/2.4"},
+                headers={"User-Agent": "BET.PRONO-Widget/2.5"},
             )
             with urllib.request.urlopen(request, timeout=6) as response:
                 image_data = response.read(3_000_000)
@@ -376,6 +477,26 @@ class BetPronoWidget(tk.Tk):
         except (OSError, urllib.error.URLError):
             return
         self.after(0, lambda: self._apply_brand_image(BRAND_IMAGE_PATH))
+
+    def _download_brand_icon(self) -> None:
+        """Met l'icône Windows en cache pour le raccourci Bureau et la barre des tâches."""
+        try:
+            base_url = (self.base_url or DEFAULT_SITE_URL).rstrip("/")
+            request = urllib.request.Request(
+                base_url + BRAND_ICON_URL,
+                headers={"User-Agent": "BET.PRONO-Widget/2.5"},
+            )
+            with urllib.request.urlopen(request, timeout=6) as response:
+                icon_data = response.read(1_000_000)
+            if not icon_data.startswith(b"\x00\x00\x01\x00"):
+                return
+            BRAND_ICON_PATH.parent.mkdir(parents=True, exist_ok=True)
+            temporary_path = BRAND_ICON_PATH.with_suffix(".tmp")
+            temporary_path.write_bytes(icon_data)
+            temporary_path.replace(BRAND_ICON_PATH)
+        except (OSError, urllib.error.URLError):
+            return
+        self.after(0, self._set_window_icon)
 
     def _apply_brand_image(self, path: Path) -> None:
         try:
@@ -485,14 +606,19 @@ class BetPronoWidget(tk.Tk):
             self.profit.configure(text=eur(metrics["profit"]), fg=GOOD if metrics["profit"] >= 0 else BAD)
             self.roi.configure(text=percent(metrics["roi"]), fg=GOOD if (metrics["roi"] or 0) > 0 else BAD if (metrics["roi"] or 0) < 0 else TEXT)
             self.win_rate.configure(text=percent(metrics["win_rate"]), fg=TEXT)
+            self.metric_details["bankroll"].configure(text=f"Initiale : {eur(data.get('initial_bankroll', 0))}")
+            self.metric_details["profit"].configure(text=f"{metrics['settled']} pari(s) réglé(s)")
+            self.metric_details["roi"].configure(text="Bénéfice net / mises")
+            decisive = metrics["decisive"]
+            self.metric_details["win_rate"].configure(text=f"{metrics['wins']} gagnés / {decisive}" if decisive else "Aucun pari décisif")
             self.chart_value.configure(text=eur(metrics["curve"][-1]) if metrics["curve"] else "—")
             label = "tout l’historique" if self.period_days is None else f"les {self.period_days} derniers jours"
             self.chart_caption.configure(text=f"Bankroll sur {label} • animation à chaque actualisation")
             self._animate_sparkline(metrics["curve"])
-            if metrics["sports"]:
-                self.sports.configure(text="  •  ".join(f"{sport} {eur(value)}" for sport, value in metrics["sports"][:3]))
-            else:
-                self.sports.configure(text="Aucun pari réglé pour cette période.")
+            self._render_sports(metrics["sports"])
+            self.summary.configure(
+                text=f"✓ {metrics['wins']} gagnés   ✕ {metrics['losses']} perdus   • {metrics['pending']} en attente"
+            )
             self._set_status(f"{metrics['settled']} pari(s) réglé(s), {metrics['pending']} en attente — {label}.\nMis à jour à {dt.datetime.now().strftime('%H:%M')}")
         except RuntimeError as error:
             self._set_connected_badge(False)
@@ -505,6 +631,60 @@ class BetPronoWidget(tk.Tk):
             return
         webbrowser.open(address + ("/app" if self.client else "/login"))
 
+    def create_desktop_shortcut(self) -> None:
+        """Installe un raccourci Bureau stable, avec l'icône renard au lieu de Python."""
+        icon_path = self._brand_icon_path()
+        if not icon_path:
+            threading.Thread(target=self._download_brand_icon, daemon=True).start()
+            messagebox.showinfo(
+                APP_NAME,
+                "Le logo est en cours de préparation. Attends quelques secondes puis clique à nouveau sur « Bureau ».",
+                parent=self,
+            )
+            return
+
+        try:
+            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            installed_script = CONFIG_PATH.parent / Path(__file__).name
+            if Path(__file__).resolve() != installed_script.resolve():
+                shutil.copy2(Path(__file__).resolve(), installed_script)
+            installed_icon = CONFIG_PATH.parent / BRAND_ICON_NAME
+            if icon_path.resolve() != installed_icon.resolve():
+                shutil.copy2(icon_path, installed_icon)
+
+            python_executable = Path(sys.executable)
+            pythonw = python_executable.with_name("pythonw.exe")
+            if pythonw.is_file():
+                python_executable = pythonw
+
+            def power_shell_literal(value: Path) -> str:
+                return "'" + str(value).replace("'", "''") + "'"
+
+            command = (
+                "$shell = New-Object -ComObject WScript.Shell; "
+                "$shortcut = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'BET.PRONO Widget.lnk')); "
+                f"$shortcut.TargetPath = {power_shell_literal(python_executable)}; "
+                f"$shortcut.Arguments = {power_shell_literal(installed_script)}; "
+                f"$shortcut.WorkingDirectory = {power_shell_literal(CONFIG_PATH.parent)}; "
+                f"$shortcut.IconLocation = {power_shell_literal(installed_icon)} + ',0'; "
+                "$shortcut.Description = 'BET.PRONO — tableau de bord bureau'; $shortcut.Save()"
+            )
+            subprocess.run(
+                ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            messagebox.showerror(APP_NAME, f"Impossible de créer le raccourci Bureau.\n\n{error}", parent=self)
+            return
+
+        self._set_status("Raccourci Bureau créé avec le logo renard. Tu peux désormais lancer le widget depuis cette icône.")
+        messagebox.showinfo(APP_NAME, "Le raccourci BET.PRONO avec le logo renard est prêt sur ton Bureau.", parent=self)
+
 
 if __name__ == "__main__":
     BetPronoWidget().mainloop()
+
+
