@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -22,6 +23,11 @@ from tkinter import messagebox, simpledialog
 
 APP_NAME = "BET.PRONO Widget"
 CONFIG_PATH = Path(os.environ.get("APPDATA", str(Path.home()))) / APP_NAME / "config.json"
+BRAND_IMAGE_NAME = "bet-prono-widget-logo.png"
+BRAND_IMAGE_PATH = CONFIG_PATH.parent / BRAND_IMAGE_NAME
+BUNDLED_BRAND_IMAGE_PATH = Path(__file__).with_name(BRAND_IMAGE_NAME)
+BRAND_IMAGE_URL = f"/static/downloads/{BRAND_IMAGE_NAME}"
+DEFAULT_SITE_URL = "https://bet-prono.onrender.com"
 BG = "#111827"
 PANEL = "#1f2937"
 PANEL_ALT = "#273449"
@@ -175,7 +181,7 @@ class BetPronoWidget(tk.Tk):
         self.configure(bg=BG)
         self.resizable(False, False)
         self.attributes("-topmost", True)
-        self.geometry("410x656+48+96")
+        self.geometry("410x664+48+96")
         self.client: BetPronoApi | None = None
         self.base_url = self._load_url()
         self.period_days: int | None = 30
@@ -184,12 +190,15 @@ class BetPronoWidget(tk.Tk):
         self._sparkline_values: list[float] = []
         self._sparkline_progress = 1.0
         self._sparkline_job: str | None = None
+        self._brand_image_full: tk.PhotoImage | None = None
+        self._brand_image: tk.PhotoImage | None = None
 
         self._build()
+        self.after(80, self._load_brand_image)
         self._set_status("Connecte ton compte pour afficher tes statistiques.")
 
     def _build(self) -> None:
-        header = tk.Frame(self, bg=HEADER, height=70)
+        header = tk.Frame(self, bg=HEADER, height=78)
         header.pack(fill="x")
         header.pack_propagate(False)
         for widget in (header,):
@@ -199,9 +208,13 @@ class BetPronoWidget(tk.Tk):
         accent = tk.Frame(header, bg=ACCENT, width=5)
         accent.pack(side="left", fill="y")
         brand = tk.Frame(header, bg=HEADER)
-        brand.pack(side="left", fill="both", expand=True, padx=(13, 0), pady=11)
-        tk.Label(brand, text="BET.PRONO", bg=HEADER, fg=TEXT, font=("Segoe UI", 15, "bold")).pack(anchor="w")
-        tk.Label(brand, text="TON TABLEAU DE BORD • BUREAU", bg=HEADER, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(1, 0))
+        brand.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=10)
+        self.brand_mark = tk.Label(brand, text="🦊", bg=HEADER, fg=ACCENT, font=("Segoe UI Emoji", 26), width=2)
+        self.brand_mark.pack(side="left", padx=(0, 8))
+        brand_copy = tk.Frame(brand, bg=HEADER)
+        brand_copy.pack(side="left", fill="y")
+        tk.Label(brand_copy, text="BET.PRONO", bg=HEADER, fg=TEXT, font=("Segoe UI", 15, "bold")).pack(anchor="w", pady=(4, 0))
+        tk.Label(brand_copy, text="TON TABLEAU DE BORD • BUREAU", bg=HEADER, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(1, 0))
         self.connection_badge = tk.Label(header, text="● HORS LIGNE", bg="#172235", fg=MUTED, font=("Segoe UI", 8, "bold"), padx=8, pady=4)
         self.connection_badge.pack(side="right", padx=(0, 4), pady=20)
         close = tk.Button(header, text="×", command=self.destroy, bg=HEADER, fg=MUTED, bd=0, font=("Segoe UI", 17), activebackground=HEADER, activeforeground=TEXT)
@@ -335,6 +348,46 @@ class BetPronoWidget(tk.Tk):
             x = self.winfo_x() + event.x - self._drag_origin[0]
             y = self.winfo_y() + event.y - self._drag_origin[1]
             self.geometry(f"+{x}+{y}")
+
+    def _load_brand_image(self) -> None:
+        """Affiche le renard fourni, localement ou après un téléchargement discret."""
+        for path in (BUNDLED_BRAND_IMAGE_PATH, BRAND_IMAGE_PATH):
+            if path.is_file():
+                self._apply_brand_image(path)
+                return
+        threading.Thread(target=self._download_brand_image, daemon=True).start()
+
+    def _download_brand_image(self) -> None:
+        """Met en cache le visuel public pour garder le widget autonome ensuite."""
+        try:
+            base_url = (self.base_url or DEFAULT_SITE_URL).rstrip("/")
+            request = urllib.request.Request(
+                base_url + BRAND_IMAGE_URL,
+                headers={"User-Agent": "BET.PRONO-Widget/2.4"},
+            )
+            with urllib.request.urlopen(request, timeout=6) as response:
+                image_data = response.read(3_000_000)
+            if not image_data.startswith(b"\x89PNG\r\n\x1a\n"):
+                return
+            BRAND_IMAGE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            temporary_path = BRAND_IMAGE_PATH.with_suffix(".tmp")
+            temporary_path.write_bytes(image_data)
+            temporary_path.replace(BRAND_IMAGE_PATH)
+        except (OSError, urllib.error.URLError):
+            return
+        self.after(0, lambda: self._apply_brand_image(BRAND_IMAGE_PATH))
+
+    def _apply_brand_image(self, path: Path) -> None:
+        try:
+            full_size = tk.PhotoImage(file=str(path))
+            scale = max(1, max(full_size.width(), full_size.height()) // 48)
+            thumbnail = full_size.subsample(scale, scale)
+        except tk.TclError:
+            return
+        self._brand_image_full = full_size
+        self._brand_image = thumbnail
+        self.brand_mark.configure(image=thumbnail, text="", width=0)
+        self.iconphoto(True, full_size)
 
     def _load_url(self) -> str:
         try:
