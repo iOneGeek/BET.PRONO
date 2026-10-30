@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>BET.PRONO - Suivi de bankroll</title>
-<meta name="theme-color" content="#353839">
+<meta name="theme-color" content="#071426">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/static/icons/icon-192.png?v=2">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png">
@@ -127,7 +127,6 @@ tbody tr{transition:background .12s ease}
 tbody tr:hover{background:var(--field)}
 .x{display:none}.row-edit .x{display:inline-block}.row-edit .v{display:none}.row-edit-btn{border:1px solid var(--line);background:var(--field);color:var(--accent);border-radius:8px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:.9rem;cursor:pointer;transition:.15s;flex-shrink:0}.row-edit-btn:hover{background:rgba(255,111,0,.15)}.per{display:flex;gap:6px;justify-content:center;padding:8px 0}.per button{background:transparent;color:#fff;border-color:rgba(255,255,255,.5);padding:4px 12px;border-radius:999px;font-size:.85rem}.per button[aria-pressed=true]{background:#fff;color:#353839;font-weight:600}.plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.plan div{display:grid}.plan span{color:var(--mute);font-size:.85rem}.plan b{font-size:1.15rem}.warn{color:var(--loss);margin:8px 0 0;font-size:.88rem}
 .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-.widget-download{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
 textarea{width:100%;height:90px;margin-top:8px;font:12px monospace;background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:8px}
 footer{color:var(--mute);font-size:.8rem;text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow-sm);line-height:1.6}
 .social-bar{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:6px 0 4px}
@@ -332,19 +331,67 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 .jserror{position:fixed;top:8px;left:8px;right:8px;z-index:9999;background:var(--loss);color:#fff;padding:10px 12px;border-radius:10px;font-size:.85rem;box-shadow:0 6px 20px rgba(0,0,0,.35)}
 .jserror button{margin-left:8px;background:#fff;color:var(--loss);border:none;border-radius:8px;padding:6px 12px;font-weight:700}
 </style>
+<style id="betPronoV2">
+/* BET.PRONO 2.0 — la logique reste dans app.js, cette couche ne redéfinit que l'expérience. */
+:root{color-scheme:dark;--bg:#071426;--panel:#102440;--panel-2:#132b4a;--field:#0b1d35;--line:#234767;--text:#edf5ff;--mute:#9eb4d2;--gain:#19d98b;--loss:#ff526b;--accent:#ff7518;--accent-2:#ff9b45;--cyan:#20c8f6;--violet:#9b6cff;--on-accent:#fff9f2;--shadow:0 18px 44px rgba(1,7,19,.34);--shadow-sm:0 8px 20px rgba(1,8,22,.22);--radius:16px}
+html{background:var(--bg)}
+body{min-height:100vh;background:radial-gradient(circle at 82% 4%,rgba(37,106,182,.18),transparent 25%),radial-gradient(circle at 14% 38%,rgba(255,117,24,.065),transparent 23%),linear-gradient(135deg,#061120 0%,#07182c 50%,#061222 100%);background-attachment:fixed;color:var(--text)}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(128,177,224,.028) 1px,transparent 1px),linear-gradient(90deg,rgba(128,177,224,.024) 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,black,transparent 72%)}
+.sidebar{position:fixed;inset:0 auto 0 0;z-index:10;width:260px;padding:26px 16px 20px;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(8,27,49,.97),rgba(5,18,34,.98));border-right:1px solid rgba(87,139,192,.18);box-shadow:16px 0 50px rgba(0,0,0,.14)}
+.sidebar-brand{display:flex;align-items:center;gap:10px;padding:4px 9px 26px;text-decoration:none}.sidebar-brand img{width:172px;max-width:100%;height:auto;filter:drop-shadow(0 6px 16px rgba(0,0,0,.22))}.sidebar-brand span{color:var(--mute);font-size:.72rem;line-height:1.2}
+.sidebar-label{margin:0 10px 9px;color:#6f8baa;font-size:.67rem;font-weight:800;letter-spacing:.15em}.side-menu{display:grid;gap:5px}.side-menu button{display:flex;align-items:center;gap:11px;width:100%;border:1px solid transparent;border-radius:11px;padding:11px 12px;background:transparent;color:var(--mute);text-align:left;font-size:.88rem;font-weight:700}.side-menu button:hover{background:rgba(51,110,161,.16);color:var(--text)}.side-menu button[aria-current=true]{color:#fff;background:linear-gradient(90deg,rgba(255,117,24,.95),rgba(200,78,12,.82));box-shadow:0 8px 22px rgba(255,117,24,.23)}.side-menu .nav-icon{width:20px;text-align:center;color:inherit;font-size:1rem}
+.sidebar-card{margin-top:auto;border:1px solid rgba(255,142,61,.45);border-radius:14px;padding:14px;background:linear-gradient(145deg,rgba(21,49,79,.9),rgba(8,27,48,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}.sidebar-card b{display:block;font-size:.87rem;color:var(--text)}.sidebar-card p{margin:4px 0 11px;color:var(--mute);font-size:.73rem;line-height:1.45}.sidebar-card button{width:100%;border-color:rgba(255,117,24,.55);background:rgba(255,117,24,.12);color:#ffd5b4;font-weight:700;font-size:.78rem}.sidebar-card button:hover{background:var(--accent);color:#fff}
+main{max-width:1540px;margin:0 0 0 260px;padding:26px 34px 46px;display:grid;gap:22px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:18px;min-height:56px}.topbar .brand{display:block}.topbar .brand .logo-img{display:none}.topbar .brand .sub{font-size:.88rem}.topbar .brand:before{content:"TABLEAU DE BORD";display:block;color:var(--accent);font-size:.7rem;font-weight:800;letter-spacing:.14em;margin-bottom:3px}.topbar .brand:after{content:"Suivez vos performances, pari après pari.";display:block;color:var(--text);font-size:1.42rem;font-weight:800;letter-spacing:-.04em;line-height:1.1}.who{gap:9px}.who>span:first-child{display:flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid var(--line);border-radius:999px;background:rgba(13,36,63,.78);color:var(--mute)}.who>span:first-child:before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gain);box-shadow:0 0 0 4px rgba(25,217,139,.12)}.who b{color:var(--text)}#goProfile,#logout{border-radius:10px;background:rgba(16,39,68,.9);border-color:var(--line);box-shadow:none;color:var(--mute);padding:9px 13px}#goProfile:hover,#logout:hover{background:rgba(255,117,24,.12);border-color:var(--accent);color:#fff}.soc-mini{background:rgba(16,39,68,.9);border-color:var(--line);box-shadow:none}
+.mobile-nav{display:none!important}.view.active{gap:22px;animation:v2In .36s ease both}.view.active>*{min-width:0}@keyframes v2In{from{opacity:.65;transform:translateY(7px)}to{opacity:1;transform:none}}
+.panel{background:linear-gradient(145deg,rgba(17,40,70,.96),rgba(10,29,52,.97));border-color:rgba(77,128,177,.39);border-radius:var(--radius);box-shadow:var(--shadow);padding:19px}.panel:hover{border-color:rgba(96,157,215,.58)}h2{font-size:1rem;letter-spacing:-.015em;margin-bottom:13px}h2:before{width:4px;height:1.25em;background:linear-gradient(180deg,#ffad5d,var(--accent));box-shadow:0 0 13px rgba(255,117,24,.55)}h3{color:var(--text)}.sub{color:var(--mute)}
+input,select,textarea{background:#0a1c33!important;border-color:#295177!important;color:var(--text)!important;border-radius:10px;padding:10px 11px}input::placeholder{color:#718baa}button{border-color:var(--line);background:#102947;color:var(--text);border-radius:10px}.primary{background:linear-gradient(135deg,#ff9c48,#ff6811);border-color:#ff9a4d;color:#fff;box-shadow:0 9px 21px rgba(255,103,17,.24)}.primary:hover:not(:disabled){box-shadow:0 12px 27px rgba(255,103,17,.36)}
+.dashboard-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.dashboard-toolbar .per{padding:0;justify-content:flex-start}.per{gap:7px}.per button,.analytics-periods button{border-color:var(--line);background:#102846;color:var(--mute);padding:8px 14px}.per button[aria-pressed=true],.analytics-periods button[aria-pressed=true]{background:linear-gradient(135deg,#ff9b45,#ff6811);border-color:#ff9b45;color:#fff;box-shadow:0 8px 19px rgba(255,103,17,.29)}.chart{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(16,43,75,.98),rgba(8,29,53,.98));border:1px solid rgba(74,137,191,.48);border-radius:18px;padding:18px 16px 9px;box-shadow:var(--shadow)}.chart:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 84% 18%,rgba(255,117,24,.12),transparent 27%)}.chart>*{position:relative;z-index:1}.chart-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px}.chart-title{display:flex;align-items:center;gap:10px}.chart-title .chart-icon{width:35px;height:35px;display:grid;place-items:center;border-radius:10px;background:rgba(255,117,24,.12);color:var(--accent);font-size:1.18rem}.chart-title h2{margin:0;font-size:1.04rem}.chart-value{text-align:right}.chart-value b{display:block;color:var(--gain);font-size:1.12rem}.chart-value span{font-size:.72rem;color:var(--mute)}.chart svg{min-height:290px}.chart text{fill:#a9bfda;font-size:11px}.chart .gl{stroke:rgba(125,172,213,.16)}.chart .gl.z{stroke:rgba(160,200,235,.36)}.chart .ln{stroke:var(--accent);stroke-width:3;filter:drop-shadow(0 4px 4px rgba(255,117,24,.55))}.chart .area{fill:url(#chartArea)}.chart .hint{fill:var(--mute);font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{position:relative;overflow:hidden;min-height:146px;padding:16px;background:linear-gradient(145deg,rgba(16,39,68,.98),rgba(11,29,51,.98));border-color:rgba(72,125,177,.42);border-radius:15px;box-shadow:var(--shadow-sm);gap:6px}.card:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--metric);opacity:.9}.card:hover{transform:translateY(-3px);border-color:var(--metric);box-shadow:0 16px 28px rgba(0,8,24,.34)}.metric-head{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:.78rem;font-weight:700}.metric-icon{display:grid;place-items:center;width:31px;height:31px;border-radius:10px;color:var(--metric);background:color-mix(in srgb,var(--metric) 16%,transparent);font-size:1rem}.card b{font-size:1.58rem;line-height:1.15;color:var(--text)}.card small,.card em{font-size:.75rem;color:var(--mute);font-style:normal}.card .positive{color:var(--gain)}.card .negative{color:var(--loss)}.card[data-metric=bankroll]{--metric:#26d99b}.card[data-metric=profit]{--metric:#ff8b35}.card[data-metric=roi]{--metric:#20c8f6}.card[data-metric=rate]{--metric:#a56cff}
+.secondary-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.secondary-stat{display:flex;align-items:center;gap:10px;padding:13px 15px;border:1px solid var(--line);border-radius:13px;background:rgba(13,34,59,.76)}.secondary-stat i{font-style:normal;color:var(--accent);font-size:1.15rem}.secondary-stat span{display:block;color:var(--mute);font-size:.72rem}.secondary-stat b{display:block;color:var(--text);font-size:1rem}
+.dashboard-insights{display:grid;grid-template-columns:minmax(290px,.92fr) minmax(420px,1.08fr);gap:18px}.insight-card{background:linear-gradient(145deg,rgba(16,39,68,.97),rgba(10,29,51,.97));border:1px solid rgba(72,125,177,.42);border-radius:16px;padding:17px}.insight-card h2{margin-bottom:14px}.result-content{display:flex;align-items:center;gap:20px}.result-donut{--won:0;--lost:0;--void:0;--pending:0;position:relative;display:grid;place-items:center;flex:0 0 144px;width:144px;height:144px;border-radius:50%;background:conic-gradient(var(--gain) 0 calc(var(--won)*1%),var(--loss) calc(var(--won)*1%) calc((var(--won) + var(--lost))*1%),#9cb2ce calc((var(--won) + var(--lost))*1%) calc((var(--won) + var(--lost) + var(--void))*1%),var(--accent) calc((var(--won) + var(--lost) + var(--void))*1%) 100%);box-shadow:0 0 0 8px rgba(8,25,45,.65),0 8px 25px rgba(0,0,0,.24)}.result-donut:after{content:"";position:absolute;inset:25px;border-radius:50%;background:#0c213b;border:1px solid var(--line)}.result-donut b,.result-donut span{position:relative;z-index:1;text-align:center}.result-donut b{font-size:1.45rem}.result-donut span{display:block;color:var(--mute);font-size:.7rem}.results-legend{display:grid;gap:8px;min-width:0}.results-legend div{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--mute);font-size:.82rem}.results-legend b{color:var(--text)}.legend-dot{width:9px;height:9px;border-radius:50%;margin-right:7px;display:inline-block}.legend-won{background:var(--gain)}.legend-lost{background:var(--loss)}.legend-void{background:#9cb2ce}.legend-pending{background:var(--accent)}
+.sport-overview{display:grid;gap:8px}.sport-overview-row{display:grid;grid-template-columns:minmax(80px,1fr) minmax(110px,1.2fr) auto;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(85,137,186,.22)}.sport-overview-row:last-child{border-bottom:none}.sport-overview-name{font-weight:700;font-size:.86rem}.sport-overview-meta{display:block;color:var(--mute);font-size:.7rem}.sport-overview-track{height:7px;overflow:hidden;border-radius:99px;background:#07182b}.sport-overview-bar{display:block;height:100%;width:var(--progress);border-radius:inherit;background:var(--sport-color)}.sport-overview-profit{font-weight:800;font-size:.84rem;white-space:nowrap}
+.advanced-analytics{padding:20px}.analytics-summary{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.analytics-metric{background:#0b2039;border-color:var(--line);border-radius:13px;padding:14px}.analytics-content{gap:16px}.analytics-chart{background:#0a1e36;border:1px solid var(--line);border-radius:14px}.analytics-chart .analytics-line{stroke:var(--accent)}.analytics-chart .analytics-area{fill:rgba(255,117,24,.18)}.analytics-chart .analytics-dot{fill:var(--accent);stroke:#ffe2ca}.analytics-sports{background:#0b2039;border-color:var(--line)}
+.wrap{border:1px solid rgba(72,125,177,.32);border-radius:12px;background:rgba(6,22,41,.38)}table{min-width:620px}th{background:#102642;color:#9ab0cd;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}th,td{padding:10px 11px;border-color:rgba(72,125,177,.23)}tbody tr:hover{background:rgba(44,92,138,.13)}.bet-toolbar{padding:10px;border:1px solid var(--line);border-radius:13px;background:rgba(8,26,47,.48)}
+footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:12px}.plan div,.advice-box,.pick-advice-box,.bet-item{background:#0b2039;border-color:var(--line);border-radius:12px}.plan div{padding:12px}.plan b{color:var(--accent)}
+#viewHome,#viewProfile{max-width:1000px}.jserror{background:var(--loss)}
+@media (max-width:1220px){main{padding:24px}.stats,.secondary-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-insights{grid-template-columns:1fr}.result-content{justify-content:center}.card{min-height:126px}}
+@media (max-width:880px){.sidebar{display:none}main{margin:0;padding:18px 14px 98px;gap:16px}.topbar{align-items:flex-start}.topbar .brand:after{font-size:1.18rem}.who>span:first-child,.who-social{display:none}.mobile-nav{position:fixed;display:grid!important;grid-template-columns:repeat(5,1fr);gap:2px;z-index:50;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));padding:6px;background:rgba(8,25,45,.96);border:1px solid rgba(82,139,191,.5);border-radius:16px;box-shadow:0 15px 36px rgba(0,0,0,.45);backdrop-filter:blur(12px)}.mobile-nav button{border:0;background:transparent;color:var(--mute);padding:7px 2px;font-size:.66rem;line-height:1.1}.mobile-nav button:before{content:attr(data-icon);display:block;font-size:1.05rem;margin-bottom:3px}.mobile-nav button[aria-current=true]{color:#fff}.chart svg{min-height:230px}.dashboard-insights{grid-template-columns:1fr}.analytics-content{grid-template-columns:1fr}}
+@media (max-width:560px){.topbar{gap:10px}.topbar .brand:before{font-size:.62rem}.topbar .brand:after{font-size:1.03rem}.topbar .brand .sub{display:none}#goProfile,#logout{padding:8px 9px;font-size:.75rem}.stats,.secondary-stats,.analytics-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.card{min-height:118px;padding:12px}.card b{font-size:1.22rem}.metric-head{font-size:.67rem}.metric-icon{width:27px;height:27px}.secondary-stat{padding:10px}.secondary-stat b{font-size:.88rem}.chart{padding:14px 8px 7px}.chart-head{align-items:flex-start}.chart-title h2{font-size:.9rem}.chart-value b{font-size:.92rem}.chart svg{min-height:205px}.per button{padding:7px 9px;font-size:.72rem}.result-content{gap:13px}.result-donut{flex-basis:115px;width:115px;height:115px}.result-donut:after{inset:21px}.results-legend div{font-size:.72rem}.sport-overview-row{grid-template-columns:80px 1fr;gap:8px}.sport-overview-profit{grid-column:2}.analytics-periods button{padding:7px 9px;font-size:.7rem}.panel{padding:14px}.form{grid-template-columns:1fr}.side-menu{display:none}}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+</style>
 </head>
 <body>
 <canvas id="bgfx" aria-hidden="true"></canvas>
+<aside class="sidebar" aria-label="Navigation BET.PRONO">
+  <a class="sidebar-brand" href="#dashboardTop" aria-label="BET.PRONO, tableau de bord">
+    <img src="/static/logo_betprono.png" alt="BET.PRONO">
+  </a>
+  <p class="sidebar-label">MENU PRINCIPAL</p>
+  <nav class="side-menu" id="sideNav">
+    <button type="button" data-route="dashboard" aria-current="true"><span class="nav-icon" aria-hidden="true">⌂</span>Tableau de bord</button>
+    <button type="button" data-route="bets"><span class="nav-icon" aria-hidden="true">◫</span>Mes paris</button>
+    <button type="button" data-route="analysis"><span class="nav-icon" aria-hidden="true">◔</span>Analyses</button>
+    <button type="button" data-route="community"><span class="nav-icon" aria-hidden="true">◇</span>Paris partagés</button>
+    <button type="button" data-route="settings"><span class="nav-icon" aria-hidden="true">⚙</span>Profil & réglages</button>
+  </nav>
+  <section class="sidebar-card" aria-label="Raccourci d'ajout">
+    <b>Ajouter un pari</b>
+    <p>Enregistre une mise, un retrait ou un résultat pour mettre tes statistiques à jour.</p>
+    <button type="button" data-route="add-bet">+ Nouveau pari</button>
+  </section>
+</aside>
 <main>
 <header class="topbar">
-  <div class="brand"><div><img src="/static/logo_betprono.png" alt="BET.PRONO" class="logo-img"><p class="sub">Suivi de ma bankroll, pari après pari</p></div></div>
+  <div class="brand"><div><img src="/static/logo_betprono.png" alt="BET.PRONO" class="logo-img"><p class="sub">Données personnelles, calculs et résultats réels de ton compte.</p></div></div>
   <div class="who"><span>Connecté : <b id="whoami">…</b></span><span class="who-social"><a class="soc-mini soc-tg" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow" title="Telegram @bet_prono_fr"><img src="/static/icons/telegram.png" width="18" height="18" alt="Telegram"></a><a class="soc-mini soc-ig" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow" title="Instagram @bet.prono"><img src="/static/icons/insta.png" width="18" height="18" alt="Instagram"></a></span><button id="goProfile" type="button">Profil</button><button id="logout" type="button">Déconnexion</button></div>
 </header>
 
-<nav class="nav" id="mainNav" hidden>
-  <button type="button" data-view="home" aria-pressed="true">Accueil</button>
-  <button type="button" data-view="bankroll" aria-pressed="false">Bankroll</button>
-  <span class="nav-selector" id="navSelector" aria-hidden="true"></span>
+<nav class="nav mobile-nav" id="mainNav" hidden aria-label="Navigation mobile">
+  <button type="button" data-route="dashboard" data-icon="⌂" aria-current="true">Accueil</button>
+  <button type="button" data-route="bets" data-icon="◫">Paris</button>
+  <button type="button" data-route="add-bet" data-icon="＋">Ajouter</button>
+  <button type="button" data-route="analysis" data-icon="◔">Analyses</button>
+  <button type="button" data-route="settings" data-icon="⚙">Profil</button>
 </nav>
 
 <div id="viewHome" class="view">
@@ -396,10 +443,27 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
 </div>
 
 <div id="viewBankroll" class="view">
-<section class="chart"><svg id="svg" viewBox="0 0 640 300" role="img" aria-label="Évolution du bénéfice pari après pari"></svg>
-<div class="per" id="per"><button data-p="d">1 j</button><button data-p="w">1 sem.</button><button data-p="m">1 mois</button><button data-p="all" aria-pressed="true">Tout</button></div></section>
-<section class="stats" id="stats"></section>
-  <section class="panel advanced-analytics" aria-labelledby="analyticsTitle">
+<section class="stats" id="stats" aria-label="Indicateurs principaux"></section>
+<section class="chart dashboard-chart" id="dashboardTop">
+  <div class="chart-head">
+    <div class="chart-title"><span class="chart-icon" aria-hidden="true">⌁</span><div><h2>Évolution de la bankroll</h2><p class="sub" id="chartPeriodLabel">Capital réel sur la période sélectionnée</p></div></div>
+    <div class="chart-value"><b id="chartBankrollValue">—</b><span>Bankroll actuelle</span></div>
+  </div>
+  <svg id="svg" viewBox="0 0 640 300" role="img" aria-label="Évolution de la bankroll"></svg>
+  <div class="dashboard-toolbar"><div class="per" id="per" aria-label="Période du graphique"><button data-p="week">7 jours</button><button data-p="month" aria-pressed="true">30 jours</button><button data-p="quarter">90 jours</button><button data-p="all">Tout</button></div><span class="sub">Les retraits et résultats sont inclus.</span></div>
+</section>
+<section class="secondary-stats" id="secondaryStats" aria-label="Indicateurs complémentaires"></section>
+<section class="dashboard-insights" aria-label="Synthèse des résultats">
+  <article class="insight-card">
+    <h2>Répartition des résultats</h2>
+    <div class="result-content"><div class="result-donut" id="resultsDonut"><div><b id="resultsTotal">—</b><span>paris</span></div></div><div class="results-legend" id="resultsLegend"></div></div>
+  </article>
+  <article class="insight-card">
+    <h2>Performance par sport</h2>
+    <div class="sport-overview" id="sportsOverview"></div>
+  </article>
+</section>
+  <section class="panel advanced-analytics" id="analysisSection" aria-labelledby="analyticsTitle">
   <div class="analytics-head">
     <div>
       <h2 id="analyticsTitle">Analyse avancée</h2>
@@ -423,10 +487,10 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
   </div>
 </section>
 <section class="panel"><h2>Mises conseillées <button type="button" class="info-btn" data-help="advice" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-advice" hidden>Mises conseillées selon ta bankroll : respecte la mise préconisée pour améliorer ta bankroll sur la durée.</p><div class="plan" id="plan"></div></section>
-<section class="panel"><h2>Par sport <button type="button" class="info-btn" data-help="sport" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-sport" hidden>Chaque sport est différent : fais des catégories pour savoir quel sport te convient le mieux et sur lequel tu gagnes le plus.</p><div class="wrap"><table id="bs"></table></div></section>
-<section class="panel"><h2>Par type de pari <button type="button" class="info-btn" data-help="type" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-type" hidden>Chaque type de pari a ses particularités : consulte tes résultats pour savoir quel type te convient le mieux.</p><div class="wrap"><table id="bt"></table></div></section>
+<section class="panel" id="sportsSection"><h2>Par sport <button type="button" class="info-btn" data-help="sport" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-sport" hidden>Chaque sport est différent : fais des catégories pour savoir quel sport te convient le mieux et sur lequel tu gagnes le plus.</p><div class="wrap"><table id="bs"></table></div></section>
+<section class="panel" id="betTypesSection"><h2>Par type de pari <button type="button" class="info-btn" data-help="type" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-type" hidden>Chaque type de pari a ses particularités : consulte tes résultats pour savoir quel type te convient le mieux.</p><div class="wrap"><table id="bt"></table></div></section>
 
-<section class="panel">
+<section class="panel" id="betsSection">
   <h2>Mes paris <button type="button" class="info-btn" data-help="history" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-history" hidden>Mes paris : l'historique complet de tes mises et de leurs résultats.</p>
   <div class="bet-toolbar">
     <input id="betSearch" type="search" placeholder="Rechercher (sport, type…)" aria-label="Rechercher un pari">
@@ -458,7 +522,7 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
   </section>
   <p class="sub" style="margin-top:8px">Ajoutez vos paris : note bien tout ce que tu as misé aujourd'hui ou les jours précédents. N'oublie pas de modifier si un pari est encore en cours.</p>
 
-<section class="panel">
+<section class="panel" id="bankrollSettings">
   <h2>Modifier ton BK <button type="button" class="info-btn" data-help="bk" aria-label="En savoir plus">?</button></h2>
   <p class="sub" id="help-bk" hidden>Si tu as déposé de l'argent, je te conseille fortement de mettre ta bankroll à jour.</p>
   <div class="form">
@@ -503,18 +567,17 @@ h2 .bar{display:inline-block;width:5px;height:22px;border-radius:99px;background
     <h2>Widget bureau</h2>
     <p class="sub">Connecte ton widget sans partager ton mot de passe. Génère un code temporaire, puis saisis-le dans le widget dans les 5 minutes.</p>
     <div class="row">
-      <a class="primary widget-download" href="/static/downloads/BET.PRONO%20Widget.pyw" download="BET.PRONO Widget.pyw">⬇ Télécharger le widget Windows</a>
+      <a class="primary" href="/static/downloads/BET.PRONO%20Widget.pyw" download="BET.PRONO Widget.pyw">⬇ Télécharger le widget Windows</a>
       <button class="primary" id="widgetPairBtn" type="button">Générer un code</button>
       <output id="widgetPairCode" class="sub" hidden aria-live="polite"></output>
     </div>
-    <p class="sub">Le widget fonctionne avec Python 3, sans module supplémentaire à installer.</p>
     <p class="sub" id="widgetPairMsg"></p>
   </section>
 </div>
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V2.2.5 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V2.3.0 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -563,6 +626,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=2.2.5"></script>
+    <script src="/static/app.js?v=2.3.0"></script>
 </body>
 </html>
