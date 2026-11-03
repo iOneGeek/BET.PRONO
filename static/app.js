@@ -479,6 +479,7 @@ function showView(v){
   $('viewHome').classList.toggle('active',v==='home');
   $('viewBankroll').classList.toggle('active',v==='bankroll');
   $('viewProfile').classList.toggle('active',v==='profile');
+  $('viewAI').classList.toggle('active',v==='ai');
 }
 function setActiveRoute(route){
   document.querySelectorAll('[data-route]').forEach(button=>{
@@ -487,7 +488,7 @@ function setActiveRoute(route){
   });
 }
 function navigate(route,shouldScroll=true){
-  const routes={dashboard:{view:'bankroll',target:'dashboardTop'},bets:{view:'bankroll',target:'betsSection'},'add-bet':{view:'bankroll',target:'ed'},analysis:{view:'bankroll',target:'analysisSection'},community:{view:'home',target:'viewHome'},settings:{view:'profile',target:'viewProfile'}};
+  const routes={dashboard:{view:'bankroll',target:'dashboardTop'},bets:{view:'bankroll',target:'betsSection'},'add-bet':{view:'bankroll',target:'ed'},analysis:{view:'bankroll',target:'analysisSection'},ai:{view:'ai',target:'viewAI'},community:{view:'home',target:'viewHome'},settings:{view:'profile',target:'viewProfile'}};
   const current=routes[route]||routes.dashboard;
   showView(current.view);setActiveRoute(route in routes?route:'dashboard');
   if(shouldScroll){requestAnimationFrame(()=>{const target=document.getElementById(current.target);if(target)target.scrollIntoView({behavior:'smooth',block:'start'});});}

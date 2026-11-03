@@ -68,6 +68,12 @@ DATABASE_URL=ton-url-neon python migrate_to_neon.py
 fichier commité sur GitHub. Uniquement dans le dashboard Render et dans
 `local.env` (ignoré par git).
 
+## BET PRONO AI — Bêta
+
+Un onglet de démonstration permet de saisir un sport et deux adversaires, avec
+un aperçu local facultatif de capture. Aucune IA ou donnée sportive réelle
+n'est connectée. Voir le [guide de test et les limites de la bêta](docs/BET_PRONO_AI.md).
+
 ## Structure
 
 - `app.py` — serveur Flask : authentification (cookie + JWT), API REST des paris,
