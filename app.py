@@ -6,6 +6,7 @@ import sqlite3
 import secrets
 import sys
 import uuid
+import unicodedata
 import base64
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -825,6 +826,52 @@ def me():
         "initial_bankroll": g.user["initial_bankroll"],
         "is_admin": bool(g.user["is_admin"]),
     })
+
+
+@app.post("/api/ai/analyze")
+@login_required
+def ai_analyze():
+    """Validate a manually entered fixture; never imply live data or inference."""
+    if not request.is_json:
+        return jsonify({"error": "Envoie les équipes au format JSON. Les images restent locales."}), 415
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "La saisie du match est invalide."}), 400
+    sports = {"football": "Football", "basketball": "Basketball", "tennis": "Tennis",
+              "hockey": "Hockey sur glace", "rugby": "Rugby", "baseball": "Baseball",
+              "american-football": "Football américain"}
+    sport = data.get("sport")
+    if not isinstance(sport, str) or sport not in sports:
+        return jsonify({"error": "Choisis un sport proposé."}), 400
+    teams = []
+    for key in ("home_team", "away_team"):
+        value = data.get(key)
+        if not isinstance(value, str) or len(value) > 80:
+            return jsonify({"error": "Chaque équipe ou joueur doit contenir entre 2 et 80 caractères."}), 400
+        value = unicodedata.normalize("NFKC", value)
+        if any(unicodedata.category(char).startswith("C") for char in value):
+            return jsonify({"error": "Les noms contiennent des caractères non autorisés."}), 400
+        value = " ".join(value.split())
+        if not 2 <= len(value) <= 80:
+            return jsonify({"error": "Chaque équipe ou joueur doit contenir entre 2 et 80 caractères."}), 400
+        teams.append(value)
+    if teams[0].casefold() == teams[1].casefold():
+        return jsonify({"error": "Saisis deux équipes ou joueurs différents."}), 400
+    response = jsonify({
+        "mode": "demo",
+        "title": "Démonstration — aucune prédiction",
+        "match": {"sport": sports[sport], "home_team": teams[0], "away_team": teams[1]},
+        "notice": "Saisie reçue, rencontre non vérifiée. Aucune API sportive ni IA connectée.",
+        "checks": [
+            {"label": "Rencontre et calendrier", "status": "À vérifier auprès d’une source sportive."},
+            {"label": "Forme et confrontations", "status": "Données indisponibles."},
+            {"label": "Absences et compositions", "status": "Données indisponibles."},
+            {"label": "Probabilités et pronostic", "status": "Non calculés. Aucun conseil de mise."},
+        ],
+        "sources": [], "prediction": None,
+    })
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.patch("/api/settings")
