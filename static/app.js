@@ -47,7 +47,7 @@ let PER='month';
 let ANALYTICS_PERIOD='month';
 let QS='', QR='all';
 const cut=()=>{if(PER==='all')return'';const d=new Date();d.setDate(d.getDate()-({week:6,month:29,quarter:89})[PER]);return d.toISOString().slice(0,10)};
-const pl=b=>b.r==='won'?b.s*(b.o-1)+(b.b||0):b.r==='lost'?-b.s:0;
+const pl=b=>b.p!=null&&['won','lost','void'].includes(b.r)?Number(b.p)-Number(b.s):b.r==='won'?b.s*(b.o-1)+(b.b||0):b.r==='lost'?-b.s:0;
 // Available cash: an unsettled stake is already held by the bookmaker.
 const balanceDelta=b=>b.r==='wd'||b.r==='pending'?-(Number(b.s)||0):pl(b);
 
@@ -87,12 +87,7 @@ function analyticsPeriodCut(){
   date.setDate(date.getDate()-days);
   return date.toISOString().slice(0,10);
 }
-function analyticsProfit(bet){
-  const stake=Number(bet.s)||0,odds=Number(bet.o)||0,bonus=Number(bet.b)||0;
-  if(bet.r==='won')return stake*(odds-1)+bonus;
-  if(bet.r==='lost')return-stake;
-  return 0;
-}
+function analyticsProfit(bet){ return pl(bet); }
 function analyticsClass(value){return value>0?'g':value<0?'l':''}
 function analyticsEscape(value){
   return String(value==null?'':value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -334,6 +329,7 @@ $('t').addEventListener('click', async ev=>{
     document.getElementById('ebStake').value=b.s;
     document.getElementById('ebOdds').value=b.o||'';
     document.getElementById('ebResult').value=b.r||'pending';
+    $('ebPayout').value=b.p==null?'':b.p;
     dlg._betId=b.id;
     if(typeof dlg.showModal==='function') dlg.showModal();
     return;
@@ -364,12 +360,14 @@ $('ebSave').addEventListener('click',async()=>{
   const dlg=document.getElementById('editBetDlg');
   if(!dlg||!dlg._betId) return;
   const body={d:document.getElementById('ebDate').value,sp:document.getElementById('ebSport').value,ty:document.getElementById('ebType').value,s:document.getElementById('ebStake').value,o:document.getElementById('ebOdds').value,r:document.getElementById('ebResult').value};
+  body.p=$('ebPayout').value.trim()===''?null:Number($('ebPayout').value);
   try{
     await api('/api/bets/'+dlg._betId,{method:'PATCH',body:JSON.stringify(body)});
     if(typeof dlg.close==='function') dlg.close();
     await loadBets();
   }catch(err){ alert('Erreur lors de la modification : '+(err&&err.message?err.message:err)); }
 });
+$('ebResult').addEventListener('change',()=>{$('ebPayout').value='';});
 const ebCancel=document.getElementById('ebCancel');
 if(ebCancel){ ebCancel.addEventListener('click',()=>{ const d=document.getElementById('editBetDlg'); if(d&&typeof d.close==='function') d.close(); }); }
 const ebDelete=document.getElementById('ebDelete');

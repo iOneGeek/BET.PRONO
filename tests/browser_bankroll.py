@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import threading
+import json
 from playwright.sync_api import sync_playwright, expect
 from werkzeug.serving import make_server
 import test_ai
@@ -62,6 +63,36 @@ def run():
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
                 if screenshots and width != 320:
                     page.screenshot(path=str(Path(screenshots) / f'bankroll-{width}.png'), full_page=True)
+            # Review a patch, download the original, apply once, and preserve IDs.
+            page.set_viewport_size({'width': 1440, 'height': 1000})
+            page.locator('#sideNav [data-route="bets"]').click()
+            page.locator('summary').filter(has_text='Rapprocher un historique').click()
+            before = context.request.get(origin + '/api/bets').json()['bets']
+            plan = {'version': 1, 'initial_bankroll': 100, 'before': before,
+                    'updates': [{'id': rows[4]['id'], 'p': 19.98}], 'additions': [ledger()[3]]}
+            page.locator('#reconcileFile').set_input_files({'name': 'corrections.json', 'mimeType': 'application/json', 'buffer': json.dumps(plan).encode()})
+            expect(page.locator('#reconcileStatus')).to_contain_text('344,69')
+            expect(page.locator('#reconcileApply')).to_be_disabled()
+            assert context.request.get(origin + '/api/bets').json()['bets'] == before
+            with page.expect_download() as download:
+                page.locator('#reconcileBackup').click()
+            saved = json.loads(Path(download.value.path()).read_text(encoding='utf-8'))
+            assert {b['id']: b for b in saved['bets']} == {b['id']: b for b in before}, (saved, before)
+            expect(page.locator('#reconcileApply')).to_be_enabled()
+            page.locator('#reconcileApply').click()
+            expect(page.locator('#reconcileStatus')).to_contain_text('Corrections appliquées')
+            after = context.request.get(origin + '/api/bets').json()['bets']
+            assert {b['id'] for b in before} < {b['id'] for b in after}
+            page.locator('#sideNav [data-route="bets"]').click()
+            page.locator(f'[data-e="{rows[4]["id"]}"]').click()
+            expect(page.locator('#ebPayout')).to_have_value('19.98')
+            expect(page.locator('#ebOdds')).to_have_value('2')
+            page.locator('#ebPayout').fill('0')
+            page.locator('#ebSave').click()
+            expect(page.locator('#editBetDlg')).not_to_be_visible()
+            page.locator('#sideNav [data-route="dashboard"]').click()
+            expect(page.locator('[data-metric="bankroll"] b')).to_contain_text('324,71')
+            assert '324,71' in page.locator('#analyticsBankrollChart').get_attribute('aria-label')
             # Flat balances at a grid boundary previously produced NaN SVG coordinates.
             page.evaluate('BETS=[];INIT=100;refresh()')
             assert 'NaN' not in page.locator('#svg').inner_html()
