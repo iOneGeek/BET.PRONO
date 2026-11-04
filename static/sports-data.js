@@ -1,4 +1,4 @@
-/* Read-only, on-demand sports data. No model or prediction is invoked. */
+/* Sports snapshots with an automatic, separately loaded explanatory analysis. */
 (() => {
   'use strict';
   const el = id => document.getElementById(id);
@@ -9,6 +9,7 @@
   el('liveDate').min = new Date(today.getTime() - 30 * 86400000).toISOString().slice(0, 10);
   el('liveDate').max = new Date(today.getTime() + 30 * 86400000).toISOString().slice(0, 10);
   let active = null;
+  let analysisActive = null;
   const dateLabel = value => {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'Horaire non disponible' : date.toLocaleString('fr-FR', {timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short'}) + ' (Paris)';
@@ -18,9 +19,64 @@
     ? 'Score indisponible' : `${game.home.score} — ${game.away.score}`;
 
   function clearSelection() {
+    if (analysisActive) analysisActive.abort();
+    analysisActive = null;
+    el('liveAnalysis').removeAttribute('aria-busy');
+    el('liveAnalysisContent').hidden = true;
+    el('liveAnalysisStatus').textContent = '';
     el('liveReport').hidden = true;
     el('liveError').hidden = true;
     el('liveMatches').querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', 'false'));
+  }
+
+  async function loadAnalysis(snapshot) {
+    const controller = new AbortController();
+    analysisActive = controller;
+    el('liveAnalysis').setAttribute('aria-busy', 'true');
+    el('liveAnalysisStatus').textContent = 'Préparation de l’analyse à partir des données du match…';
+    const timer = setTimeout(() => controller.abort(), 35000);
+    try {
+      const response = await fetch(`/api/ai/matches/${snapshot.match.id}/analysis`, {
+        method: 'POST', credentials: 'same-origin', signal: controller.signal,
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({snapshot_id: snapshot.snapshot_id})
+      });
+      if (analysisActive !== controller) return;
+      if (response.status === 401) { location.href = '/login'; return; }
+      const result = await response.json().catch(() => ({}));
+      if (analysisActive !== controller) return;
+      if (!response.ok) throw new Error('Analysis unavailable');
+      if (['unavailable', 'insufficient_data', 'outdated'].includes(result.status) && typeof result.message === 'string') {
+        el('liveAnalysisStatus').textContent = result.message;
+        return;
+      }
+      if (result.status !== 'ready' || result.snapshot_id !== snapshot.snapshot_id || typeof result.summary !== 'string'
+          || !Array.isArray(result.observations) || !Array.isArray(result.limitations)) throw new Error('Invalid analysis');
+      const points = result.observations.map(point => {
+        if (typeof point.text !== 'string' || !Array.isArray(point.evidence)) throw new Error('Invalid evidence');
+        const item = document.createElement('li');
+        const explanation = document.createElement('p'); explanation.textContent = point.text;
+        const evidence = document.createElement('p'); evidence.className = 'sub';
+        evidence.textContent = 'Données citées : ' + point.evidence.join(' · ');
+        item.append(explanation, evidence);
+        return item;
+      });
+      el('liveAnalysisSummary').textContent = result.summary;
+      el('liveAnalysisPoints').replaceChildren(...points);
+      el('liveAnalysisLimits').replaceChildren(...result.limitations.map(text => {
+        const item = document.createElement('li'); item.textContent = text; return item;
+      }));
+      el('liveAnalysisDate').textContent = 'Synthèse générée par IA le ' + dateLabel(result.generated_at);
+      el('liveAnalysisStatus').textContent = 'Analyse disponible, fondée sur les données affichées.';
+      el('liveAnalysisContent').hidden = false;
+    } catch (_) {
+      if (analysisActive === controller) el('liveAnalysisStatus').textContent = 'L’analyse automatique est momentanément indisponible. Les statistiques restent consultables.';
+    } finally {
+      clearTimeout(timer);
+      if (analysisActive === controller) {
+        analysisActive = null;
+        el('liveAnalysis').removeAttribute('aria-busy');
+      }
+    }
   }
   el('liveForm').addEventListener('input', () => {
     if (active) active.abort();
@@ -94,6 +150,7 @@
       button.setAttribute('aria-pressed', 'true');
       el('liveStatus').textContent = 'Données du match chargées. Aucune prédiction calculée.';
       el('liveReport').focus();
+      loadAnalysis(data);
     }, false);
   }
 

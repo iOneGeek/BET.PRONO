@@ -187,4 +187,4 @@ class Scores365Client:
         return {'mode': 'sports_data', 'match': game, 'statistics': list(rows.values())[:40],
                 'source': self.SOURCE, 'fetched_at': fetched_at, 'cached': cached,
                 'cache_seconds': self.TTL, 'prediction': None,
-                'notice': 'Données fournies par 365Scores, potentiellement différées. Aucune analyse IA ni prédiction.'}
+                'notice': 'Données fournies par 365Scores, potentiellement différées. La synthèse IA est chargée séparément ; aucune prédiction n’est calculée.'}

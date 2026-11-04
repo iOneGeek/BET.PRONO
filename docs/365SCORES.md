@@ -20,8 +20,10 @@ pas la fraîcheur des données en amont : des scores peuvent être différés et
 couverture peut être partielle. Les noms et intitulés restent dans la langue
 de la source (anglais avec le paramètre actuellement testé).
 
-L'intégration n'effectue aucune analyse IA, ne récupère pas de pronostics ou
-de cotes, et ne recommande aucune mise. Elle ne modifie ni les paris ni la bankroll.
+Le connecteur sportif ne récupère pas de pronostics ou de cotes et ne recommande
+aucune mise. Une [synthèse IA optionnelle](AUTO_ANALYSIS.md) est désormais demandée
+automatiquement après l'affichage du match, sans bouton supplémentaire.
+Elle ne modifie ni les paris ni la bankroll et ne calcule aucune prédiction.
 Le formulaire de démonstration multisport et l'aperçu local d'image restent séparés.
 
 ## Service testé
@@ -49,6 +51,8 @@ Aucune clé API supplémentaire. `SPORTS_DATA_ENABLED=1` active la consultation
 (valeur par défaut) ; `SPORTS_DATA_ENABLED=0` la désactive sans affecter le reste
 de l'application. Configurer cette variable dans Render > Environment ou dans
 `local.env`. Pas de nouvelle dépendance de production, migration ou tâche planifiée.
+La synthèse automatique utilise séparément `GEMINI_API_KEY`, uniquement côté serveur ;
+elle reste indisponible sans cette clé, tandis que les données sportives fonctionnent.
 
 Seuls des clics explicites déclenchent une recherche ou une fiche. Aucun sondage
 automatique ni téléchargement d'image/logo distant n'est ajouté.

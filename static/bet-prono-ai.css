@@ -37,6 +37,12 @@
 #liveStats th,#liveStats td{white-space:normal;overflow-wrap:anywhere;font-size:.8rem;padding:10px 7px}
 #liveStats caption{padding:12px;color:var(--mute);text-align:left;font-size:.85rem}
 #liveStats td{text-align:center}
+.ai-auto-analysis{margin-top:24px;padding:20px;border:1px solid var(--line);border-radius:12px;background:rgba(6,22,41,.35);overflow-wrap:anywhere}
+.ai-auto-analysis h3{margin-top:0}
+#liveAnalysisPoints{padding-left:20px}
+#liveAnalysisPoints li{margin:16px 0}
+#liveAnalysisPoints p{margin:5px 0}
+#liveAnalysisLimits{padding-left:20px}
 @media(max-width:880px){.mobile-nav{grid-template-columns:repeat(6,minmax(0,1fr))}.mobile-nav button{min-height:48px}.ai-layout{grid-template-columns:1fr;gap:16px}}
 @media(max-width:540px){.ai-checks{grid-template-columns:1fr}.ai-notice{padding:12px}.ai-hero{padding:20px}}
 @media(prefers-reduced-motion:reduce){#viewAI{animation:none}}

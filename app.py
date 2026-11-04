@@ -23,6 +23,7 @@ from werkzeug.utils import secure_filename
 from google.auth.transport.requests import Request
 from google.oauth2.id_token import verify_oauth2_token
 from sports_data import Scores365Client, SportsDataError
+from match_analysis import MatchAnalysis, snapshot_id, unavailable as analysis_unavailable
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "instance", "bankroll.db")
@@ -70,6 +71,10 @@ app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 256 * 1024
 app.config['SPORTS_DATA_ENABLED'] = os.getenv('SPORTS_DATA_ENABLED', '1') == '1'
 sports_client = Scores365Client()
+app.config['GEMINI_API_KEY'] = os.getenv('GEMINI_API_KEY', '').strip()
+app.config['GEMINI_MODEL'] = os.getenv('GEMINI_MODEL', 'gemini-3.8-flash').strip()
+app.config['AUTO_ANALYSIS_ENABLED'] = os.getenv('AUTO_ANALYSIS_ENABLED', '1') == '1'
+match_analyzer = MatchAnalysis()
 
 
 # ---------------------------------------------------------------------------
@@ -867,7 +872,31 @@ def sports_matches():
 def sports_match(game_id):
     if not 0 < game_id < 10**12:
         return jsonify({'error': 'Identifiant de rencontre invalide.'}), 400
-    return sports_response(lambda: sports_client.match(game_id))
+    def get_snapshot():
+        data = sports_client.match(game_id)
+        return {**data, 'snapshot_id': snapshot_id(data)}
+    return sports_response(get_snapshot)
+
+
+@app.post('/api/ai/matches/<int:game_id>/analysis')
+@login_required
+def automatic_match_analysis(game_id):
+    if not request.is_json:
+        return jsonify({'error': 'Format de requête invalide.'}), 415
+    payload = request.get_json(silent=True)
+    if (not 0 < game_id < 10**12 or not isinstance(payload, dict)
+            or set(payload) != {'snapshot_id'} or not isinstance(payload['snapshot_id'], str)
+            or not re.fullmatch(r'[0-9a-f]{64}', payload['snapshot_id'])):
+        return jsonify({'error': 'Référence de données invalide.'}), 400
+
+    def analyze_snapshot():
+        if not app.config['AUTO_ANALYSIS_ENABLED'] or not app.config['GEMINI_API_KEY']:
+            return analysis_unavailable()
+        data = sports_client.match(game_id)
+        if snapshot_id(data) != payload['snapshot_id']:
+            return {'status': 'outdated', 'message': 'Les données du match ont changé. Sélectionne à nouveau la rencontre pour actualiser sa fiche.', 'prediction': None}
+        return match_analyzer.analyze(data, g.user['id'], app.config['GEMINI_API_KEY'], app.config['GEMINI_MODEL'])
+    return sports_response(analyze_snapshot)
 
 
 @app.post("/api/ai/analyze")

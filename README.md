@@ -73,6 +73,8 @@ fichier commité sur GitHub. Uniquement dans le dashboard Render et dans
 L'onglet propose une [connexion expérimentale à 365Scores](docs/365SCORES.md)
 pour rechercher des matchs de football et consulter les scores/statistiques
 disponibles, avec source et heure de récupération. Aucune prédiction n'est calculée.
+Une [analyse descriptive intégrée](docs/AUTO_ANALYSIS.md) se charge automatiquement
+dans la fiche lorsque les données et la clé serveur sont disponibles.
 La [démonstration IA et l'aperçu local de captures](docs/BET_PRONO_AI.md) restent disponibles.
 
 ## Structure
