@@ -8,6 +8,9 @@ import io
 import os
 from pathlib import Path
 import threading
+from copy import deepcopy
+from datetime import datetime
+from unittest.mock import patch
 
 from PIL import Image
 from playwright.sync_api import sync_playwright, expect
@@ -38,6 +41,7 @@ def run():
             page.on('request', lambda request: requests.append((request.method, request.url)))
             page.goto(origin + '/app')
             page.wait_for_function('window.__ready === true')
+            expect(page.locator('#jsError')).not_to_be_visible()
             page.locator('#sideNav [data-route="ai"]').click()
             expect(page.locator('#viewAI')).to_be_visible()
             expect(page.locator('#viewBankroll')).not_to_be_visible()
@@ -95,6 +99,8 @@ def run():
                 expect(page.locator('#aiCaptureStatus')).to_contain_text(message)
                 expect(page.locator('#aiPreviewArea')).not_to_be_visible()
 
+            expect(page.locator('#jsError')).not_to_be_visible()
+
             # Recoverable API failures, unexpected responses and session expiry.
             api_url = '**/api/ai/analyze'
             page.route(api_url, lambda route: route.abort())
@@ -145,13 +151,63 @@ def run():
                 page.locator(nav + ' [data-route="analysis"]').click()
                 expect(page.locator('#analysisSection')).to_be_visible()
                 page.locator(nav + ' [data-route="ai"]').click()
+            # Exercise the actual Flask adapter with synthetic provider responses.
+            from test_sports_data import GAME, FakeResponse
+            today = datetime.now(fixture.module.FR_TZ).date().isoformat()
+            game = deepcopy(GAME)
+            game['startTime'] = today + 'T20:00:00+01:00'
+            other = {**game, 'id': 1002}
+            def provider_response(url, **kwargs):
+                if 'games/allscores' in url:
+                    return FakeResponse({'games': [game, other]})
+                if kwargs['params']['games'] == 1002:
+                    return FakeResponse({'games': [other], 'statistics': []})
+                return FakeResponse({'games': [game], 'statistics': [
+                    {'id': 3, 'name': 'Shots', 'competitorId': 10, 'value': '0'},
+                    {'id': 3, 'name': 'Shots', 'competitorId': 20, 'value': '8'},
+                    {'id': 8, 'name': 'Corners', 'competitorId': 20, 'value': '2'},
+                    {'id': 9, 'name': '<img src=x>', 'competitorId': 10, 'value': '<script>test</script>'},
+                ]})
+            with patch('sports_data.requests.get', side_effect=provider_response) as get:
+                page.locator('#liveDate').fill(today)
+                page.locator('#liveQuery').fill('Paris')
+                page.locator('#liveSearch').click()
+                expect(page.locator('#liveMatches button')).to_have_count(2)
+                page.locator('#liveMatches button').first.click()
+                expect(page.locator('#liveReport')).to_be_visible()
+                expect(page.locator('#liveScore')).to_have_text('0 — 2')
+                expect(page.locator('#liveStatsBody')).to_contain_text('Indisponible')
+                expect(page.locator('#liveStatsBody img')).to_have_count(0)
+                expect(page.locator('#liveStatsBody script')).to_have_count(0)
+                expect(page.locator('#liveDetailFreshness')).to_contain_text('365Scores')
+                for width in (320, 390, 768, 1440):
+                    page.set_viewport_size({'width': width, 'height': 900})
+                    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Live view overflow at {width}'
+                    if screenshots and width in (390, 1440):
+                        suffix = 'mobile' if width == 390 else 'desktop'
+                        page.locator('.ai-live').screenshot(path=str(Path(screenshots) / f'365scores-test-{suffix}.png'), animations='disabled')
+                page.locator('#liveMatches button').nth(1).click()
+                expect(page.locator('#liveNoStats')).to_be_visible()
+                expect(page.locator('#liveStatsWrap')).not_to_be_visible()
+                page.locator('#liveQuery').fill('No such test team')
+                expect(page.locator('#liveReport')).not_to_be_visible()
+                expect(page.locator('#liveMatches button')).to_have_count(0)
+                page.locator('#liveSearch').click()
+                expect(page.locator('#liveStatus')).to_contain_text('Aucune rencontre')
+                self_count = get.call_count
+                assert self_count == 3, f'Expected cached search; got {self_count} provider calls'
+            page.route('**/api/ai/matches?*', lambda route: route.fulfill(status=503, content_type='application/json', body='{"error":"Source indisponible"}'))
+            page.locator('#liveSearch').click()
+            expect(page.locator('#liveError')).to_have_text('Source indisponible')
+            expect(page.locator('#liveSearch')).to_be_enabled()
+            page.unroute('**/api/ai/matches?*')
             context.clear_cookies()
-            page.locator('#aiSubmit').click()
+            page.locator('#liveSearch').click()
             page.wait_for_url(origin + '/login')
             page.wait_for_load_state('networkidle')
             assert not errors, errors
             browser.close()
-            print('Browser checks passed: desktop/mobile, navigation, validation, safe text, local images, API errors, session expiry.')
+            print('Browser checks passed: demo regression, sports search/detail, missing statistics, shared cache, safe text, responsive layouts, provider errors and session expiry.')
     finally:
         server.shutdown()
         thread.join()

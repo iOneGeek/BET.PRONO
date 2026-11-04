@@ -22,6 +22,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from google.auth.transport.requests import Request
 from google.oauth2.id_token import verify_oauth2_token
+from sports_data import Scores365Client, SportsDataError
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "instance", "bankroll.db")
@@ -67,6 +68,8 @@ else:
 
 app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = 256 * 1024
+app.config['SPORTS_DATA_ENABLED'] = os.getenv('SPORTS_DATA_ENABLED', '1') == '1'
+sports_client = Scores365Client()
 
 
 # ---------------------------------------------------------------------------
@@ -826,6 +829,45 @@ def me():
         "initial_bankroll": g.user["initial_bankroll"],
         "is_admin": bool(g.user["is_admin"]),
     })
+
+
+def sports_response(callback):
+    if not app.config['SPORTS_DATA_ENABLED']:
+        return jsonify({'error': 'La consultation 365Scores est désactivée.'}), 503
+    try:
+        sports_client.allow_user(g.user['id'])
+        response = jsonify(callback())
+    except SportsDataError as error:
+        response = jsonify({'error': str(error)})
+        response.status_code = error.status
+        if error.status == 429:
+            response.headers['Retry-After'] = '60'
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@app.get('/api/ai/matches')
+@login_required
+def sports_matches():
+    date_text = request.args.get('date', '')
+    query = request.args.get('q', '').strip()
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', date_text) or len(query) > 80:
+        return jsonify({'error': 'Choisis une date valide et une recherche de 80 caractères maximum.'}), 400
+    try:
+        day = datetime.strptime(date_text, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'error': 'Date invalide.'}), 400
+    if abs((day - datetime.now(FR_TZ).date()).days) > 30:
+        return jsonify({'error': 'Choisis une date dans les 30 jours précédents ou suivants.'}), 400
+    return sports_response(lambda: sports_client.matches(day, query))
+
+
+@app.get('/api/ai/matches/<int:game_id>')
+@login_required
+def sports_match(game_id):
+    if not 0 < game_id < 10**12:
+        return jsonify({'error': 'Identifiant de rencontre invalide.'}), 400
+    return sports_response(lambda: sports_client.match(game_id))
 
 
 @app.post("/api/ai/analyze")

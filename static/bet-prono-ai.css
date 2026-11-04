@@ -27,6 +27,16 @@
 .ai-checks dt{font-weight:700;margin-bottom:6px}
 .ai-checks dd{margin:0;color:var(--mute);font-size:.88rem}
 .ai-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.ai-live-matches{display:grid;gap:10px;margin-top:16px}
+.ai-live-matches button{text-align:left;white-space:normal;min-height:58px;padding:14px;overflow-wrap:anywhere}
+.ai-live-matches button span{display:block;margin-top:5px;color:var(--mute);font-size:.82rem}
+.ai-live-matches button[aria-pressed=true]{border-color:var(--accent);background:#23344a}
+.ai-live-report{margin-top:24px;border-top:1px solid var(--line);padding-top:20px;scroll-margin-top:20px}
+.ai-live-report h3{overflow-wrap:anywhere}
+#liveStats{min-width:0;width:100%;table-layout:fixed}
+#liveStats th,#liveStats td{white-space:normal;overflow-wrap:anywhere;font-size:.8rem;padding:10px 7px}
+#liveStats caption{padding:12px;color:var(--mute);text-align:left;font-size:.85rem}
+#liveStats td{text-align:center}
 @media(max-width:880px){.mobile-nav{grid-template-columns:repeat(6,minmax(0,1fr))}.mobile-nav button{min-height:48px}.ai-layout{grid-template-columns:1fr;gap:16px}}
 @media(max-width:540px){.ai-checks{grid-template-columns:1fr}.ai-notice{padding:12px}.ai-hero{padding:20px}}
 @media(prefers-reduced-motion:reduce){#viewAI{animation:none}}

@@ -359,7 +359,7 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
 @media (max-width:560px){.topbar{gap:10px}.topbar .brand:before{font-size:.62rem}.topbar .brand:after{font-size:1.03rem}.topbar .brand .sub{display:none}#goProfile,#logout{padding:8px 9px;font-size:.75rem}.stats,.secondary-stats,.analytics-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.card{min-height:118px;padding:12px}.card b{font-size:1.22rem}.metric-head{font-size:.67rem}.metric-icon{width:27px;height:27px}.secondary-stat{padding:10px}.secondary-stat b{font-size:.88rem}.chart{padding:14px 8px 7px}.chart-head{align-items:flex-start}.chart-title h2{font-size:.9rem}.chart-value b{font-size:.92rem}.chart svg{min-height:205px}.per button{padding:7px 9px;font-size:.72rem}.result-content{gap:13px}.result-donut{flex-basis:115px;width:115px;height:115px}.result-donut:after{inset:21px}.results-legend div{font-size:.72rem}.sport-overview-row{grid-template-columns:80px 1fr;gap:8px}.sport-overview-profit{grid-column:2}.analytics-periods button{padding:7px 9px;font-size:.7rem}.panel{padding:14px}.form{grid-template-columns:1fr}.side-menu{display:none}}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 </style>
-<link rel="stylesheet" href="/static/bet-prono-ai.css?v=1">
+<link rel="stylesheet" href="/static/bet-prono-ai.css?v=2">
 </head>
 <body>
 <canvas id="bgfx" aria-hidden="true"></canvas>
@@ -557,13 +557,40 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
   <section class="panel ai-hero">
     <span class="ai-eyebrow">LE LABO BET.PRONO <span class="ai-badge">BÊTA</span></span>
     <h1 id="aiTitle">BET PRONO <span>AI</span></h1>
-    <p>Prépare ta prochaine analyse de match.</p>
-    <p class="sub">Choisis un sport et saisis les deux adversaires pour explorer le rapport de démonstration.</p>
-    <div class="ai-notice"><strong>Mode démonstration</strong> · Aucune IA ni donnée sportive connectée. Aucune statistique, probabilité ou prédiction réelle n’est générée.</div>
+    <p>Les données du match, avant l’analyse.</p>
+    <p class="sub">Retrouve une rencontre de football et consulte les données disponibles chez 365Scores.</p>
+    <div class="ai-notice"><strong>Données sportives · Connexion expérimentale</strong> · Les scores et statistiques proviennent de 365Scores et peuvent être différés. L’analyse IA reste en démonstration : aucune prédiction n’est générée.</div>
+  </section>
+  <section class="panel ai-live" aria-labelledby="liveTitle">
+    <span class="ai-eyebrow">365SCORES · FOOTBALL</span>
+    <h2 id="liveTitle">Trouver un vrai match</h2>
+    <p class="sub" id="liveHelp">Choisis une date, puis filtre par équipe ou compétition. Horaires de Paris, dans une fenêtre de 30 jours avant ou après aujourd’hui. Les autres sports restent disponibles en démonstration ci-dessous.</p>
+    <form id="liveForm" class="ai-form">
+      <fieldset id="liveFields">
+        <legend class="ai-sr-only">Recherche de rencontres de football</legend>
+        <label for="liveDate">Date du match</label><input id="liveDate" type="date" required aria-describedby="liveHelp">
+        <label for="liveQuery">Équipe ou compétition (facultatif)</label><input id="liveQuery" type="search" maxlength="80" placeholder="Ex. Paris, Marseille ou Champions League" autocomplete="off">
+        <button id="liveSearch" class="primary" type="submit">Chercher les matchs</button>
+      </fieldset>
+    </form>
+    <p id="liveStatus" class="sub" role="status" aria-live="polite">Aucune donnée chargée. Lance une recherche pour consulter 365Scores.</p>
+    <p id="liveError" class="ai-error" role="alert" hidden></p>
+    <p id="liveFreshness" class="sub" hidden></p>
+    <div id="liveMatches" class="ai-live-matches" aria-label="Rencontres trouvées"></div>
+    <section id="liveReport" class="ai-live-report" tabindex="-1" aria-labelledby="liveReportTitle" hidden>
+      <h3 id="liveReportTitle"></h3>
+      <p id="liveMatchMeta" class="sub"></p>
+      <p id="liveScore" class="ai-match"></p>
+      <p id="liveDetailFreshness" class="sub"></p>
+      <div class="wrap" id="liveStatsWrap" hidden><table id="liveStats"><caption>Statistiques du match fournies par 365Scores</caption><thead><tr><th scope="col">Statistique</th><th id="liveHomeTitle" scope="col"></th><th id="liveAwayTitle" scope="col"></th></tr></thead><tbody id="liveStatsBody"></tbody></table></div>
+      <p id="liveNoStats" class="sub" hidden>Aucune statistique disponible pour cette rencontre. C’est notamment possible avant le coup d’envoi.</p>
+      <p class="sub">Source : <a href="https://www.365scores.com/" target="_blank" rel="noopener noreferrer">365Scores</a>. Les intitulés sont affichés dans la langue fournie par la source. L’heure de récupération ne garantit pas l’actualité du score.</p>
+      <p class="ai-notice">Données observées, sans analyse IA, probabilité ou conseil de mise. Ce service expérimental peut être indisponible.</p>
+    </section>
   </section>
   <div class="ai-layout">
     <section class="panel" aria-labelledby="aiFormTitle">
-      <h2 id="aiFormTitle">Ta rencontre</h2>
+      <h2 id="aiFormTitle">Ta rencontre · Démonstration</h2>
       <p class="sub">Saisie manuelle uniquement. Les noms ne sont pas vérifiés dans un calendrier sportif.</p>
       <form id="aiForm" class="ai-form">
         <fieldset id="aiFields">
@@ -678,7 +705,11 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
     el.hidden=false;
     var m=document.getElementById('jsErrMsg'); if(m) m.textContent=' '+(msg||'Erreur inconnue');
   }
-  window.addEventListener('error',function(e){ show(e.message||''); },true);
+  window.addEventListener('error',function(e){
+    // Off-DOM image decoding is validated locally by the screenshot picker.
+    if(e.target instanceof HTMLImageElement && !e.target.isConnected) return;
+    show(e.message||'');
+  },true);
   document.getElementById('jsErrorFix').addEventListener('click',function(){
     if(navigator.serviceWorker){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});}).catch(function(){});}
     if(window.caches&&caches.keys){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});}).catch(function(){});}
@@ -689,5 +720,6 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 <canvas id="canvas"></canvas>
     <script src="/static/app.js?v=2.3.1-ai-beta"></script>
     <script src="/static/bet-prono-ai.js?v=1"></script>
+    <script src="/static/sports-data.js?v=1"></script>
 </body>
 </html>

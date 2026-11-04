@@ -3,6 +3,7 @@ import importlib.util
 import os
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -13,6 +14,8 @@ class AIBetaTests(unittest.TestCase):
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
         root = Path(__file__).resolve().parents[1]
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
         isolated_app = Path(cls.temp.name) / 'app.py'
         shutil.copyfile(root / 'app.py', isolated_app)
         # app.py initializes its database on import. Copying it isolates BASE_DIR,
@@ -123,6 +126,45 @@ class AIBetaTests(unittest.TestCase):
         for path in ['/static/bet-prono-ai.js', '/static/bet-prono-ai.css', '/static/app.js', '/api/picks']:
             with self.client.get(path) as response:
                 self.assertEqual(response.status_code, 200)
+
+    def test_sports_routes_auth_validation_and_disabled_mode(self):
+        from datetime import datetime
+        today = datetime.now(self.module.FR_TZ).date().isoformat()
+        with patch.object(self.module, 'sports_client') as provider:
+            provider.matches.return_value = {'mode': 'sports_data', 'matches': []}
+            provider.match.return_value = {'mode': 'sports_data', 'prediction': None}
+            anonymous = self.app.test_client()
+            self.assertEqual(anonymous.get('/api/ai/matches?date=' + today).status_code, 401)
+            self.assertEqual(anonymous.get('/api/ai/matches/1001').status_code, 401)
+            provider.allow_user.assert_not_called()
+            for query in ['date=invalid', 'date=2026-02-31', 'date=2000-01-01', 'date=' + today + '&q=' + 'x' * 81]:
+                self.assertEqual(self.client.get('/api/ai/matches?' + query).status_code, 400)
+            provider.matches.assert_not_called()
+            response = self.client.get('/api/ai/matches', query_string={'date': today, 'q': 'Paris'})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers['Cache-Control'], 'no-store')
+            self.assertEqual(provider.matches.call_args.args[1], 'Paris')
+            self.assertEqual(self.client.get('/api/ai/matches/1001').status_code, 200)
+            provider.match.assert_called_once_with(1001)
+            self.assertEqual(self.client.get('/api/ai/matches/0').status_code, 400)
+            self.assertEqual(self.client.get('/api/ai/matches/1000000000000').status_code, 400)
+            with patch.dict(self.app.config, {'SPORTS_DATA_ENABLED': False}):
+                self.assertEqual(self.client.get('/api/ai/matches/1001').status_code, 503)
+            with self.app.app_context():
+                db = self.module.get_db()
+                db.execute('UPDATE users SET banned = 1')
+                db.commit()
+            self.assertEqual(self.client.get('/api/ai/matches/1001').status_code, 403)
+
+    def test_sports_route_provider_errors_and_no_bet_changes(self):
+        before = self.client.get('/api/bets').get_json()
+        with patch.object(self.module, 'sports_client') as provider:
+            provider.match.side_effect = self.module.SportsDataError('Quota atteint', 429)
+            response = self.client.get('/api/ai/matches/1001')
+            self.assertEqual(response.status_code, 429)
+            self.assertEqual(response.headers['Retry-After'], '60')
+            self.assertEqual(response.get_json()['error'], 'Quota atteint')
+        self.assertEqual(self.client.get('/api/bets').get_json(), before)
 
 
 if __name__ == '__main__':
