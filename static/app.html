@@ -447,13 +447,14 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
 
 <div id="viewBankroll" class="view">
 <section class="stats" id="stats" aria-label="Indicateurs principaux"></section>
+<details class="panel"><summary>Détail du solde disponible</summary><p id="bankrollBreakdown" class="sub"></p><p class="sub">Pour comparer avec ton bookmaker, vérifie les mises en cours, les résultats, les bonus effectivement crédités et les retraits. La courbe est reconstituée avec le statut actuel de chaque pari à sa date de saisie.</p></details>
 <section class="chart dashboard-chart" id="dashboardTop">
   <div class="chart-head">
     <div class="chart-title"><span class="chart-icon" aria-hidden="true">⌁</span><div><h2>Évolution de la bankroll</h2><p class="sub" id="chartPeriodLabel">Capital réel sur la période sélectionnée</p></div></div>
-    <div class="chart-value"><b id="chartBankrollValue">—</b><span>Bankroll actuelle</span></div>
+    <div class="chart-value"><b id="chartBankrollValue">—</b><span>Solde disponible</span></div>
   </div>
   <svg id="svg" viewBox="0 0 640 300" role="img" aria-label="Évolution de la bankroll"></svg>
-  <div class="dashboard-toolbar"><div class="per" id="per" aria-label="Période du graphique"><button data-p="week">7 jours</button><button data-p="month" aria-pressed="true">30 jours</button><button data-p="quarter">90 jours</button><button data-p="all">Tout</button></div><span class="sub">Les retraits et résultats sont inclus.</span></div>
+  <div class="dashboard-toolbar"><div class="per" id="per" aria-label="Période du graphique"><button data-p="week">7 jours</button><button data-p="month" aria-pressed="true">30 jours</button><button data-p="quarter">90 jours</button><button data-p="all">Tout</button></div><span class="sub">Solde antérieur repris ; retraits et mises en cours déduits.</span></div>
 </section>
 <section class="secondary-stats" id="secondaryStats" aria-label="Indicateurs complémentaires"></section>
 <section class="dashboard-insights" aria-label="Synthèse des résultats">
@@ -549,6 +550,13 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
   </div>
   <div class="row"><button id="ex" type="button">Exporter mes données</button><button id="im" type="button">Importer</button><button id="rs" type="button">Effacer tous mes paris</button></div>
   <p class="sub" id="msg"></p><textarea id="out" hidden aria-label="Données"></textarea>
+  <details><summary>Rapprocher un historique vérifié</summary>
+    <p class="sub">Charge un fichier de corrections pour examiner chaque changement. Les paris existants sont conservés. Une sauvegarde est à télécharger avant l’application.</p>
+    <label>Fichier de corrections JSON<input id="reconcileFile" type="file" accept=".json,application/json"></label>
+    <p id="reconcileStatus" role="status" aria-live="polite"></p>
+    <div id="reconcilePreview" style="max-height:320px;overflow:auto;overflow-wrap:anywhere"></div>
+    <div class="row"><button id="reconcileBackup" type="button" hidden>Télécharger la sauvegarde</button><button id="reconcileApply" type="button" class="primary" hidden disabled>Appliquer les corrections vérifiées</button></div>
+  </details>
 </section>
 <section class="panel"><h2>Poker <button type="button" class="info-btn" data-help="poker" aria-label="En savoir plus">?</button></h2><p class="sub" id="help-poker" hidden>Note ton buy-in et ce que tu sors de la table : la différence (+ ou −) met ta bankroll à jour automatiquement.</p><form id="pokerForm" class="form"><label>Buy-in (€)<input id="pkBuy" type="number" min="0" step="0.01" placeholder="10" inputmode="decimal"></label><label>Sorti avec (€)<input id="pkOut" type="number" min="0" step="0.01" placeholder="46" inputmode="decimal"></label><button class="primary" type="submit" id="pkBtn">Valider</button></form></section>
 </div>
@@ -661,6 +669,7 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
     <label>Sport<select id="ebSport"><option value="Foot">⚽ Foot</option><option value="Mixte">🎯 Mixte</option><option value="Tennis">🎾 Tennis</option><option value="NBA">🏀 NBA</option><option value="F1">🏎️ F1</option><option value="MMA">🥊 MMA</option><option value="MLB">⚾ MLB</option><option value="NFL">🏈 NFL</option><option value="NHL">🏒 NHL</option></select></label>
     <label>Type de pari<select id="ebType"><option>Simple</option><option>Combiné</option><option>Combiné FUN</option><option>Combiné x4</option><option>Combiné x5</option></select></label>
     <label>Mise (€)<input type="number" id="ebStake" min="0.1" step="0.5"></label>
+    <label>Montant réellement crédité (€)<input type="number" id="ebPayout" min="0" step="0.01" placeholder="Facultatif"></label><p class="sub">Total reversé par le bookmaker, mise et bonus compris. Vide : calcul depuis la cote. Zéro est un montant valide.</p>
     <label>Cote<input type="number" id="ebOdds" min="1" step="0.01"></label>
     <label>Résultat<select id="ebResult"><option value="won">Gagné</option><option value="lost">Perdu</option><option value="void">Remboursé</option><option value="pending">En cours</option><option value="wd">Annulé</option></select></label>
     <div class="eb-actions">
@@ -687,7 +696,8 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=2.3.1-ai-beta"></script>
+    <script src="/static/app.js?v=2.3.3-payout"></script>
+    <script src="/static/bankroll-reconcile.js?v=1"></script>
     <script src="/static/bet-prono-ai.js?v=1"></script>
 </body>
 </html>

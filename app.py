@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import os
 import re
 import sqlite3
@@ -156,6 +157,9 @@ class Conn:
     def commit(self):
         self._c.commit()
 
+    def rollback(self):
+        self._c.rollback()
+
     def close(self):
         self._c.close()
 
@@ -272,6 +276,7 @@ def init_pg_db():
             CREATE INDEX IF NOT EXISTS idx_widget_pairings_user ON widget_pairings(user_id);
         """)
         # Migrations : colonnes ajoutées sur des tables existantes
+        _run_ddl(conn, "ALTER TABLE bets ADD COLUMN IF NOT EXISTS payout DOUBLE PRECISION")
         _run_ddl(conn, "ALTER TABLE picks ADD COLUMN IF NOT EXISTS sport TEXT")
         _run_ddl(conn, "ALTER TABLE picks ADD COLUMN IF NOT EXISTS advice_profile TEXT DEFAULT 'prudent'")
         _run_ddl(conn, "UPDATE picks SET advice_profile = 'prudent' WHERE advice_profile IS NULL")
@@ -358,6 +363,9 @@ def init_sqlite_db():
         """
     )
     # Migration for databases created before the is_admin column existed.
+    bet_cols = [r[1] for r in db.execute("PRAGMA table_info(bets)").fetchall()]
+    if "payout" not in bet_cols:
+        db.execute("ALTER TABLE bets ADD COLUMN payout REAL")
     cols = [r[1] for r in db.execute("PRAGMA table_info(users)").fetchall()]
     if "is_admin" not in cols:
         db.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
@@ -948,6 +956,7 @@ def serialize_bet(row):
         "o": row["odds"],
         "r": row["result"],
         "b": row["bonus"],
+        "p": row["payout"],
     }
 
 
@@ -965,6 +974,10 @@ def list_bets():
 
 
 def validate_bet_payload(data):
+    if not isinstance(data, dict):
+        return None, "Données de pari invalides."
+    if any(not isinstance(data.get(k, ""), str) for k in ("d", "sp", "ty", "r")):
+        return None, "Champs texte invalides."
     date = (data.get("d") or "").strip()
     sport = (data.get("sp") or "").strip()[:20]
     btype = (data.get("ty") or "").strip()[:20]
@@ -973,15 +986,20 @@ def validate_bet_payload(data):
         stake = float(data.get("s"))
         odds = float(data.get("o") or 0)
         bonus = float(data.get("b") or 0)
+        payout = None if data.get("p") is None else float(data["p"])
     except (TypeError, ValueError):
         return None, "Valeurs numériques invalides."
-    if not date or result not in RESULTS or stake <= 0 or odds < 0 or bonus < 0:
+    if (not date or result not in RESULTS or stake <= 0 or odds < 0 or bonus < 0
+            or not all(math.isfinite(v) for v in (stake, odds, bonus))
+            or payout is not None and (not math.isfinite(payout) or payout < 0)):
         return None, "Données de pari invalides."
+    if payout is not None and result not in {"won", "lost", "void"}:
+        return None, "Un montant crédité nécessite un pari réglé."
     if result != "wd" and not sport:
         sport = "-"
     return {
         "date": date, "sport": sport or "-", "type": btype or "-",
-        "stake": stake, "odds": odds, "result": result, "bonus": bonus,
+        "stake": stake, "odds": odds, "result": result, "bonus": bonus, "payout": payout,
     }, None
 
 
@@ -995,9 +1013,9 @@ def create_bet():
     db = get_db()
     now = datetime.now(timezone.utc).isoformat()
     cur = db.execute(
-        "INSERT INTO bets (user_id, date, sport, type, stake, odds, result, bonus, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (g.user["id"], bet["date"], bet["sport"], bet["type"], bet["stake"], bet["odds"], bet["result"], bet["bonus"], now),
+        "INSERT INTO bets (user_id, date, sport, type, stake, odds, result, bonus, payout, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (g.user["id"], bet["date"], bet["sport"], bet["type"], bet["stake"], bet["odds"], bet["result"], bet["bonus"], bet["payout"], now),
     )
     db.commit()
     row = db.execute("SELECT * FROM bets WHERE id = ?", (cur.lastrowid,)).fetchone()
@@ -1008,13 +1026,24 @@ def create_bet():
 @login_required
 def update_bet(bet_id):
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "Données de pari invalides."}), 400
     db = get_db()
     row = db.execute("SELECT * FROM bets WHERE id = ? AND user_id = ?", (bet_id, g.user["id"])).fetchone()
     if not row:
         return jsonify({"error": "Pari introuvable."}), 404
+    # A new status invalidates the previous settlement amount unless supplied anew.
+    merged = {**serialize_bet(row), **data}
+    if "r" in data and data["r"] != row["result"] and "p" not in data:
+        merged["p"] = None
+    valid, err = validate_bet_payload(merged)
+    if err:
+        return jsonify({"error": err}), 400
     # On ne modifie que les champs fournis.
     updates = []
     vals = []
+    if "p" in data or "r" in data and data["r"] != row["result"]:
+        updates.append("payout = ?"); vals.append(valid["payout"])
     if "r" in data:
         result = data.get("r")
         if result not in RESULTS:
@@ -1081,12 +1110,111 @@ def import_bets():
     db.execute("DELETE FROM bets WHERE user_id = ?", (g.user["id"],))
     for bet in parsed:
         db.execute(
-            "INSERT INTO bets (user_id, date, sport, type, stake, odds, result, bonus, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (g.user["id"], bet["date"], bet["sport"], bet["type"], bet["stake"], bet["odds"], bet["result"], bet["bonus"], now),
+            "INSERT INTO bets (user_id, date, sport, type, stake, odds, result, bonus, payout, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (g.user["id"], bet["date"], bet["sport"], bet["type"], bet["stake"], bet["odds"], bet["result"], bet["bonus"], bet["payout"], now),
         )
     db.commit()
     return jsonify({"ok": True, "count": len(parsed)})
+
+
+def bet_cash(bet):
+    if bet["r"] in {"pending", "wd"}:
+        return -bet["s"]
+    if bet.get("p") is not None:
+        return bet["p"] - bet["s"]
+    if bet["r"] == "won":
+        return bet["s"] * (bet["o"] - 1) + bet["b"]
+    return -bet["s"] if bet["r"] == "lost" else 0
+
+
+@app.post("/api/bets/reconcile")
+@login_required
+def reconcile_bets():
+    """Preview/apply a guarded patch without deleting rows or changing IDs."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or data.get("version") != 1 or type(data.get("apply", False)) is not bool:
+        return jsonify({"error": "Fichier de rapprochement invalide."}), 400
+    before, updates, additions = (data.get(k) for k in ("before", "updates", "additions"))
+    if any(not isinstance(v, list) or len(v) > 2000 for v in (before, updates, additions)):
+        return jsonify({"error": "Listes de rapprochement invalides."}), 400
+    if not updates and not additions:
+        return jsonify({"error": "Aucune correction à appliquer."}), 400
+    fields = {"d": "date", "sp": "sport", "ty": "type", "s": "stake", "o": "odds", "r": "result", "b": "bonus", "p": "payout"}
+
+    def canonical(items):
+        result = {}
+        for item in items:
+            if not isinstance(item, dict) or type(item.get("id")) is not int or item["id"] in result:
+                raise ValueError("Identifiants invalides ou dupliqués.")
+            valid, error = validate_bet_payload(item)
+            if error:
+                raise ValueError(error)
+            result[item["id"]] = {"id": item["id"], **{k: valid[v] for k, v in fields.items()}}
+        return result
+
+    db = get_db()
+    try:
+        expected = canonical(before)
+        # Lock against concurrent inserts/settlements between comparison and writes.
+        db.execute("LOCK TABLE bets IN SHARE ROW EXCLUSIVE MODE" if USE_PG else "BEGIN IMMEDIATE")
+        initial = db.execute("SELECT initial_bankroll FROM users WHERE id = ?" + (" FOR UPDATE" if USE_PG else ""), (g.user["id"],)).fetchone()[0]
+        current = [serialize_bet(r) for r in db.execute("SELECT * FROM bets WHERE user_id = ? ORDER BY id", (g.user["id"],)).fetchall()]
+        baseline = canonical(current)
+        if expected != baseline or data.get("initial_bankroll") != initial:
+            db.rollback()
+            return jsonify({"error": "L’historique ou le capital initial a changé. Refais le rapprochement depuis un export récent."}), 409
+        changed, seen = [], set()
+        for patch in updates:
+            if (not isinstance(patch, dict) or type(patch.get("id")) is not int
+                    or patch["id"] in seen or patch["id"] not in baseline
+                    or set(patch) - {"id", "s", "p"} or len(patch) < 2):
+                raise ValueError("Correction invalide : seuls la mise et le montant crédité sont modifiables.")
+            seen.add(patch["id"])
+            old = baseline[patch["id"]]
+            valid, error = validate_bet_payload({**old, **patch})
+            if error:
+                raise ValueError(error)
+            if valid["stake"] != old["s"] and db.execute("SELECT id FROM pick_follows WHERE bet_id = ?", (patch["id"],)).fetchone():
+                raise ValueError("La mise d’un pronostic suivi doit être corrigée séparément.")
+            new = {"id": patch["id"], **{k: valid[v] for k, v in fields.items()}}
+            changed.append({"before": old, "after": new})
+        parsed = []
+        for item in additions:
+            if not isinstance(item, dict) or set(item) - set(fields):
+                raise ValueError("Nouvelle opération invalide.")
+            valid, error = validate_bet_payload(item)
+            if error:
+                raise ValueError(error)
+            parsed.append(valid)
+        after = dict(baseline)
+        for item in changed:
+            after[item["after"]["id"]] = item["after"]
+        new_items = [{k: v[col] for k, col in fields.items()} for v in parsed]
+        response = {
+            "updated": len(changed), "added": len(parsed), "changes": changed, "additions": new_items,
+            "balance_before": round(initial + sum(bet_cash(b) for b in current), 2),
+            "balance_after": round(initial + sum(bet_cash(b) for b in list(after.values()) + new_items), 2),
+            "backup": {"bets": current, "initial_bankroll": initial}, "applied": data.get("apply", False),
+        }
+        if data.get("apply", False):
+            for item in changed:
+                b = item["after"]
+                db.execute("UPDATE bets SET stake = ?, payout = ? WHERE id = ? AND user_id = ?", (b["s"], b["p"], b["id"], g.user["id"]))
+            now = datetime.now(timezone.utc).isoformat()
+            for b in parsed:
+                db.execute("INSERT INTO bets (user_id, date, sport, type, stake, odds, result, bonus, payout, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           (g.user["id"], b["date"], b["sport"], b["type"], b["stake"], b["odds"], b["result"], b["bonus"], b["payout"], now))
+            db.commit()
+        else:
+            db.rollback()
+        return jsonify(response)
+    except (ValueError, TypeError) as error:
+        db.rollback()
+        return jsonify({"error": str(error)}), 400
+    except Exception:
+        db.rollback()
+        raise
 
 
 @app.post("/api/bets/reset")
@@ -1270,11 +1398,11 @@ def update_pick(pick_id):
         ).fetchall()]
         if result in ("won", "lost", "void"):
             for bet_id in bet_ids:
-                db.execute("UPDATE bets SET result = ? WHERE id = ?", (result, bet_id))
+                db.execute("UPDATE bets SET payout = CASE WHEN result = ? THEN payout ELSE NULL END, result = ? WHERE id = ?", (result, result, bet_id))
         elif result == "pending" and bet_ids:
             # Retour en arrière : annule la résolution chez les suiveurs.
             for bet_id in bet_ids:
-                db.execute("UPDATE bets SET result = ? WHERE id = ?", ("pending", bet_id))
+                db.execute("UPDATE bets SET payout = NULL, result = ? WHERE id = ?", ("pending", bet_id))
     if "advice_profile" in data:
         adv = (data.get("advice_profile") or "prudent").strip().lower()
         if adv in ("fun", "prudent", "confiance", "maxi"):
@@ -1497,8 +1625,10 @@ def admin_users():
         COALESCE((
             SELECT SUM(
                 CASE
+                    WHEN b.payout IS NOT NULL AND b.result IN ('won', 'lost', 'void') THEN b.payout - b.stake
                     WHEN b.result = 'won'  THEN b.stake * (b.odds - 1) + COALESCE(b.bonus, 0)
                     WHEN b.result = 'lost'  THEN -b.stake
+                    WHEN b.result = 'pending' THEN -b.stake
                     WHEN b.result = 'wd'    THEN -b.stake
                     ELSE 0
                 END
@@ -1540,8 +1670,10 @@ def admin_user_detail(user_id):
     nbets = db.execute("SELECT COUNT(*) FROM bets WHERE user_id = ?", (user_id,)).fetchone()[0]
     net = db.execute(
         "SELECT COALESCE(SUM(CASE "
+        "WHEN payout IS NOT NULL AND result IN ('won', 'lost', 'void') THEN payout - stake "
         "WHEN result = 'won' THEN stake * (odds - 1) + COALESCE(bonus, 0) "
         "WHEN result = 'lost' THEN -stake "
+        "WHEN result = 'pending' THEN -stake "
         "WHEN result = 'wd' THEN -stake "
         "ELSE 0 END), 0) FROM bets WHERE user_id = ?",
         (user_id,),
