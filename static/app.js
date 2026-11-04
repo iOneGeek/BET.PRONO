@@ -48,19 +48,31 @@ let ANALYTICS_PERIOD='month';
 let QS='', QR='all';
 const cut=()=>{if(PER==='all')return'';const d=new Date();d.setDate(d.getDate()-({week:6,month:29,quarter:89})[PER]);return d.toISOString().slice(0,10)};
 const pl=b=>b.r==='won'?b.s*(b.o-1)+(b.b||0):b.r==='lost'?-b.s:0;
-const balanceDelta=b=>b.r==='wd'?-(Number(b.s)||0):pl(b);
+// Available cash: an unsettled stake is already held by the bookmaker.
+const balanceDelta=b=>b.r==='wd'||b.r==='pending'?-(Number(b.s)||0):pl(b);
 
-function chart(L){
-  let c=INIT;const pts=[c,...L.map(b=>c+=balanceDelta(b))];
+function bankrollPoints(all,start){
+  let balance=Number(INIT)+all.filter(b=>start&&b.d<start).reduce((sum,b)=>sum+balanceDelta(b),0);
+  const points=[{date:start||(all[0]&&all[0].d)||null,value:balance}];
+  all.filter(b=>!start||b.d>=start).forEach(b=>{
+    balance+=balanceDelta(b);
+    points.push({date:b.d,value:balance});
+  });
+  return points;
+}
+
+function chart(points){
+  const pts=points.map(point=>point.value);
   const lo=Math.min(...pts),hi=Math.max(...pts),rng=(hi-lo)||1;
   const st=[10,25,50,100,250,500,1000,2500,5000].find(s=>rng/s<=5)||10000;
-  const a=Math.floor(lo/st)*st,z=Math.ceil(hi/st)*st||st;
+  const a=Math.floor(lo/st)*st,z=Math.max(a+st,Math.ceil(hi/st)*st);
   const X=i=>56+(pts.length>1?i/(pts.length-1):0)*568,Y=v=>276-(v-a)/(z-a)*252;
   let g='';
   for(let v=a;v<=z;v+=st)g+=`<line x1="56" x2="624" y1="${Y(v)}" y2="${Y(v)}" class="gl${v===0?' z':''}"/><text x="48" y="${Y(v)+4}" text-anchor="end">${v.toLocaleString('fr-FR')} €</text>`;
   const d=pts.map((v,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join('');
   const area='M'+X(0).toFixed(1)+' 276 '+pts.map((v,i)=>'L'+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join(' ')+' L'+X(pts.length-1).toFixed(1)+' 276 Z';
   $('svg').innerHTML=`<defs><linearGradient id="chartArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ff7518" stop-opacity=".42"/><stop offset="1" stop-color="#ff7518" stop-opacity="0"/></linearGradient></defs>`+g+(pts.length>1?`<path d="${area}" class="area"/><path d="${d}" class="ln"/>`:`<text x="340" y="150" text-anchor="middle" class="hint">Ajoutez des paris réglés pour faire apparaître votre courbe</text>`);
+  $('svg').setAttribute('aria-label','Évolution du solde disponible de '+eur(pts[0])+' à '+eur(pts[pts.length-1]));
 }
 
 const grp=(L,k)=>{const m={};L.forEach(b=>(m[b[k]]=m[b[k]]||[]).push(b));
@@ -80,9 +92,6 @@ function analyticsProfit(bet){
   if(bet.r==='won')return stake*(odds-1)+bonus;
   if(bet.r==='lost')return-stake;
   return 0;
-}
-function analyticsBalanceDelta(bet){
-  return bet.r==='wd'?-(Number(bet.s)||0):analyticsProfit(bet);
 }
 function analyticsClass(value){return value>0?'g':value<0?'l':''}
 function analyticsEscape(value){
@@ -123,7 +132,6 @@ function renderAnalytics(){
   if(!metrics||!sports||!rangeLabel)return;
   const all=[...BETS].sort((left,right)=>left.d.localeCompare(right.d)||(left.id||0)-(right.id||0));
   const start=analyticsPeriodCut();
-  const before=start?all.filter(bet=>bet.d<start):[];
   const period=all.filter(bet=>(!start||bet.d>=start)&&bet.r!=='wd');
   const settled=period.filter(bet=>bet.r==='won'||bet.r==='lost'||bet.r==='void');
   const decisive=settled.filter(bet=>bet.r==='won'||bet.r==='lost');
@@ -140,14 +148,7 @@ function renderAnalytics(){
     ['Paris réglés',String(settled.length),'',pending?pending+' en attente':'Aucun en attente']
   ];
   metrics.innerHTML=cards.map(card=>'<article class="analytics-metric"><span>'+card[0]+'</span><b class="'+analyticsClass(card[2])+'">'+card[1]+'</b><small>'+card[3]+'</small></article>').join('');
-  const startBalance=INIT+before.reduce((sum,bet)=>sum+analyticsBalanceDelta(bet),0);
-  let balance=startBalance;
-  const points=[{date:start||((all[0]&&all[0].d)||null),value:balance}];
-  all.filter(bet=>(!start||bet.d>=start)&&(bet.r==='won'||bet.r==='lost'||bet.r==='void'||bet.r==='wd')).forEach(bet=>{
-    balance+=analyticsBalanceDelta(bet);
-    points.push({date:bet.d,value:balance});
-  });
-  renderAnalyticsChart(points);
+  renderAnalyticsChart(bankrollPoints(all,start));
   const grouped={};
   settled.forEach(bet=>{
     const sport=bet.sp||'Autre';
@@ -219,7 +220,10 @@ function render(){
   const all=[...BETS].sort((a,b)=>a.d.localeCompare(b.d)||a.id-b.id);
   const c0=cut(),bets=all.filter(b=>(!c0||b.d>=c0)&&b.r!=='wd'),done=bets.filter(b=>b.r==='won'||b.r==='lost');
   const profit=bets.reduce((a,b)=>a+pl(b),0),staked=done.reduce((a,b)=>a+b.s,0);
-  const wd=all.filter(b=>b.r==='wd').reduce((a,b)=>a+b.s,0),bk=INIT+all.reduce((a,b)=>a+pl(b),0)-wd,wins=done.filter(b=>b.r==='won').length;
+  const wd=all.filter(b=>b.r==='wd').reduce((a,b)=>a+b.s,0);
+  const pendingStake=all.filter(b=>b.r==='pending').reduce((a,b)=>a+b.s,0);
+  const totalProfit=all.reduce((a,b)=>a+pl(b),0);
+  const bk=Number(INIT)+all.reduce((a,b)=>a+balanceDelta(b),0),wins=done.filter(b=>b.r==='won').length;
   const maxOdds=Math.max(0,...bets.filter(b=>b.r==='won').map(b=>+b.o||0));
   const maxGain=bets.length?Math.max(...bets.map(b=>pl(b))):0;
   const recOddsBet=bets.filter(b=>b.r==='won').reduce((a,b)=>(+b.o||0)>((a&&+a.o)||0)?b:a,null);
@@ -229,11 +233,12 @@ function render(){
   const rate=done.length?wins/done.length*100:null;
   const periodLabel={week:'7 derniers jours',month:'30 derniers jours',quarter:'90 derniers jours',all:"tout l'historique"}[PER];
   $('stats').innerHTML=[
-    dashboardMetric('Bankroll actuelle',eur(bk),bk-INIT,`Initiale : ${eur(INIT)}`,'◉','bankroll'),
+    dashboardMetric('Solde disponible',eur(bk),bk-INIT,`Mises en cours déduites : ${eur(pendingStake)}`,'◉','bankroll'),
     dashboardMetric('Bénéfice net',eur(profit),profit,`Sur ${periodLabel}`,'▥','profit'),
     dashboardMetric('ROI',staked?pct(profit/staked*100):'—',profit,'Bénéfice net / mises','%','roi'),
     dashboardMetric('Taux de réussite',rate==null?'—':pct(rate),rate==null?0:rate-50,done.length?`${wins} gagnés / ${done.length}`:'Aucun pari décisif','◎','rate')
   ].join('');
+  $('bankrollBreakdown').textContent=`Initiale ${eur(INIT)} + résultat net total (${eur(totalProfit)}) − retraits ${eur(wd)} − mises en cours ${eur(pendingStake)} = disponible ${eur(bk)}. Calcul sur tout l’historique enregistré, indépendamment de la période du graphique.`;
   const secondary=[['◫','Paris réglés',String(bets.filter(b=>b.r==='won'||b.r==='lost'||b.r==='void').length)],['◈','Mises totales',eur(staked)],['⌁','Cote moyenne',avgOdds?('× '+avgOdds.toLocaleString('fr-FR',{maximumFractionDigits:2})):'—'],['★','Record gain',maxGain>0?eur(maxGain):'—']];
   const secondaryEl=document.getElementById('secondaryStats');
   if(secondaryEl)secondaryEl.innerHTML=secondary.map(item=>`<article class="secondary-stat"><i aria-hidden="true">${item[0]}</i><div><span>${item[1]}</span><b>${item[2]}</b></div></article>`).join('');
@@ -241,9 +246,9 @@ function render(){
   $('bs').innerHTML=grp(done,'sp');$('bt').innerHTML=grp(done,'ty');
   $('plan').innerHTML=[['FUN',1],['Prudente',5],['Confiance',7],['Maximum',10]].map(p=>`<div><span>${p[0]} (${p[1]} %)</span><b>${eur(bk*p[1]/100)}</b></div>`).join('');
   [...$('per').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.p===PER));
-  chart(all.filter(b=>(!c0||b.d>=c0)&&b.r!=='pending'));
+  chart(bankrollPoints(all,c0));
   const chartValue=document.getElementById('chartBankrollValue');if(chartValue)chartValue.textContent=eur(bk);
-  const chartLabel=document.getElementById('chartPeriodLabel');if(chartLabel)chartLabel.textContent='Capital réel — '+periodLabel+'.';
+  const chartLabel=document.getElementById('chartPeriodLabel');if(chartLabel)chartLabel.textContent='Solde disponible reconstitué — '+periodLabel+'.';
   renderDashboardInsights(bets,bets.filter(b=>b.r==='won'||b.r==='lost'||b.r==='void'));
   renderAnalytics();
   const q=(QS||'').trim().toLowerCase(), qr=(QR)||'all';
@@ -906,7 +911,7 @@ async function handlePicksClick(ev){
       await api('/api/picks/'+follow+'/follow',{method:'POST',body:JSON.stringify({stake,sport,type})});
       await loadPicks();await loadBets();
     }else if(unfollow){
-      if(!confirm('Annuler ce pari ? Sa mise sera retirée de ta bankroll.'))return;
+      if(!confirm('Annuler ce suivi ? Sa mise ne sera plus déduite du solde disponible. Cela n’annule pas le pari chez le bookmaker.'))return;
       await api('/api/picks/'+unfollow+'/follow',{method:'DELETE'});
       await loadPicks();await loadBets();
     }else if(toggleEl||ev.target.closest('.pick-details')){

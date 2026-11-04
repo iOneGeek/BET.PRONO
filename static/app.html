@@ -447,13 +447,14 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
 
 <div id="viewBankroll" class="view">
 <section class="stats" id="stats" aria-label="Indicateurs principaux"></section>
+<details class="panel"><summary>Détail du solde disponible</summary><p id="bankrollBreakdown" class="sub"></p><p class="sub">Pour comparer avec ton bookmaker, vérifie les mises en cours, les résultats, les bonus effectivement crédités et les retraits. La courbe est reconstituée avec le statut actuel de chaque pari à sa date de saisie.</p></details>
 <section class="chart dashboard-chart" id="dashboardTop">
   <div class="chart-head">
     <div class="chart-title"><span class="chart-icon" aria-hidden="true">⌁</span><div><h2>Évolution de la bankroll</h2><p class="sub" id="chartPeriodLabel">Capital réel sur la période sélectionnée</p></div></div>
-    <div class="chart-value"><b id="chartBankrollValue">—</b><span>Bankroll actuelle</span></div>
+    <div class="chart-value"><b id="chartBankrollValue">—</b><span>Solde disponible</span></div>
   </div>
   <svg id="svg" viewBox="0 0 640 300" role="img" aria-label="Évolution de la bankroll"></svg>
-  <div class="dashboard-toolbar"><div class="per" id="per" aria-label="Période du graphique"><button data-p="week">7 jours</button><button data-p="month" aria-pressed="true">30 jours</button><button data-p="quarter">90 jours</button><button data-p="all">Tout</button></div><span class="sub">Les retraits et résultats sont inclus.</span></div>
+  <div class="dashboard-toolbar"><div class="per" id="per" aria-label="Période du graphique"><button data-p="week">7 jours</button><button data-p="month" aria-pressed="true">30 jours</button><button data-p="quarter">90 jours</button><button data-p="all">Tout</button></div><span class="sub">Solde antérieur repris ; retraits et mises en cours déduits.</span></div>
 </section>
 <section class="secondary-stats" id="secondaryStats" aria-label="Indicateurs complémentaires"></section>
 <section class="dashboard-insights" aria-label="Synthèse des résultats">
@@ -687,7 +688,7 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=2.3.1-ai-beta"></script>
+    <script src="/static/app.js?v=2.3.2-bankroll"></script>
     <script src="/static/bet-prono-ai.js?v=1"></script>
 </body>
 </html>

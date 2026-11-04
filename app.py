@@ -1499,6 +1499,7 @@ def admin_users():
                 CASE
                     WHEN b.result = 'won'  THEN b.stake * (b.odds - 1) + COALESCE(b.bonus, 0)
                     WHEN b.result = 'lost'  THEN -b.stake
+                    WHEN b.result = 'pending' THEN -b.stake
                     WHEN b.result = 'wd'    THEN -b.stake
                     ELSE 0
                 END
@@ -1542,6 +1543,7 @@ def admin_user_detail(user_id):
         "SELECT COALESCE(SUM(CASE "
         "WHEN result = 'won' THEN stake * (odds - 1) + COALESCE(bonus, 0) "
         "WHEN result = 'lost' THEN -stake "
+        "WHEN result = 'pending' THEN -stake "
         "WHEN result = 'wd' THEN -stake "
         "ELSE 0 END), 0) FROM bets WHERE user_id = ?",
         (user_id,),
