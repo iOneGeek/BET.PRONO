@@ -164,12 +164,15 @@ def run():
             today = datetime.now(fixture.module.FR_TZ).date().isoformat()
             game = deepcopy(GAME)
             game['startTime'] = today + 'T20:00:00+01:00'
-            other = {**game, 'id': 1002}
+            other = {**game, 'id': 1002, 'statusGroup': 2, 'statusText': 'Scheduled'}
             def provider_response(url, **kwargs):
                 if 'games/allscores' in url:
                     return FakeResponse({'games': [game, other]})
+                if url.endswith('/game/'):
+                    assert kwargs['params']['gameId'] == 1002
+                    return FakeResponse({'game': other})
                 if kwargs['params']['games'] == 1002:
-                    return FakeResponse({'games': [other], 'statistics': []})
+                    return FakeResponse({'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60})
                 return FakeResponse({'games': [game], 'statistics': [
                     {'id': 3, 'name': 'Shots', 'competitorId': 10, 'value': '0'},
                     {'id': 3, 'name': 'Shots', 'competitorId': 20, 'value': '8'},
@@ -201,6 +204,8 @@ def run():
                         page.locator('.ai-live').screenshot(path=str(Path(screenshots) / f'365scores-test-{suffix}.png'), animations='disabled')
                 page.locator('#liveMatches button').nth(1).click()
                 expect(page.locator('#liveNoStats')).to_be_visible()
+                expect(page.locator('#liveError')).not_to_be_visible()
+                expect(page.locator('#liveScore')).to_have_text('Score indisponible')
                 expect(page.locator('#liveStatsWrap')).not_to_be_visible()
                 expect(page.locator('#liveAnalysisStatus')).to_contain_text('insuffisantes')
                 expect(page.locator('#liveAnalysisContent')).not_to_be_visible()
@@ -245,7 +250,7 @@ def run():
                 page.locator('#liveSearch').click()
                 expect(page.locator('#liveStatus')).to_contain_text('Aucune rencontre')
                 self_count = get.call_count
-                assert self_count == 3, f'Expected cached search; got {self_count} provider calls'
+                assert self_count == 4, f'Expected cached search and details; got {self_count} provider calls'
             page.route('**/api/ai/matches?*', lambda route: route.fulfill(status=503, content_type='application/json', body='{"error":"Source indisponible"}'))
             page.locator('#liveSearch').click()
             expect(page.locator('#liveError')).to_have_text('Source indisponible')
