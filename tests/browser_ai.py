@@ -212,8 +212,16 @@ def run():
                 assert generate.call_count == 1
                 with patch.dict(fixture.app.config, {'GEMINI_API_KEY': ''}):
                     page.locator('#liveMatches button').first.click()
-                    expect(page.locator('#liveAnalysisStatus')).to_contain_text('indisponible')
+                    expect(page.locator('#liveAnalysisStatus')).to_contain_text('clé du service d’analyse est absente')
                     expect(page.locator('#liveStatsWrap')).to_be_visible()
+                fixture.module.match_analyzer._cache.clear()
+                with patch('match_analysis.requests.post', return_value=FakeResponse(status=429)) as quota:
+                    page.locator('#liveMatches button').first.click()
+                    expect(page.locator('#liveAnalysisStatus')).to_contain_text('quota du service d’analyse est atteint')
+                    expect(page.locator('#liveStatsWrap')).to_be_visible()
+                    page.locator('#liveMatches button').first.click()
+                    expect(page.locator('#liveAnalysisStatus')).to_contain_text('quota du service d’analyse est atteint')
+                    quota.assert_called_once()
                 # A late analysis for one match must never replace another match's report.
                 analysis_url = '**/api/ai/matches/1001/analysis'
                 delayed = []

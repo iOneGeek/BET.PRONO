@@ -24,7 +24,7 @@ from werkzeug.utils import secure_filename
 from google.auth.transport.requests import Request
 from google.oauth2.id_token import verify_oauth2_token
 from sports_data import Scores365Client, SportsDataError
-from match_analysis import MatchAnalysis, snapshot_id, unavailable as analysis_unavailable
+from match_analysis import MatchAnalysis, snapshot_id, configuration_error
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "instance", "bankroll.db")
@@ -898,8 +898,9 @@ def automatic_match_analysis(game_id):
         return jsonify({'error': 'Référence de données invalide.'}), 400
 
     def analyze_snapshot():
-        if not app.config['AUTO_ANALYSIS_ENABLED'] or not app.config['GEMINI_API_KEY']:
-            return analysis_unavailable()
+        error = configuration_error(app.config['GEMINI_API_KEY'], app.config['GEMINI_MODEL'], app.config['AUTO_ANALYSIS_ENABLED'])
+        if error:
+            return error
         data = sports_client.match(game_id)
         if snapshot_id(data) != payload['snapshot_id']:
             return {'status': 'outdated', 'message': 'Les données du match ont changé. Sélectionne à nouveau la rencontre pour actualiser sa fiche.', 'prediction': None}

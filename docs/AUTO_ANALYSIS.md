@@ -24,8 +24,15 @@ le connecteur actuel ne fournit pas encore l'historique, la forme ou les absence
 5. Choisir une rencontre comportant des statistiques. La section « Analyse du match »
    doit afficher une synthèse, les données citées et les limites, sans clic supplémentaire.
 
-`AUTO_ANALYSIS_ENABLED=0` désactive uniquement la synthèse. Une clé absente ou
-refusée donne un message d'indisponibilité, sans faux texte de démonstration.
+`AUTO_ANALYSIS_ENABLED=0` désactive uniquement la synthèse. L’application distingue
+une clé absente, un accès refusé, un quota atteint, un modèle inaccessible,
+une requête refusée, un délai dépassé et une réponse invalide ou tronquée.
+Les variables optionnelles utilisent les valeurs par défaut indiquées plus haut.
+Les journaux Render indiquent `Automatic match analysis failed` suivi d’un code fixe.
+Le code est également retourné dans `reason` et conservé pendant la suspension
+des appels après erreur. Seul ce code est journalisé, sans clé, corps de réponse,
+prompt ni texte d’exception. Un refus HTTP 400 indique une requête refusée et
+nécessite de vérifier la clé et la compatibilité du modèle pour préciser la cause.
 La disponibilité du modèle et les quotas dépendent du compte Google utilisé.
 Aucune souscription ou activation de facturation n'est effectuée par ce code.
 

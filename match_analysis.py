@@ -3,11 +3,28 @@ from collections import OrderedDict, deque
 from datetime import datetime, timezone
 import hashlib
 import json
+import logging
 import re
 import threading
 import time
 
 import requests
+
+ERROR_MESSAGES = {
+    'disabled': 'L’analyse automatique est désactivée sur le serveur.',
+    'missing_key': 'La clé du service d’analyse est absente de la configuration du serveur.',
+    'invalid_model': 'Le nom du modèle d’analyse est invalide dans la configuration du serveur.',
+    'access_denied': 'Le service d’analyse refuse l’accès. Vérifie la clé API et les autorisations de son projet.',
+    'quota_exceeded': 'Le quota du service d’analyse est atteint. Vérifie les limites du projet et sa facturation.',
+    'model_unavailable': 'Le modèle configuré est introuvable ou inaccessible avec ce projet. Vérifie GEMINI_MODEL.',
+    'request_rejected': 'Le service d’analyse a refusé la requête. Vérifie la clé API et la compatibilité du modèle configuré.',
+    'provider_unavailable': 'Le service d’analyse est temporairement indisponible. Réessaie dans une minute.',
+    'timeout': 'Le service d’analyse a dépassé le délai de réponse. Réessaie dans une minute.',
+    'network_error': 'Le serveur ne parvient pas à joindre le service d’analyse. Réessaie dans une minute.',
+    'response_truncated': 'La réponse de l’analyse a atteint sa limite de longueur avant d’être terminée.',
+    'response_refused': 'Le service d’analyse a interrompu ou refusé cette réponse.',
+    'invalid_response': 'La réponse générée a échoué aux vérifications de format ou de cohérence avec les statistiques.',
+}
 
 
 def snapshot_id(data):
@@ -15,8 +32,24 @@ def snapshot_id(data):
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
-def unavailable(message='L’analyse automatique est momentanément indisponible. Les données du match restent consultables.'):
-    return {'status': 'unavailable', 'message': message, 'prediction': None}
+def unavailable(message=None, reason='provider_unavailable'):
+    return {'status': 'unavailable', 'message': message or ERROR_MESSAGES[reason], 'reason': reason, 'prediction': None}
+
+
+def configuration_error(api_key, model, enabled=True):
+    if not enabled:
+        return unavailable(reason='disabled')
+    if not api_key:
+        return unavailable(reason='missing_key')
+    if not re.fullmatch(r'gemini-[a-zA-Z0-9.-]{1,64}', model):
+        return unavailable(reason='invalid_model')
+    return None
+
+
+class AnalysisServiceError(ValueError):
+    def __init__(self, reason):
+        self.reason = reason
+        super().__init__(reason)
 
 
 class InvalidAnalysis(ValueError):
@@ -48,6 +81,7 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
         self._calls = deque()
         self._lock = threading.Lock()
         self._blocked_until = 0
+        self._last_failure = 'provider_unavailable'
 
     @staticmethod
     def facts(data):
@@ -96,8 +130,9 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
         return {'summary': summary, 'observations': checked}
 
     def analyze(self, data, user_id, api_key, model, enabled=True):
-        if not enabled or not api_key or not re.fullmatch(r'gemini-[a-zA-Z0-9.-]{1,64}', model):
-            return unavailable()
+        error = configuration_error(api_key, model, enabled)
+        if error:
+            return error
         facts = self.facts(data)
         if not facts:
             return {'status': 'insufficient_data', 'message': 'Les statistiques disponibles sont insuffisantes pour une analyse. Aucune conclusion n’est générée.', 'prediction': None}
@@ -113,7 +148,7 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
                 self._cache.move_to_end(key)
                 return {**entry[1], 'cached': True}
             if now < self._blocked_until:
-                return unavailable()
+                return unavailable(reason=self._last_failure)
             calls = self._users.pop(user_id, deque())
             while calls and now - calls[0] >= 3600:
                 calls.popleft()
@@ -144,9 +179,20 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
             try:
                 result = self._generate(api_key, model, body)
                 checked = self.validate(result, facts)
-            except (requests.RequestException, ValueError, TypeError, KeyError):
+            except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
+                if isinstance(exc, AnalysisServiceError):
+                    reason = exc.reason
+                elif isinstance(exc, requests.Timeout):
+                    reason = 'timeout'
+                elif isinstance(exc, requests.RequestException):
+                    reason = 'network_error'
+                else:
+                    reason = 'invalid_response'
+                # Fixed codes only. Never log exceptions, keys, prompts or response bodies.
+                logging.getLogger(__name__).warning('Automatic match analysis failed: %s', reason)
+                self._last_failure = reason
                 self._blocked_until = time.monotonic() + 60
-                return unavailable()
+                return unavailable(reason=reason)
             result = {**checked, 'status': 'ready', 'cached': False, 'snapshot_id': digest,
                       'generated_at': datetime.now(timezone.utc).isoformat(),
                       'limitations': self.LIMITATIONS, 'prediction': None}
@@ -164,8 +210,12 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
         with requests.post(f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
                            headers={'x-goog-api-key': api_key, 'Content-Type': 'application/json'},
                            json=body, timeout=(3.05, 18), allow_redirects=False, stream=True) as response:
-            if response.status_code != 200 or 'application/json' not in response.headers.get('Content-Type', '').lower():
-                raise InvalidAnalysis('Generation unavailable')
+            if response.status_code != 200:
+                reason = {400: 'request_rejected', 401: 'access_denied', 403: 'access_denied',
+                          404: 'model_unavailable', 429: 'quota_exceeded'}.get(response.status_code, 'provider_unavailable')
+                raise AnalysisServiceError(reason)
+            if 'application/json' not in response.headers.get('Content-Type', '').lower():
+                raise InvalidAnalysis('Invalid content type')
             raw = bytearray()
             for chunk in response.iter_content(8192):
                 raw.extend(chunk)
@@ -178,8 +228,10 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
         if not isinstance(candidates, list) or len(candidates) != 1 or not isinstance(candidates[0], dict):
             raise InvalidAnalysis('No candidate')
         candidate = candidates[0]
+        if candidate.get('finishReason') == 'MAX_TOKENS':
+            raise AnalysisServiceError('response_truncated')
         if candidate.get('finishReason') != 'STOP':
-            raise InvalidAnalysis('Incomplete or refused answer')
+            raise AnalysisServiceError('response_refused')
         content = candidate.get('content')
         if not isinstance(content, dict) or not isinstance(content.get('parts'), list):
             raise InvalidAnalysis('Invalid content')
