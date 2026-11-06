@@ -178,6 +178,7 @@ class AIBetaTests(unittest.TestCase):
             result = self.client.post(endpoint, json=body)
             self.assertEqual(result.status_code, 200)
             self.assertEqual(result.get_json()['status'], 'unavailable')
+            self.assertEqual(result.get_json()['reason'], 'missing_key')
             analyzer.analyze.assert_not_called()
             sports.match.assert_not_called()
         with self.app.app_context():

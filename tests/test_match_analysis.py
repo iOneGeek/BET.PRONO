@@ -28,7 +28,7 @@ class MatchAnalysisTests(unittest.TestCase):
 
     def test_missing_key_disabled_and_insufficient_data_make_no_call(self):
         with patch('match_analysis.requests.post') as post:
-            self.assertEqual(self.analyze(key='')['status'], 'unavailable')
+            self.assertEqual(self.analyze(key='')['reason'], 'missing_key')
             self.assertEqual(self.analyzer.analyze(SNAPSHOT, 1, 'key', 'gemini-3.8-flash', enabled=False)['status'], 'unavailable')
             self.assertEqual(self.analyzer.analyze(SNAPSHOT, 1, 'key', '../evil')['status'], 'unavailable')
             self.assertEqual(self.analyze({**SNAPSHOT, 'statistics': []})['status'], 'insufficient_data')
@@ -75,7 +75,7 @@ class MatchAnalysisTests(unittest.TestCase):
             with self.subTest(answer=answer), self.assertRaises(InvalidAnalysis):
                 self.analyzer.validate(answer, facts)
 
-    def test_failure_is_generic_and_circuit_breaker_prevents_retries(self):
+    def test_failures_preserve_safe_reason_and_circuit_breaker_prevents_retries(self):
         cases = [FakeResponse(status=401), FakeResponse(status=429), FakeResponse(status=302),
                  FakeResponse(content_type='text/html'), FakeResponse(raw=b'not json'),
                  FakeResponse(raw=b'x' * (128 * 1024 + 1)), FakeResponse({'candidates': []}),
@@ -89,6 +89,37 @@ class MatchAnalysisTests(unittest.TestCase):
         self.analyzer = MatchAnalysis()
         with patch('match_analysis.requests.post', side_effect=requests.Timeout('secret-value')):
             self.assertNotIn('secret-value', json.dumps(self.analyze()))
+
+    def test_provider_diagnostics_do_not_expose_keys_or_error_bodies(self):
+        cases = [(400, 'request_rejected'), (401, 'access_denied'), (403, 'access_denied'),
+                 (404, 'model_unavailable'), (429, 'quota_exceeded'), (503, 'provider_unavailable')]
+        for status, reason in cases:
+            sample = FakeResponse(status=status, raw=b'private-body-and-test-key')
+            with self.subTest(status=status), patch('match_analysis.requests.post', return_value=sample) as post:
+                self.analyzer = MatchAnalysis()
+                with self.assertLogs('match_analysis', level='WARNING') as logs:
+                    result = self.analyze()
+                self.assertEqual(result['reason'], reason)
+                self.assertEqual(self.analyze(user=2)['reason'], reason)
+                post.assert_called_once()
+                self.assertEqual(logs.output, [f'WARNING:match_analysis:Automatic match analysis failed: {reason}'])
+                self.assertNotIn('private-body', json.dumps(result))
+                self.assertNotIn('test-key', json.dumps(result))
+
+    def test_timeout_and_incomplete_response_have_distinct_diagnostics(self):
+        for sample, reason in [(response(finish='MAX_TOKENS'), 'response_truncated'),
+                               (response(finish='SAFETY'), 'response_refused'),
+                               (response({'summary': 'bad'}), 'invalid_response')]:
+            with patch('match_analysis.requests.post', return_value=sample):
+                self.analyzer = MatchAnalysis()
+                self.assertEqual(self.analyze()['reason'], reason)
+        for error, reason in [(requests.Timeout('private-value'), 'timeout'),
+                              (requests.ConnectionError('private-value'), 'network_error')]:
+            with patch('match_analysis.requests.post', side_effect=error):
+                self.analyzer = MatchAnalysis()
+                result = self.analyze()
+                self.assertEqual(result['reason'], reason)
+                self.assertNotIn('private-value', json.dumps(result))
 
     def test_generation_limits_and_concurrency(self):
         with patch.object(self.analyzer, '_generate', return_value=ANSWER) as generate:
