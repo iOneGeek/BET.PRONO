@@ -6,9 +6,11 @@ supplémentaire et aucun nom de fournisseur de modèle dans l'interface.
 La mention « Synthèse générée par IA » distingue le texte généré des données source.
 
 Les statistiques fonctionnent même sans clé, en cas de panne ou de quota atteint.
-Sans statistiques exploitables, aucune génération n'est demandée et le manque de
-données est indiqué. Ce comportement est fréquent avant le début d'un match :
-le connecteur actuel ne fournit pas encore l'historique, la forme ou les absences.
+Pour un match programmé sans statistiques, la fiche charge jusqu'à cinq résultats
+récents vérifiés de chaque équipe et les transmet à l'analyse. Les dates et scores
+apparaissent dans la fiche et les références de la synthèse. En l'absence de
+statistiques et de résultats récents exploitables, aucune génération n'est demandée.
+Les absences et compositions restent hors des données transmises.
 
 ## Activer dans Render
 
@@ -21,7 +23,7 @@ le connecteur actuel ne fournit pas encore l'historique, la forme ou les absence
    - `SPORTS_DATA_ENABLED=1` pour la consultation des données.
 4. Sauvegarder la configuration puis, après intégration de cette branche,
    déployer la version correspondante selon le processus habituel.
-5. Choisir une rencontre comportant des statistiques. La section « Analyse du match »
+5. Choisir une rencontre comportant des statistiques ou des résultats récents. La section « Analyse du match »
    doit afficher une synthèse, les données citées et les limites, sans clic supplémentaire.
 
 `AUTO_ANALYSIS_ENABLED=0` désactive uniquement la synthèse. L’application distingue

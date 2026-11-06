@@ -60,6 +60,25 @@ class MatchAnalysisTests(unittest.TestCase):
             self.assertFalse(self.analyze(changed)['cached'])
             post.assert_called_once()
 
+    def test_pregame_analysis_uses_displayed_history_and_snapshot_tracks_scores(self):
+        past = normalize_game({**GAME, 'id': 900, 'startTime': '2026-10-20T20:00:00+01:00'})
+        data = {**SNAPSHOT, 'statistics': [], 'recent_results': {'home': [past], 'away': []}}
+        answer = {'summary': 'Les résultats disponibles donnent un premier contexte.', 'observations': [
+            {'text': 'Test Paris a perdu face à Test Lyon sur le score de 0 à 2.', 'fact_ids': ['home_recent_0']}]}
+        with patch('match_analysis.requests.post', return_value=response(answer)) as post:
+            result = self.analyze(data)
+            self.assertEqual(result['status'], 'ready')
+            evidence = result['observations'][0]['evidence'][0]
+            self.assertIn('2026-10-20', evidence)
+            self.assertIn('Test Paris 0', evidence)
+            self.assertIn('2 Test Lyon', evidence)
+            self.assertIn('home_recent_0', json.dumps(post.call_args.kwargs['json']))
+            changed = deepcopy(data)
+            changed['recent_results']['home'][0]['away']['score'] = 3
+            self.assertNotEqual(snapshot_id(data), snapshot_id(changed))
+            self.assertEqual(self.analyze(changed)['reason'], 'invalid_response')
+            self.assertEqual(post.call_count, 2)
+
     def test_unknown_evidence_invented_numbers_and_forecasts_rejected(self):
         bad = [None, {}, {**ANSWER, 'prediction': 'home'},
                {**ANSWER, 'summary': 'Victoire à 80%'},

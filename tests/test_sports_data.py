@@ -133,6 +133,49 @@ class SportsClientTests(unittest.TestCase):
                 Scores365Client().match(1001)
             self.assertEqual(get.call_count, 1)
 
+    def test_pregame_history_filters_sorts_deduplicates_and_caches(self):
+        scheduled = deepcopy(GAME)
+        scheduled.update(statusGroup=2, statusText='Scheduled')
+        scheduled['homeCompetitor']['recentMatches'] = list(range(2000, 2015))
+        scheduled['awayCompetitor']['recentMatches'] = [3000, 3001]
+        completed = [{**deepcopy(GAME), 'id': 2000 + index, 'startTime': f'2026-10-{index + 1:02}T20:00:00+01:00'} for index in range(6)]
+        invalid = [
+            {**GAME, 'id': 2006, 'startTime': GAME['startTime']},
+            {**GAME, 'id': 2007, 'statusGroup': 2},
+            {**GAME, 'id': 2008, 'statusGroup': 3},
+            {**GAME, 'id': 2009, 'sportId': 2},
+            {**GAME, 'id': 2010, 'homeCompetitor': {**GAME['homeCompetitor'], 'score': None}},
+            {**GAME, 'id': 2011, 'startTime': '2026-10-20T20:00:00+01:00', 'homeCompetitor': {**GAME['homeCompetitor'], 'score': 1.5}},
+            {**GAME, 'id': 2012, 'startTime': '2026-10-20T20:00:00+01:00', 'homeCompetitor': {'id': 77, 'name': 'Other', 'score': 1}, 'awayCompetitor': {'id': 88, 'name': 'Other', 'score': 2}},
+            {**GAME, 'id': 2013, 'startTime': '2099-01-01T20:00:00+01:00'},
+            {**GAME, 'id': 9999}, {**GAME, 'id': []},
+        ]
+        samples = [FakeResponse({'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}),
+                   FakeResponse({'game': scheduled}), FakeResponse({'games': completed + invalid + [completed[2]]})]
+        with patch('sports_data.requests.get', side_effect=samples) as get:
+            result = self.client.match(1001)
+            self.assertEqual(result['statistics'], [])
+            self.assertEqual([g['id'] for g in result['recent_results']['home']], [2005, 2004, 2003, 2002, 2001])
+            self.assertEqual(len(result['recent_results']['away']), 5)
+            self.assertTrue(self.client.match(1001)['cached'])
+            self.assertEqual(get.call_count, 3)
+            self.assertLessEqual(len(get.call_args.kwargs['params']['games'].split(',')), 30)
+            self.assertEqual(get.call_args.kwargs['params']['showOdds'], 'false')
+
+    def test_history_outage_keeps_match_and_future_results_are_excluded(self):
+        scheduled = deepcopy(GAME)
+        scheduled.update(statusGroup=2, startTime='2099-11-04T20:00:00+01:00')
+        scheduled['homeCompetitor']['recentMatches'] = [2000]
+        future = {**GAME, 'id': 2000, 'startTime': '2099-10-01T20:00:00+01:00'}
+        for history_response in (FakeResponse(status=503), FakeResponse({'games': [future]})):
+            samples = [FakeResponse({'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}),
+                       FakeResponse({'game': scheduled}), history_response]
+            with patch('sports_data.requests.get', side_effect=samples):
+                result = Scores365Client().match(1001)
+                self.assertEqual(result['match']['id'], 1001)
+                self.assertEqual(result['recent_results'], {'home': [], 'away': []})
+                self.assertTrue(result['history_notice'])
+
     def test_errors_fail_explicitly_and_do_not_retry(self):
         cases = [
             (FakeResponse(status=403), 503), (FakeResponse(status=302), 503),

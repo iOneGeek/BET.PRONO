@@ -165,13 +165,18 @@ def run():
             game = deepcopy(GAME)
             game['startTime'] = today + 'T20:00:00+01:00'
             other = {**game, 'id': 1002, 'statusGroup': 2, 'statusText': 'Scheduled'}
+            pregame = deepcopy(other)
+            pregame['id'] = 1003
+            pregame['homeCompetitor']['recentMatches'] = [900]
+            past = {**deepcopy(GAME), 'id': 900, 'startTime': '2026-10-01T20:00:00+02:00'}
             def provider_response(url, **kwargs):
                 if 'games/allscores' in url:
-                    return FakeResponse({'games': [game, other]})
+                    if 'games' in kwargs['params']:
+                        return FakeResponse({'games': [past]})
+                    return FakeResponse({'games': [game, other, pregame]})
                 if url.endswith('/game/'):
-                    assert kwargs['params']['gameId'] == 1002
-                    return FakeResponse({'game': other})
-                if kwargs['params']['games'] == 1002:
+                    return FakeResponse({'game': pregame if kwargs['params']['gameId'] == 1003 else other})
+                if kwargs['params']['games'] in (1002, 1003):
                     return FakeResponse({'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60})
                 return FakeResponse({'games': [game], 'statistics': [
                     {'id': 3, 'name': 'Shots', 'competitorId': 10, 'value': '0'},
@@ -183,7 +188,7 @@ def run():
                 page.locator('#liveDate').fill(today)
                 page.locator('#liveQuery').fill('Paris')
                 page.locator('#liveSearch').click()
-                expect(page.locator('#liveMatches button')).to_have_count(2)
+                expect(page.locator('#liveMatches button')).to_have_count(3)
                 page.locator('#liveMatches button').first.click()
                 expect(page.locator('#liveReport')).to_be_visible()
                 expect(page.locator('#liveScore')).to_have_text('0 — 2')
@@ -252,13 +257,31 @@ def run():
                 delayed[0].abort()
                 page.unroute(analysis_url)
                 expect(page.locator('#liveStatsWrap')).to_be_visible()
+                # A scheduled match can generate an analysis from verified past results.
+                fixture.module.match_analyzer._blocked_until = 0
+                history_answer = {'summary': 'Les résultats passés donnent un premier contexte.', 'observations': [
+                    {'text': 'Test Paris a perdu face à Test Lyon sur le score de 0 à 2.', 'fact_ids': ['home_recent_0']}]}
+                with patch('match_analysis.requests.post', return_value=model_response(history_answer)) as history_generate:
+                    page.locator('#liveMatches button').nth(2).click()
+                    expect(page.locator('#liveRecent')).to_be_visible()
+                    expect(page.locator('#liveRecentTeams')).to_contain_text('01/10/2026')
+                    expect(page.locator('#liveRecentTeams')).to_contain_text('0 — 2')
+                    expect(page.locator('#liveStatsWrap')).not_to_be_visible()
+                    expect(page.locator('#liveAnalysisSummary')).to_have_text(history_answer['summary'])
+                    expect(page.locator('#liveAnalysisContent')).to_be_visible()
+                    history_generate.assert_called_once()
+                    for width in (390, 1440):
+                        page.set_viewport_size({'width': width, 'height': 900})
+                        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                        if screenshots:
+                            page.locator('.ai-live').screenshot(path=str(Path(screenshots) / f'pregame-{width}.png'), animations='disabled')
                 page.locator('#liveQuery').fill('No such test team')
                 expect(page.locator('#liveReport')).not_to_be_visible()
                 expect(page.locator('#liveMatches button')).to_have_count(0)
                 page.locator('#liveSearch').click()
                 expect(page.locator('#liveStatus')).to_contain_text('Aucune rencontre')
                 self_count = get.call_count
-                assert self_count == 4, f'Expected cached search and details; got {self_count} provider calls'
+                assert self_count == 7, f'Expected cached search and details; got {self_count} provider calls'
             page.route('**/api/ai/matches?*', lambda route: route.fulfill(status=503, content_type='application/json', body='{"error":"Source indisponible"}'))
             page.locator('#liveSearch').click()
             expect(page.locator('#liveError')).to_have_text('Source indisponible')
