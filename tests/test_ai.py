@@ -3,6 +3,7 @@ import importlib.util
 import os
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -13,11 +14,13 @@ class AIBetaTests(unittest.TestCase):
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
         root = Path(__file__).resolve().parents[1]
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
         isolated_app = Path(cls.temp.name) / 'app.py'
         shutil.copyfile(root / 'app.py', isolated_app)
         # app.py initializes its database on import. Copying it isolates BASE_DIR,
         # local.env, secret.key and uploads as well as the SQLite database.
-        with patch.dict(os.environ, {'DATABASE_URL': '', 'SECRET_KEY': 'test-only-secret', 'ADMIN_USERNAME': ''}):
+        with patch.dict(os.environ, {'DATABASE_URL': '', 'SECRET_KEY': 'test-only-secret', 'ADMIN_USERNAME': '', 'GEMINI_API_KEY': '', 'AUTO_ANALYSIS_ENABLED': '1'}):
             spec = importlib.util.spec_from_file_location('isolated_bet_prono', isolated_app)
             cls.module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(cls.module)
@@ -123,6 +126,82 @@ class AIBetaTests(unittest.TestCase):
         for path in ['/static/bet-prono-ai.js', '/static/bet-prono-ai.css', '/static/app.js', '/api/picks']:
             with self.client.get(path) as response:
                 self.assertEqual(response.status_code, 200)
+
+    def test_sports_routes_auth_validation_and_disabled_mode(self):
+        from datetime import datetime
+        today = datetime.now(self.module.FR_TZ).date().isoformat()
+        with patch.object(self.module, 'sports_client') as provider:
+            provider.matches.return_value = {'mode': 'sports_data', 'matches': []}
+            provider.match.return_value = {'mode': 'sports_data', 'match': {'id': 1001}, 'statistics': [], 'prediction': None}
+            anonymous = self.app.test_client()
+            self.assertEqual(anonymous.get('/api/ai/matches?date=' + today).status_code, 401)
+            self.assertEqual(anonymous.get('/api/ai/matches/1001').status_code, 401)
+            provider.allow_user.assert_not_called()
+            for query in ['date=invalid', 'date=2026-02-31', 'date=2000-01-01', 'date=' + today + '&q=' + 'x' * 81]:
+                self.assertEqual(self.client.get('/api/ai/matches?' + query).status_code, 400)
+            provider.matches.assert_not_called()
+            response = self.client.get('/api/ai/matches', query_string={'date': today, 'q': 'Paris'})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers['Cache-Control'], 'no-store')
+            self.assertEqual(provider.matches.call_args.args[1], 'Paris')
+            self.assertEqual(self.client.get('/api/ai/matches/1001').status_code, 200)
+            provider.match.assert_called_once_with(1001)
+            self.assertEqual(self.client.get('/api/ai/matches/0').status_code, 400)
+            self.assertEqual(self.client.get('/api/ai/matches/1000000000000').status_code, 400)
+            with patch.dict(self.app.config, {'SPORTS_DATA_ENABLED': False}):
+                self.assertEqual(self.client.get('/api/ai/matches/1001').status_code, 503)
+            with self.app.app_context():
+                db = self.module.get_db()
+                db.execute('UPDATE users SET banned = 1')
+                db.commit()
+            self.assertEqual(self.client.get('/api/ai/matches/1001').status_code, 403)
+
+    def test_sports_route_provider_errors_and_no_bet_changes(self):
+        before = self.client.get('/api/bets').get_json()
+        with patch.object(self.module, 'sports_client') as provider:
+            provider.match.side_effect = self.module.SportsDataError('Quota atteint', 429)
+            response = self.client.get('/api/ai/matches/1001')
+            self.assertEqual(response.status_code, 429)
+            self.assertEqual(response.headers['Retry-After'], '60')
+            self.assertEqual(response.get_json()['error'], 'Quota atteint')
+        self.assertEqual(self.client.get('/api/bets').get_json(), before)
+
+    def test_automatic_analysis_route_rejects_untrusted_inputs_and_requires_auth(self):
+        endpoint = '/api/ai/matches/1001/analysis'
+        body = {'snapshot_id': 'a' * 64}
+        self.assertEqual(self.app.test_client().post(endpoint, json=body).status_code, 401)
+        self.assertEqual(self.client.post(endpoint, data=body).status_code, 415)
+        for invalid in [None, [], {}, {'snapshot_id': 123}, {'snapshot_id': '../bad'}, {**body, 'prompt': 'invent a result'}]:
+            response = self.client.post(endpoint, data=__import__('json').dumps(invalid), content_type='application/json')
+            self.assertEqual(response.status_code, 400)
+        with patch.object(self.module, 'match_analyzer') as analyzer, patch.object(self.module, 'sports_client') as sports:
+            result = self.client.post(endpoint, json=body)
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result.get_json()['status'], 'unavailable')
+            analyzer.analyze.assert_not_called()
+            sports.match.assert_not_called()
+        with self.app.app_context():
+            db = self.module.get_db()
+            db.execute('UPDATE users SET banned = 1')
+            db.commit()
+        self.assertEqual(self.client.post(endpoint, json=body).status_code, 403)
+
+    def test_automatic_analysis_uses_only_current_server_snapshot(self):
+        from test_match_analysis import SNAPSHOT
+        endpoint = '/api/ai/matches/1001/analysis'
+        with patch.dict(self.app.config, {'GEMINI_API_KEY': 'test-secret'}), patch.object(self.module, 'sports_client') as sports, patch.object(self.module, 'match_analyzer') as analyzer:
+            sports.match.return_value = SNAPSHOT
+            analyzer.analyze.return_value = {'status': 'ready', 'prediction': None}
+            stale = self.client.post(endpoint, json={'snapshot_id': 'a' * 64})
+            self.assertEqual(stale.get_json()['status'], 'outdated')
+            analyzer.analyze.assert_not_called()
+            response = self.client.post(endpoint, json={'snapshot_id': self.module.snapshot_id(SNAPSHOT)})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers['Cache-Control'], 'no-store')
+            self.assertEqual(analyzer.analyze.call_args.args[0], SNAPSHOT)
+            self.assertNotIn('test-secret', response.get_data(as_text=True))
+            with patch.dict(self.app.config, {'SPORTS_DATA_ENABLED': False}):
+                self.assertEqual(self.client.post(endpoint, json={'snapshot_id': 'a' * 64}).status_code, 503)
 
 
 if __name__ == '__main__':

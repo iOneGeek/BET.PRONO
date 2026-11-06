@@ -70,9 +70,12 @@ fichier commité sur GitHub. Uniquement dans le dashboard Render et dans
 
 ## BET PRONO AI — Bêta
 
-Un onglet de démonstration permet de saisir un sport et deux adversaires, avec
-un aperçu local facultatif de capture. Aucune IA ou donnée sportive réelle
-n'est connectée. Voir le [guide de test et les limites de la bêta](docs/BET_PRONO_AI.md).
+L'onglet propose une [connexion expérimentale à 365Scores](docs/365SCORES.md)
+pour rechercher des matchs de football et consulter les scores/statistiques
+disponibles, avec source et heure de récupération. Aucune prédiction n'est calculée.
+Une [analyse descriptive intégrée](docs/AUTO_ANALYSIS.md) se charge automatiquement
+dans la fiche lorsque les données et la clé serveur sont disponibles.
+La [démonstration IA et l'aperçu local de captures](docs/BET_PRONO_AI.md) restent disponibles.
 
 ## Structure
 

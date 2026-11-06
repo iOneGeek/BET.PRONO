@@ -1,5 +1,10 @@
 # BET PRONO AI — Bêta
 
+L'onglet inclut désormais un panneau séparé de données football 365Scores :
+voir [la configuration et les tests du connecteur](365SCORES.md).
+Le présent document décrit le formulaire de **démonstration**, qui reste sans IA
+et n'utilise pas les données du panneau 365Scores pour produire un pronostic.
+
 La page est accessible depuis la navigation du tableau de bord, sur ordinateur
 et mobile. Elle utilise la session existante et ne modifie ni les paris, ni la
 bankroll, ni les statistiques. Aucune migration de base de données n'est requise.
@@ -90,9 +95,10 @@ sport et les noms, jamais l'image.
 
 ## Avant une analyse réelle
 
-Il faudra choisir et connecter une API sportive autorisée, identifier les
-rencontres sans ambiguïté (équipes/joueurs, compétition, date), puis afficher
-les sources et leur fraîcheur. Les données manquantes devront rester signalées.
+Le connecteur expérimental 365Scores permet maintenant de sélectionner une
+rencontre de football précise, avec date, compétition, identifiant et source.
+Il ne fournit aucune garantie de couverture ou de fraîcheur. Avant une analyse
+prédictive, il faudra disposer de données adaptées et vérifiées dans le temps.
 
 Un modèle d'analyse devra être évalué sur des résultats historiques séparés de
 ses données d'entraînement, avec mesure de calibration et d'incertitude avant
