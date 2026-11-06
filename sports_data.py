@@ -84,7 +84,7 @@ class Scores365Client:
             times.append(now)
 
     def _get(self, path, params):
-        if path not in ('games/allscores/', 'game/stats/'):
+        if path not in ('games/allscores/', 'game/stats/', 'game/'):
             raise ValueError('Unsupported provider path')
         key = (path, tuple(sorted(params.items())))
         # Serialize cache misses to prevent duplicate upstream calls from threads.
@@ -121,7 +121,16 @@ class Scores365Client:
                         if len(body) > self.MAX_BYTES:
                             raise SportsDataError('Réponse 365Scores trop volumineuse.')
                     data = json.loads(body)
-                if not isinstance(data, dict) or not isinstance(data.get('games'), list):
+                if not isinstance(data, dict):
+                    raise SportsDataError('Le format des données 365Scores a changé.')
+                if path == 'game/':
+                    valid = isinstance(data.get('game'), dict)
+                elif path == 'game/stats/' and 'games' not in data:
+                    # Before kickoff the stats endpoint returns only its update envelope.
+                    valid = all(type(data.get(key)) is int for key in ('lastUpdateId', 'requestedUpdateId', 'ttl'))
+                else:
+                    valid = isinstance(data.get('games'), list)
+                if not valid:
                     raise SportsDataError('Le format des données 365Scores a changé.')
             except (requests.RequestException, ValueError, UnicodeError) as exc:
                 self._blocked_until = time.monotonic() + 30
@@ -162,7 +171,13 @@ class Scores365Client:
 
     def match(self, game_id):
         data, fetched_at, cached = self._get('game/stats/', {'games': game_id})
-        game = next((normalize_game(raw) for raw in data['games']
+        raw_games = data.get('games', [])
+        if not raw_games:
+            detail, detail_fetched_at, detail_cached = self._get('game/', {'gameId': game_id})
+            raw_games = [detail['game']]
+            fetched_at = min(fetched_at, detail_fetched_at)
+            cached = cached and detail_cached
+        game = next((normalize_game(raw) for raw in raw_games
                      if isinstance(raw, dict) and raw.get('id') == game_id), None)
         if not game:
             raise SportsDataError('Cette rencontre de football est introuvable ou ses données sont incomplètes.', 404)

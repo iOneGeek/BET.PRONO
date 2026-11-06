@@ -97,7 +97,7 @@
     el('liveFields').disabled = searching;
     el('liveForm').setAttribute('aria-busy', 'true');
     el('liveStatus').textContent = 'Consultation de 365Scores…';
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), searching ? 15000 : 25000);
     try {
       const response = await fetch(path, {credentials: 'same-origin', signal: controller.signal});
       if (response.status === 401) { location.href = '/login'; return; }

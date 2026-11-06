@@ -94,6 +94,45 @@ class SportsClientTests(unittest.TestCase):
                 self.client.match(1002)
             self.assertEqual(error.exception.status, 404)
 
+    def test_scheduled_match_with_metadata_only_stats_loads_game_and_caches(self):
+        scheduled = {**deepcopy(GAME), 'statusGroup': 2, 'statusText': 'Scheduled'}
+        envelope = {'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}
+        for payload in (envelope, {**envelope, 'games': []}):
+            with self.subTest(payload=payload), patch('sports_data.requests.get', side_effect=[
+                FakeResponse(payload), FakeResponse({'game': scheduled}),
+            ]) as get:
+                client = Scores365Client()
+                result = client.match(1001)
+                self.assertEqual(result['match']['id'], 1001)
+                self.assertIsNone(result['match']['home']['score'])
+                self.assertEqual(result['statistics'], [])
+                self.assertFalse(result['cached'])
+                self.assertTrue(client.match(1001)['cached'])
+                self.assertEqual(get.call_count, 2)
+                self.assertTrue(get.call_args.args[0].endswith('/game/'))
+                self.assertEqual(get.call_args.kwargs['params']['gameId'], 1001)
+                # An empty statistics response must not suspend other searches.
+                get.side_effect = None
+                get.return_value = FakeResponse({'games': [scheduled]})
+                self.assertEqual(client.matches(date(2026, 11, 4))['total'], 1)
+
+    def test_stats_fallback_rejects_wrong_game_and_malformed_responses(self):
+        envelope = {'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}
+        for game in ({**GAME, 'id': 1002}, {**GAME, 'sportId': 2}):
+            with patch('sports_data.requests.get', side_effect=[FakeResponse(envelope), FakeResponse({'game': game})]):
+                with self.assertRaises(SportsDataError) as error:
+                    Scores365Client().match(1001)
+                self.assertEqual(error.exception.status, 404)
+        for payload in ({}, {'games': None}, {'ttl': 60}, {**envelope, 'games': {}}):
+            with patch('sports_data.requests.get', return_value=FakeResponse(payload)) as get:
+                with self.assertRaises(SportsDataError):
+                    Scores365Client().match(1001)
+                self.assertEqual(get.call_count, 1)
+        with patch('sports_data.requests.get', return_value=FakeResponse(status=403)) as get:
+            with self.assertRaises(SportsDataError):
+                Scores365Client().match(1001)
+            self.assertEqual(get.call_count, 1)
+
     def test_errors_fail_explicitly_and_do_not_retry(self):
         cases = [
             (FakeResponse(status=403), 503), (FakeResponse(status=302), 503),

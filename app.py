@@ -940,7 +940,7 @@ def ai_analyze():
         "mode": "demo",
         "title": "Démonstration — aucune prédiction",
         "match": {"sport": sports[sport], "home_team": teams[0], "away_team": teams[1]},
-        "notice": "Saisie reçue, rencontre non vérifiée. Aucune API sportive ni IA connectée.",
+        "notice": "Ce rapport de démonstration utilise uniquement ta saisie. Pour consulter les données et leur synthèse IA, sélectionne une rencontre dans les résultats de recherche au-dessus.",
         "checks": [
             {"label": "Rencontre et calendrier", "status": "À vérifier auprès d’une source sportive."},
             {"label": "Forme et confrontations", "status": "Données indisponibles."},

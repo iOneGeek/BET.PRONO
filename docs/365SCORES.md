@@ -34,6 +34,10 @@ Hôte fixe : `https://webws.365scores.com/web/`.
   `sports=1`, `startDate` et `endDate` au format `DD/MM/YYYY`,
   `showOdds=false`, `onlyMajorGames=false`.
 - `game/stats/` : paramètres communs et `games=<identifiant>`.
+- `game/` : paramètres communs et `gameId=<identifiant>`, lorsque les statistiques
+  renvoient une enveloppe valide sans rencontre. Ce cas a été vérifié sur deux matchs
+  programmés le 6 novembre 2026. La fiche affiche alors les informations disponibles
+  avec une liste de statistiques vide. Un refus HTTP ne déclenche pas ce second appel.
 
 Les réponses ont été vérifiées directement sur le service public le 4 novembre
 2026, sans clé, cookie, faux Origin/Referer ou identité de navigateur. Une recherche
