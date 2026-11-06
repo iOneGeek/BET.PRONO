@@ -26,6 +26,21 @@ automatiquement après l'affichage du match, sans bouton supplémentaire.
 Elle ne modifie ni les paris ni la bankroll et ne calcule aucune prédiction.
 Le formulaire de démonstration multisport et l'aperçu local d'image restent séparés.
 
+Pour une rencontre programmée sans statistiques, la fiche récupère les références
+`recentMatches` des deux équipes, au maximum 15 chacune. Une consultation groupée
+de `games/allscores/` avec `games=<identifiants>` et `showOdds=false` fournit les résultats.
+Seuls les matchs de football terminés, antérieurs à la fois à maintenant et au coup
+d'envoi sélectionné, avec identifiant demandé, équipe correspondante et scores
+entiers disponibles sont retenus. Ils sont dédupliqués, triés par date et limités
+aux cinq plus récents disponibles pour chaque équipe. Les résultats, dates et
+compétitions sont affichés avant la synthèse. Une panne de l'historique laisse la
+fiche consultable et indique les données manquantes. Le budget de récupération
+d'une fiche est de 22 secondes pour l'ensemble de ses appels.
+
+Ce parcours a été vérifié le 6 novembre 2026 sur Valencia–Real Madrid
+(référence 4750793), avec cinq résultats récupérés par équipe. L'analyse du modèle
+reste testée avec des réponses simulées jusqu'à validation réelle sur Render.
+
 ## Service testé
 
 Hôte fixe : `https://webws.365scores.com/web/`.

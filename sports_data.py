@@ -83,7 +83,7 @@ class Scores365Client:
                 raise SportsDataError('Trop de demandes. Réessaie dans une minute.', 429)
             times.append(now)
 
-    def _get(self, path, params):
+    def _get(self, path, params, deadline=None):
         if path not in ('games/allscores/', 'game/stats/', 'game/'):
             raise ValueError('Unsupported provider path')
         key = (path, tuple(sorted(params.items())))
@@ -100,12 +100,15 @@ class Scores365Client:
                 self._calls.popleft()
             if len(self._calls) >= 20:
                 raise SportsDataError('Limite de consultation atteinte. Réessaie dans une minute.', 429)
-            self._calls.append(now)
             query = {'appTypeId': 5, 'langId': 1, 'timezoneName': 'Europe/Paris', **params}
+            remaining = 20 if deadline is None else deadline - time.monotonic()
+            if remaining <= 0:
+                raise SportsDataError('Le délai de consultation des données est atteint.', 503)
+            self._calls.append(now)
             try:
                 with requests.get(self.BASE + path, params=query,
                                   headers={'User-Agent': 'BET.PRONO/0.1 (sports data)', 'Accept': 'application/json'},
-                                  timeout=(3.05, 6), allow_redirects=False, stream=True) as response:
+                                  timeout=(min(3.05, remaining / 2), min(6, remaining / 2)), allow_redirects=False, stream=True) as response:
                     if response.status_code == 429:
                         self._blocked_until = time.monotonic() + 60
                         raise SportsDataError('Quota 365Scores atteint. Réessaie dans une minute.', 429)
@@ -115,7 +118,7 @@ class Scores365Client:
                         raise SportsDataError('Réponse 365Scores non reconnue.')
                     body = bytearray()
                     for chunk in response.iter_content(16384):
-                        if time.monotonic() - now > 10:
+                        if time.monotonic() - now > 10 or (deadline is not None and time.monotonic() > deadline):
                             raise SportsDataError('La réponse 365Scores a expiré.', 503)
                         body.extend(chunk)
                         if len(body) > self.MAX_BYTES:
@@ -169,16 +172,45 @@ class Scores365Client:
                 'truncated': len(games) > 200, 'omitted_invalid': skipped,
                 'source': self.SOURCE, 'fetched_at': fetched_at, 'cached': cached, 'cache_seconds': self.TTL}
 
+    def _recent_results(self, raw_game, game, deadline):
+        ids = set()
+        for side in ('homeCompetitor', 'awayCompetitor'):
+            recent = raw_game.get(side, {}).get('recentMatches', [])
+            if isinstance(recent, list):
+                ids.update(value for value in recent[:15] if positive_id(value) and value != game['id'])
+        if not ids:
+            return {'home': [], 'away': []}, None, True
+        data, fetched_at, cached = self._get('games/allscores/', {
+            'games': ','.join(str(value) for value in sorted(ids)), 'showOdds': 'false'}, deadline)
+        cutoff = min(datetime.now(timezone.utc), datetime.fromisoformat(game['starts_at']))
+        completed = {}
+        for raw in data['games']:
+            if not isinstance(raw, dict) or raw.get('statusGroup') != 4 or not positive_id(raw.get('id')) or raw['id'] not in ids:
+                continue
+            result = normalize_game(raw)
+            if not result or datetime.fromisoformat(result['starts_at']) >= cutoff:
+                continue
+            if any(type(result[side]['score']) not in (int, float) or not float(result[side]['score']).is_integer()
+                   for side in ('home', 'away')):
+                continue
+            completed[result['id']] = result
+        ordered = sorted(completed.values(), key=lambda result: (datetime.fromisoformat(result['starts_at']), result['id']), reverse=True)
+        history = {side: [result for result in ordered if game[side]['id'] in
+                         (result['home']['id'], result['away']['id'])][:5] for side in ('home', 'away')}
+        return history, fetched_at, cached
+
     def match(self, game_id):
-        data, fetched_at, cached = self._get('game/stats/', {'games': game_id})
+        deadline = time.monotonic() + 22
+        data, fetched_at, cached = self._get('game/stats/', {'games': game_id}, deadline)
         raw_games = data.get('games', [])
+        detail = None
         if not raw_games:
-            detail, detail_fetched_at, detail_cached = self._get('game/', {'gameId': game_id})
+            detail, detail_fetched_at, detail_cached = self._get('game/', {'gameId': game_id}, deadline)
             raw_games = [detail['game']]
             fetched_at = min(fetched_at, detail_fetched_at)
             cached = cached and detail_cached
-        game = next((normalize_game(raw) for raw in raw_games
-                     if isinstance(raw, dict) and raw.get('id') == game_id), None)
+        raw_game = next((raw for raw in raw_games if isinstance(raw, dict) and raw.get('id') == game_id), None)
+        game = normalize_game(raw_game)
         if not game:
             raise SportsDataError('Cette rencontre de football est introuvable ou ses données sont incomplètes.', 404)
         stats = data.get('statistics', [])
@@ -199,7 +231,25 @@ class Scores365Client:
                 continue
             row = rows.setdefault(stat['id'], {'label': text(stat['name']), 'home': None, 'away': None})
             row[side] = str(value)[:80]
+        history = {'home': [], 'away': []}
+        history_notice = ''
+        if raw_game.get('statusGroup') == 2 and not rows:
+            try:
+                if detail is None:
+                    detail, detail_fetched_at, detail_cached = self._get('game/', {'gameId': game_id}, deadline)
+                    if detail['game'].get('id') != game_id or normalize_game(detail['game']) != game:
+                        raise SportsDataError('Les informations du match ont changé. Actualise sa fiche.')
+                    fetched_at = min(fetched_at, detail_fetched_at)
+                    cached = cached and detail_cached
+                history, history_fetched_at, history_cached = self._recent_results(detail['game'], game, deadline)
+                if history_fetched_at:
+                    fetched_at = min(fetched_at, history_fetched_at)
+                cached = cached and history_cached
+                history_notice = 'Jusqu’à cinq résultats récents disponibles par équipe. La couverture de la source peut être partielle.'
+            except SportsDataError:
+                history_notice = 'Les résultats récents sont temporairement indisponibles. Réessaie dans une minute.'
         return {'mode': 'sports_data', 'match': game, 'statistics': list(rows.values())[:40],
+                'recent_results': history, 'history_notice': history_notice,
                 'source': self.SOURCE, 'fetched_at': fetched_at, 'cached': cached,
                 'cache_seconds': self.TTL, 'prediction': None,
                 'notice': 'Données fournies par 365Scores, potentiellement différées. La synthèse IA est chargée séparément ; aucune prédiction n’est calculée.'}

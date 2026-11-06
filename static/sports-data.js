@@ -146,6 +146,27 @@
       }));
       el('liveStatsWrap').hidden = !data.statistics.length;
       el('liveNoStats').hidden = !!data.statistics.length;
+      el('liveRecent').hidden = !data.history_notice;
+      el('liveRecentNotice').textContent = data.history_notice || '';
+      el('liveRecentTeams').replaceChildren(...['home', 'away'].map(side => {
+        const section = document.createElement('div');
+        const heading = document.createElement('h4');
+        heading.textContent = game[side].name;
+        section.append(heading);
+        const results = data.recent_results?.[side] || [];
+        if (!results.length) {
+          const empty = document.createElement('p');
+          empty.className = 'sub'; empty.textContent = 'Aucun résultat récent vérifié disponible.';
+          section.append(empty);
+        }
+        for (const result of results) {
+          const item = document.createElement('p');
+          item.className = 'sub';
+          item.textContent = `${dateLabel(result.starts_at)} · ${result.competition} · ${result.home.name} ${score(result)} ${result.away.name}`;
+          section.append(item);
+        }
+        return section;
+      }));
       el('liveReport').hidden = false;
       button.setAttribute('aria-pressed', 'true');
       el('liveStatus').textContent = 'Données du match chargées. Aucune prédiction calculée.';
