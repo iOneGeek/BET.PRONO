@@ -359,7 +359,7 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
 @media (max-width:560px){.topbar{gap:10px}.topbar .brand:before{font-size:.62rem}.topbar .brand:after{font-size:1.03rem}.topbar .brand .sub{display:none}#goProfile,#logout{padding:8px 9px;font-size:.75rem}.stats,.secondary-stats,.analytics-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.card{min-height:118px;padding:12px}.card b{font-size:1.22rem}.metric-head{font-size:.67rem}.metric-icon{width:27px;height:27px}.secondary-stat{padding:10px}.secondary-stat b{font-size:.88rem}.chart{padding:14px 8px 7px}.chart-head{align-items:flex-start}.chart-title h2{font-size:.9rem}.chart-value b{font-size:.92rem}.chart svg{min-height:205px}.per button{padding:7px 9px;font-size:.72rem}.result-content{gap:13px}.result-donut{flex-basis:115px;width:115px;height:115px}.result-donut:after{inset:21px}.results-legend div{font-size:.72rem}.sport-overview-row{grid-template-columns:80px 1fr;gap:8px}.sport-overview-profit{grid-column:2}.analytics-periods button{padding:7px 9px;font-size:.7rem}.panel{padding:14px}.form{grid-template-columns:1fr}.side-menu{display:none}}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 </style>
-<link rel="stylesheet" href="/static/bet-prono-ai.css?v=3">
+<link rel="stylesheet" href="/static/bet-prono-ai.css?v=4">
 </head>
 <body>
 <canvas id="bgfx" aria-hidden="true"></canvas>
@@ -566,18 +566,18 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
     <span class="ai-eyebrow">LE LABO BET.PRONO <span class="ai-badge">BÊTA</span></span>
     <h1 id="aiTitle">BET PRONO <span>AI</span></h1>
     <p>Les données du match, accompagnées de leur analyse.</p>
-    <p class="sub">Retrouve une rencontre de football et consulte les données disponibles chez 365Scores.</p>
-    <div class="ai-notice"><strong>Données sportives · Connexion expérimentale</strong> · Les scores et statistiques proviennent de 365Scores et peuvent être différés. Une synthèse IA se prépare automatiquement lorsque le service et les données sont disponibles. Aucune prédiction n’est calculée.</div>
+    <div class="ai-notice"><strong>Analyse et pronostic IA</strong> · Les données de 365Scores alimentent une analyse automatique. Avant le match, un score estimé, un vainqueur envisagé et un buteur possible sont proposés lorsque les données le permettent.</div>
   </section>
   <section class="panel ai-live" aria-labelledby="liveTitle">
-    <span class="ai-eyebrow">365SCORES · FOOTBALL</span>
+    <span class="ai-eyebrow">365SCORES</span>
     <h2 id="liveTitle">Trouver un vrai match</h2>
-    <p class="sub" id="liveHelp">Choisis une date, puis filtre par équipe ou compétition. Horaires de Paris, dans une fenêtre de 30 jours avant ou après aujourd’hui. Les autres sports restent disponibles en démonstration ci-dessous.</p>
+    <p class="sub" id="liveHelp">Horaires de Paris · Jusqu’à 30 jours avant ou après aujourd’hui.</p>
     <form id="liveForm" class="ai-form">
       <fieldset id="liveFields">
-        <legend class="ai-sr-only">Recherche de rencontres de football</legend>
+        <legend class="ai-sr-only">Recherche de rencontres</legend>
+        <label for="liveSport">Sport</label><select id="liveSport"><option value="football">Football</option><option value="hockey">Hockey sur glace</option></select>
         <label for="liveDate">Date du match</label><input id="liveDate" type="date" required aria-describedby="liveHelp">
-        <label for="liveQuery">Équipe ou compétition (facultatif)</label><input id="liveQuery" type="search" maxlength="80" placeholder="Ex. Paris, Marseille ou Champions League" autocomplete="off">
+        <label for="liveQuery">Équipe ou compétition (facultatif)</label><input id="liveQuery" type="search" maxlength="80" placeholder="Ex. Madrid, Winnipeg ou NHL" autocomplete="off">
         <button id="liveSearch" class="primary" type="submit">Chercher les matchs</button>
       </fieldset>
     </form>
@@ -590,6 +590,16 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
       <p id="liveMatchMeta" class="sub"></p>
       <p id="liveScore" class="ai-match"></p>
       <p id="liveDetailFreshness" class="sub"></p>
+      <details id="matchTracker" class="match-tracker">
+        <summary>Suivi du match</summary>
+        <div id="trackerBoard" class="tracker-board">
+          <span id="trackerCompetition"></span><strong id="trackerScore"></strong><span id="trackerTeams"></span><b id="trackerPhase"></b>
+        </div>
+        <div id="trackerPeriods" class="tracker-periods"></div>
+        <h4>Derniers événements</h4><ol id="trackerEvents"></ol>
+        <p id="trackerUpdate" class="sub" role="status"></p>
+        <button type="button" id="trackerRefresh">Actualiser le suivi</button>
+      </details>
       <div class="wrap" id="liveStatsWrap" hidden><table id="liveStats"><caption>Statistiques du match fournies par 365Scores</caption><thead><tr><th scope="col">Statistique</th><th id="liveHomeTitle" scope="col"></th><th id="liveAwayTitle" scope="col"></th></tr></thead><tbody id="liveStatsBody"></tbody></table></div>
       <p id="liveNoStats" class="sub" hidden>Aucune statistique disponible pour cette rencontre. C’est notamment possible avant le coup d’envoi.</p>
       <section id="liveRecent" hidden aria-labelledby="liveRecentTitle">
@@ -599,6 +609,17 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
       </section>
       <p class="sub">Source : <a href="https://www.365scores.com/" target="_blank" rel="noopener noreferrer">365Scores</a>. Les intitulés sont affichés dans la langue fournie par la source. L’heure de récupération ne garantit pas l’actualité du score.</p>
       <section id="liveAnalysis" class="ai-auto-analysis" aria-labelledby="liveAnalysisTitle">
+        <section id="livePrediction" hidden aria-labelledby="livePredictionTitle">
+          <h3 id="livePredictionTitle">Pronostic avant-match</h3>
+          <div class="ai-checks">
+            <div><h4>Vainqueur envisagé</h4><p id="livePredictionWinner"></p></div>
+            <div><h4>Score exact estimé</h4><p id="livePredictionScore"></p></div>
+            <div><h4>Buteur possible</h4><p id="livePredictionScorer"></p><p id="livePredictionScorerNote" class="sub"></p></div>
+          </div>
+          <details><summary>Données utilisées pour le pronostic</summary><ul id="livePredictionEvidence" class="sub"></ul></details>
+          <p class="ai-notice">Estimations IA incertaines. Le score proposé est un scénario possible. La performance de ces pronostics n’a pas été évaluée.</p>
+        </section>
+        <p id="livePredictionStatus" class="sub" hidden></p>
         <h3 id="liveAnalysisTitle">Analyse du match</h3>
         <p id="liveAnalysisStatus" class="sub" role="status" aria-live="polite"></p>
         <div id="liveAnalysisContent" hidden>
@@ -608,57 +629,9 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
           <ul id="liveAnalysisLimits" class="sub"></ul>
         </div>
       </section>
-      <p class="ai-notice">Aucune probabilité ni conseil de mise. L’analyse explique les données disponibles ; elle ne prédit pas le résultat du match.</p>
     </section>
   </section>
-  <div class="ai-layout">
-    <section class="panel" aria-labelledby="aiFormTitle">
-      <h2 id="aiFormTitle">Ta rencontre · Démonstration</h2>
-      <p class="sub">Pour consulter les données et leur synthèse IA, sélectionne une rencontre dans les résultats au-dessus. Ce formulaire sert à essayer la démonstration avec une saisie manuelle.</p>
-      <form id="aiForm" class="ai-form">
-        <fieldset id="aiFields">
-          <legend class="ai-sr-only">Informations du match</legend>
-          <label for="aiSport">Sport</label>
-          <select id="aiSport" required>
-            <option value="">Choisir un sport</option>
-            <option value="football">Football</option><option value="basketball">Basketball</option>
-            <option value="tennis">Tennis</option><option value="hockey">Hockey sur glace</option>
-            <option value="rugby">Rugby</option><option value="baseball">Baseball</option>
-            <option value="american-football">Football américain</option>
-          </select>
-          <label for="aiHome">Équipe ou joueur A</label>
-          <input id="aiHome" type="text" required minlength="2" maxlength="80" placeholder="Ex. Paris Saint-Germain" autocomplete="off">
-          <label for="aiAway">Équipe ou joueur B</label>
-          <input id="aiAway" type="text" required minlength="2" maxlength="80" placeholder="Ex. Olympique de Marseille" autocomplete="off">
-          <button class="primary" id="aiSubmit" type="submit">Voir le rapport de démonstration</button>
-        </fieldset>
-        <p id="aiStatus" class="sub" role="status" aria-live="polite"></p>
-        <p id="aiError" class="ai-error" role="alert" hidden></p>
-      </form>
-    </section>
-    <section class="panel ai-capture" aria-labelledby="aiCaptureTitle">
-      <span class="ai-eyebrow">FACULTATIF · APERÇU LOCAL</span>
-      <h2 id="aiCaptureTitle">Une capture du match ?</h2>
-      <p class="sub" id="aiCaptureHelp">PNG ou JPEG, 5 Mo maximum et 16 mégapixels maximum. L’image reste dans ton navigateur : elle n’est ni envoyée, ni enregistrée, ni analysée. Recopie les équipes dans le formulaire.</p>
-      <label class="ai-file-label" for="aiScreenshot">Choisir une capture</label>
-      <input id="aiScreenshot" type="file" accept="image/png,image/jpeg" aria-describedby="aiCaptureHelp">
-      <p id="aiCaptureStatus" class="sub" role="status" aria-live="polite"></p>
-      <div id="aiPreviewArea" hidden>
-        <img id="aiPreview" alt="Aperçu local de ta capture de match">
-        <button id="aiRemoveCapture" type="button">Retirer la capture</button>
-      </div>
-    </section>
-  </div>
-  <section class="panel ai-report" id="aiReport" aria-labelledby="aiReportTitle" tabindex="-1">
-    <span class="ai-eyebrow">RAPPORT DE DÉMONSTRATION</span>
-    <h2 id="aiReportTitle">Le point de départ de ton analyse</h2>
-    <p id="aiReportNotice" class="sub">Saisis une rencontre pour afficher les informations à vérifier. Aucun pronostic ne sera proposé dans cette bêta.</p>
-    <div id="aiReportContent" hidden>
-      <p id="aiMatch" class="ai-match"></p>
-      <dl id="aiChecks" class="ai-checks"></dl>
-      <p class="ai-notice">Aucune source sportive consultée. Aucun conseil de mise. Ce rapport n’est pas une recommandation de pari.</p>
-    </div>
-  </section>
+
 </div>
 
 <div id="viewProfile" class="view">
@@ -688,7 +661,7 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V2.3.4 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V2.3.5 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -742,9 +715,9 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=2.3.4-release"></script>
+    <script src="/static/app.js?v=2.3.5-release"></script>
     <script src="/static/bankroll-reconcile.js?v=1"></script>
-    <script src="/static/bet-prono-ai.js?v=1"></script>
-    <script src="/static/sports-data.js?v=4"></script>
+    <script src="/static/match-tracker.js?v=2.3.5"></script>
+    <script src="/static/sports-data.js?v=6"></script>
 </body>
 </html>

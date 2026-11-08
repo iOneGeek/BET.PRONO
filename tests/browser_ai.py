@@ -4,15 +4,13 @@ Run: python tests/browser_ai.py
 Set BROWSER_CHANNEL=msedge to use installed Edge, and AI_SCREENSHOT_DIR to save previews.
 Uses the same disposable app/SQLite fixture as the API tests, never a live account.
 """
-import io
 import os
 from pathlib import Path
 import threading
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from PIL import Image
 from playwright.sync_api import sync_playwright, expect
 from werkzeug.serving import make_server
 from test_ai import AIBetaTests
@@ -52,96 +50,12 @@ def run():
             page.locator('#sideNav [data-route="ai"]').click()
             expect(page.locator('#viewAI')).to_be_visible()
             expect(page.locator('#viewBankroll')).not_to_be_visible()
-            page.locator('#aiSubmit').click()
-            assert not any('/api/ai/analyze' in url for _, url in requests)
-            page.locator('#aiSport').select_option('football')
-            page.locator('#aiHome').fill('Paris Saint-Germain')
-            page.locator('#aiAway').fill('Olympique de Marseille')
-            page.locator('#aiSubmit').click()
-            expect(page.locator('#aiReportContent')).to_be_visible()
-            expect(page.locator('#aiReportTitle')).to_have_text('Démonstration — aucune prédiction')
-            expect(page.locator('#aiMatch')).to_contain_text('Paris Saint-Germain — Olympique de Marseille')
-            expect(page.locator('#aiChecks > div')).to_have_count(4)
-            screenshots = os.environ.get('AI_SCREENSHOT_DIR')
+            for selector in ("#aiForm", "#aiScreenshot", "#aiReport"):
+                expect(page.locator(selector)).to_have_count(0)
+            screenshots = os.environ.get("AI_SCREENSHOT_DIR")
             if screenshots:
                 Path(screenshots).mkdir(parents=True, exist_ok=True)
-                page.evaluate('window.scrollTo(0, 0)')
-                page.screenshot(path=str(Path(screenshots) / 'bet-prono-ai-desktop.png'), full_page=True, animations='disabled')
-            # Editing removes the stale report; names are rendered as text, never markup.
-            page.locator('#aiHome').fill('<img src=x onerror=alert(1)>')
-            expect(page.locator('#aiReportContent')).not_to_be_visible()
-            page.locator('#aiSubmit').click()
-            expect(page.locator('#aiMatch')).to_contain_text('<img src=x onerror=alert(1)>')
-            expect(page.locator('#aiMatch img')).to_have_count(0)
-            page.locator('#aiHome').fill(' PARIS ')
-            page.locator('#aiAway').fill('paris')
-            page.locator('#aiSubmit').click()
-            expect(page.locator('#aiError')).to_contain_text('différents')
-            expect(page.locator('#aiSubmit')).to_be_enabled()
-            page.locator('#aiHome').fill('Paris Saint-Germain')
-            page.locator('#aiAway').fill('Olympique de Marseille')
-
-            def image_file(size=(32, 32), format='PNG'):
-                output = io.BytesIO()
-                Image.new('RGB', size, '#ff7518').save(output, format=format)
-                return {'name': 'capture.' + format.lower(), 'mimeType': 'image/png' if format == 'PNG' else 'image/jpeg', 'buffer': output.getvalue()}
-
-            for format in ('PNG', 'JPEG'):
-                before = len(requests)
-                page.locator('#aiScreenshot').set_input_files(image_file(format=format))
-                expect(page.locator('#aiPreviewArea')).to_be_visible()
-                assert len(requests) == before, 'A screenshot must never create a network request'
-                page.locator('#aiRemoveCapture').click()
-                expect(page.locator('#aiPreviewArea')).not_to_be_visible()
-                assert page.locator('#aiPreview').get_attribute('src') is None
-            invalid_files = [
-                ({'name': 'bad.svg', 'mimeType': 'image/svg+xml', 'buffer': b'<svg/>'}, 'PNG ou JPEG'),
-                ({'name': 'fake.png', 'mimeType': 'image/png', 'buffer': b'<script>alert(1)</script>'}, 'ne correspond pas'),
-                ({'name': 'broken.png', 'mimeType': 'image/png', 'buffer': b'\x89PNG\r\n\x1a\ninvalid'}, 'illisible'),
-                ({'name': 'large.png', 'mimeType': 'image/png', 'buffer': b'x' * (5 * 1024 * 1024 + 1)}, '5 Mo'),
-                (image_file((4001, 4000)), '16 mégapixels'),
-            ]
-            for file, message in invalid_files:
-                page.locator('#aiScreenshot').set_input_files(file)
-                expect(page.locator('#aiCaptureStatus')).to_contain_text(message)
-                expect(page.locator('#aiPreviewArea')).not_to_be_visible()
-
-            expect(page.locator('#jsError')).not_to_be_visible()
-
-            # Recoverable API failures, unexpected responses and session expiry.
-            api_url = '**/api/ai/analyze'
-            page.route(api_url, lambda route: route.abort())
-            page.locator('#aiSubmit').click()
-            expect(page.locator('#aiError')).to_contain_text('Connexion impossible')
-            expect(page.locator('#aiSubmit')).to_be_enabled()
-            page.unroute(api_url)
             page.clock.install()
-            pending = []
-            page.route(api_url, lambda route: pending.append(route))
-            page.locator('#aiSubmit').click()
-            expect(page.locator('#aiSubmit')).to_be_disabled()
-            page.locator('#aiForm').evaluate("form => form.dispatchEvent(new Event('submit', {cancelable:true}))")
-            page.wait_for_function("document.getElementById('aiForm').getAttribute('aria-busy') === 'true'")
-            assert len(pending) == 1, 'Duplicate submit must not send another request'
-            page.clock.fast_forward(16000)
-            expect(page.locator('#aiError')).to_contain_text('trop de temps')
-            expect(page.locator('#aiSubmit')).to_be_enabled()
-            pending[0].abort()
-            page.unroute(api_url)
-            for status, body, message in [
-                (503, '{"error":"Service indisponible"}', 'Service indisponible'),
-                (200, '{"mode":"live"}', 'Réponse inattendue'),
-                (403, '{"error":"Compte suspendu"}', 'Compte suspendu'),
-            ]:
-                page.route(api_url, lambda route, request, status=status, body=body: route.fulfill(status=status, content_type='application/json', body=body))
-                page.locator('#aiSubmit').click()
-                expect(page.locator('#aiError')).to_contain_text(message)
-                expect(page.locator('#aiSubmit')).to_be_enabled()
-                page.unroute(api_url)
-
-            page.locator('#aiSubmit').click()
-            expect(page.locator('#aiReportContent')).to_be_visible()
-            page.locator('#aiRemoveCapture').evaluate('(button) => button.click()')
             for width in [320, 390, 768, 1024, 1440]:
                 page.set_viewport_size({'width': width, 'height': 900})
                 nav = '#mainNav' if width <= 880 else '#sideNav'
@@ -161,23 +75,32 @@ def run():
             # Exercise the actual Flask adapter with synthetic provider responses.
             from test_sports_data import GAME, FakeResponse
             from test_match_analysis import response as model_response
-            today = datetime.now(fixture.module.FR_TZ).date().isoformat()
+            today = (datetime.now(fixture.module.FR_TZ).date() + timedelta(days=1)).isoformat()
             game = deepcopy(GAME)
             game['startTime'] = today + 'T20:00:00+01:00'
             other = {**game, 'id': 1002, 'statusGroup': 2, 'statusText': 'Scheduled'}
             pregame = deepcopy(other)
             pregame['id'] = 1003
-            pregame['homeCompetitor']['recentMatches'] = [900]
-            past = {**deepcopy(GAME), 'id': 900, 'startTime': '2026-10-01T20:00:00+02:00'}
+            pregame['homeCompetitor']['recentMatches'] = [900, 901, 902]
+            past = [{**deepcopy(GAME), 'id': 900 + index, 'startTime': f'2026-10-{index + 1:02}T20:00:00+02:00'} for index in range(3)]
+            pregame['members'] = [{'id': 77, 'name': 'Test Striker', 'competitorId': 20}]
+            pregame['awayCompetitor']['lineups'] = {'status': 'NotConfirmed', 'members': [{'id': 77, 'status': 1, 'position': {'id': 4}}]}
+            pregame['topPerformers'] = {'categories': [{'awayPlayer': {'id': 77, 'stats': [{'type': 1, 'name': 'Goals', 'value': '5'}]}}]}
             def provider_response(url, **kwargs):
                 if 'games/allscores' in url:
+                    if kwargs['params'].get('sports') == 4:
+                        return FakeResponse({'games': [hockey]})
                     if 'games' in kwargs['params']:
-                        return FakeResponse({'games': [past]})
+                        return FakeResponse({'games': past})
                     return FakeResponse({'games': [game, other, pregame]})
                 if url.endswith('/game/'):
+                    if kwargs['params']['gameId'] == 1004:
+                        return FakeResponse({'game': hockey})
                     return FakeResponse({'game': pregame if kwargs['params']['gameId'] == 1003 else other})
                 if kwargs['params']['games'] in (1002, 1003):
                     return FakeResponse({'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60})
+                if kwargs['params']['games'] == 1004:
+                    return FakeResponse({'games': [hockey]})
                 return FakeResponse({'games': [game], 'statistics': [
                     {'id': 3, 'name': 'Shots', 'competitorId': 10, 'value': '0'},
                     {'id': 3, 'name': 'Shots', 'competitorId': 20, 'value': '8'},
@@ -260,7 +183,9 @@ def run():
                 # A scheduled match can generate an analysis from verified past results.
                 fixture.module.match_analyzer._blocked_until = 0
                 history_answer = {'summary': 'Les résultats passés donnent un premier contexte.', 'observations': [
-                    {'text': 'Test Paris a perdu face à Test Lyon sur le score de 0 à 2.', 'fact_ids': ['home_recent_0']}]}
+                    {'text': 'Test Paris a perdu face à Test Lyon sur le score de 0 à 2.', 'fact_ids': ['home_recent_0']}],
+                    'prediction': {'home_goals': 0, 'away_goals': 2, 'scorer_id': 77,
+                                   'fact_ids': ['home_recent_0', 'away_recent_0', 'player_77']}}
                 with patch('match_analysis.requests.post', return_value=model_response(history_answer)) as history_generate:
                     page.locator('#liveMatches button').nth(2).click()
                     expect(page.locator('#liveRecent')).to_be_visible()
@@ -269,19 +194,46 @@ def run():
                     expect(page.locator('#liveStatsWrap')).not_to_be_visible()
                     expect(page.locator('#liveAnalysisSummary')).to_have_text(history_answer['summary'])
                     expect(page.locator('#liveAnalysisContent')).to_be_visible()
+                    expect(page.locator('#livePrediction')).to_be_visible()
+                    expect(page.locator('#livePredictionWinner')).to_have_text('Test Lyon')
+                    expect(page.locator('#livePredictionScore')).to_have_text('Test Paris 0 — 2 Test Lyon')
+                    expect(page.locator('#livePredictionScorer')).to_contain_text('Test Striker')
+                    expect(page.locator('#livePredictionScorerNote')).to_contain_text('composition à confirmer')
                     history_generate.assert_called_once()
                     for width in (390, 1440):
                         page.set_viewport_size({'width': width, 'height': 900})
                         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                         if screenshots:
-                            page.locator('.ai-live').screenshot(path=str(Path(screenshots) / f'pregame-{width}.png'), animations='disabled')
+                            page.locator('.ai-live').screenshot(path=str(Path(screenshots) / f'prediction-{width}.png'), animations='disabled')
                 page.locator('#liveQuery').fill('No such test team')
+                expect(page.locator('#livePrediction')).not_to_be_visible()
                 expect(page.locator('#liveReport')).not_to_be_visible()
                 expect(page.locator('#liveMatches button')).to_have_count(0)
                 page.locator('#liveSearch').click()
                 expect(page.locator('#liveStatus')).to_contain_text('Aucune rencontre')
                 self_count = get.call_count
                 assert self_count == 7, f'Expected cached search and details; got {self_count} provider calls'
+                # Start an independent hockey session window after the rapid football regression scenarios.
+                fixture.module.sports_client._users.clear()
+                hockey = {**game, 'id': 1004, 'sportId': 4, 'statusGroup': 3, 'statusText': '1st Intermission',
+                          'stages': [{'id': 40, 'shortName': 'P1', 'homeCompetitorScore': 0, 'awayCompetitorScore': 2}],
+                          'events': [{'stageId': 40, 'gameTimeDisplay': '04:15', 'competitorId': 10,
+                                      'eventType': {'name': 'Penalty'}}]}
+                page.locator('#liveSport').select_option('hockey')
+                page.locator('#liveQuery').fill('')
+                page.locator('#liveSearch').click()
+                page.locator('#liveMatches button').first.click()
+                expect(page.locator('#trackerPhase')).to_have_text('Fin du premier tiers')
+                expect(page.locator('#trackerEvents')).to_contain_text('04:15')
+                expect(page.locator('#trackerEvents')).to_contain_text('Pénalité')
+                expect(page.locator('#trackerPeriods')).to_contain_text('0 : 2')
+                page.set_viewport_size({'width': 390, 'height': 844})
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                with page.expect_request('**/1004/tracker'):
+                    page.clock.fast_forward(62000)
+                expect(page.locator('#trackerRefresh')).to_be_enabled()
+                page.locator('#liveQuery').fill('Madrid')
+                expect(page.locator('#matchTracker')).not_to_be_visible()
             page.route('**/api/ai/matches?*', lambda route: route.fulfill(status=503, content_type='application/json', body='{"error":"Source indisponible"}'))
             page.locator('#liveSearch').click()
             expect(page.locator('#liveError')).to_have_text('Source indisponible')
@@ -293,7 +245,7 @@ def run():
             page.wait_for_load_state('networkidle')
             assert not errors, errors
             browser.close()
-            print('Browser checks passed: demo regression, sports search/detail, missing statistics, shared cache, safe text, responsive layouts, provider errors and session expiry.')
+            print('Browser checks passed: demo removed, sports search/detail, pregame score/winner/scorer, missing statistics, safe text, responsive layouts, provider errors and session expiry.')
     finally:
         server.shutdown()
         thread.join()

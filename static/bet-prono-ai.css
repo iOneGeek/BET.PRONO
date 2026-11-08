@@ -46,3 +46,16 @@
 @media(max-width:880px){.mobile-nav{grid-template-columns:repeat(6,minmax(0,1fr))}.mobile-nav button{min-height:48px}.ai-layout{grid-template-columns:1fr;gap:16px}}
 @media(max-width:540px){.ai-checks{grid-template-columns:1fr}.ai-notice{padding:12px}.ai-hero{padding:20px}}
 @media(prefers-reduced-motion:reduce){#viewAI{animation:none}}
+
+.match-tracker{border:1px solid var(--line);border-radius:16px;margin:18px 0;padding:14px 16px}
+.match-tracker summary{font-weight:750;cursor:pointer;color:var(--text)}
+.tracker-board{display:grid;justify-items:center;gap:6px;margin:16px 0 12px;padding:22px 12px;border-radius:12px;text-align:center;color:#fff;background:#16364a}
+.tracker-board.rink{border:2px solid #729eb6;border-radius:56px;background:linear-gradient(90deg,transparent 29%,#709bc84a 29%,#709bc84a 30%,transparent 30%,transparent 49.5%,#b9727257 49.5%,#b9727257 50.5%,transparent 50.5%,transparent 70%,#709bc84a 70%,#709bc84a 71%,transparent 71%),radial-gradient(circle at center,transparent 42px,#729cb64f 43px,transparent 45px),#19394e}
+#trackerScore{line-height:1.1;font-size:2.45rem;font-weight:800;font-variant-numeric:tabular-nums}
+#trackerPhase{color:#ffba77}
+.tracker-periods{display:flex;gap:8px;flex-wrap:wrap}
+.tracker-periods div{display:grid;min-width:54px;text-align:center;padding:5px 9px;border:1px solid var(--line);border-radius:8px;font-variant-numeric:tabular-nums}
+.tracker-periods [aria-current]{border-color:var(--accent)}
+#trackerEvents{list-style:none;padding:0;max-height:240px;overflow:auto}
+#trackerEvents li{padding:6px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+#trackerEvents b{margin-right:10px;color:var(--mute)}

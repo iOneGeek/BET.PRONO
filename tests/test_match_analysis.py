@@ -1,5 +1,6 @@
 """Synthetic model responses only: these tests never spend API credits."""
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 import json
 import unittest
 from unittest.mock import patch
@@ -13,6 +14,19 @@ from test_sports_data import GAME, FakeResponse
 SNAPSHOT = {'match': normalize_game(GAME), 'statistics': [{'label': 'Shots', 'home': '0', 'away': '8'}]}
 ANSWER = {'summary': 'Les tirs observés sont déséquilibrés.', 'observations': [
     {'text': 'Test Lyon compte 8 tirs, contre 0 pour Test Paris.', 'fact_ids': ['stat_0']}]}
+
+
+def pregame_snapshot():
+    game = {**normalize_game(GAME), 'scheduled': True, 'starts_at': (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()}
+    past = [normalize_game({**GAME, 'id': 900 + index, 'startTime': f'2026-09-{index + 1:02}T20:00:00+02:00'}) for index in range(3)]
+    player = {'id': 77, 'name': 'Test Striker', 'team_id': 20, 'team_name': 'Test Lyon', 'side': 'away', 'goals': 5, 'lineup_confirmed': False}
+    return {'match': game, 'statistics': [], 'recent_results': {'home': past, 'away': past}, 'scorer_candidates': [player]}
+
+
+PREGAME_ANSWER = {'summary': 'Les résultats passés donnent un premier contexte.', 'observations': [
+    {'text': 'Test Paris a perdu face à Test Lyon.', 'fact_ids': ['home_recent_0']}], 'prediction': {
+        'home_goals': 0, 'away_goals': 2, 'scorer_id': 77,
+        'fact_ids': ['home_recent_0', 'away_recent_0', 'player_77']}}
 
 
 def response(answer=ANSWER, finish='STOP'):
@@ -52,7 +66,7 @@ class MatchAnalysisTests(unittest.TestCase):
         self.assertNotIn('test-key', json.dumps(options['json']))
         self.assertNotIn('test-key', json.dumps(first))
         self.assertFalse(options['allow_redirects'])
-        self.assertEqual(options['json']['generationConfig']['maxOutputTokens'], 2048)
+        self.assertEqual(options['json']['generationConfig']['maxOutputTokens'], 4096)
         self.assertNotIn('tools', options['json'])
         changed = deepcopy(SNAPSHOT)
         changed['match']['status'] = '2nd Half'
@@ -78,6 +92,60 @@ class MatchAnalysisTests(unittest.TestCase):
             self.assertNotEqual(snapshot_id(data), snapshot_id(changed))
             self.assertEqual(self.analyze(changed)['reason'], 'invalid_response')
             self.assertEqual(post.call_count, 2)
+
+    def test_prediction_contract_derives_winner_and_preserves_verified_player(self):
+        data = pregame_snapshot()
+        with patch('match_analysis.requests.post', return_value=response(PREGAME_ANSWER)) as post:
+            result = self.analyze(data)
+        self.assertEqual(result['status'], 'ready')
+        self.assertEqual(result['prediction']['winner'], 'away')
+        self.assertEqual(result['prediction']['scorer'], data['scorer_candidates'][0])
+        self.assertIn('prediction', post.call_args.kwargs['json']['generationConfig']['responseJsonSchema']['required'])
+        self.assertIn('période non précisée', ' '.join(result['prediction']['evidence']))
+        changed = deepcopy(data)
+        changed['scorer_candidates'][0]['lineup_confirmed'] = True
+        self.assertNotEqual(snapshot_id(data), snapshot_id(changed))
+
+    def test_prediction_rejects_inconsistent_scores_players_and_evidence(self):
+        data = pregame_snapshot()
+        facts = self.analyzer.facts(data)
+        prediction = PREGAME_ANSWER['prediction']
+        invalid = [
+            {**prediction, 'home_goals': True}, {**prediction, 'home_goals': -1},
+            {**prediction, 'home_goals': 11}, {**prediction, 'away_goals': 1.5},
+            {**prediction, 'scorer_id': 999}, {**prediction, 'scorer_id': True},
+            {**prediction, 'away_goals': 0}, {**prediction, 'winner': 'home'},
+            {**prediction, 'fact_ids': ['home_recent_0', 'away_recent_0']},
+            {**prediction, 'fact_ids': ['home_recent_0', 'player_77']},
+            {**prediction, 'fact_ids': ['home_recent_0', 'away_recent_0', 'invented']},
+        ]
+        for item in invalid:
+            with self.subTest(item=item), self.assertRaises(InvalidAnalysis):
+                self.analyzer.validate_prediction(item, data, facts)
+        draw = {**prediction, 'home_goals': 0, 'away_goals': 0, 'scorer_id': None,
+                'fact_ids': ['home_recent_0', 'away_recent_0']}
+        self.assertEqual(self.analyzer.validate_prediction(draw, data, facts)['winner'], 'draw')
+        self.assertIsNone(self.analyzer.validate_prediction(None, data, facts))
+
+    def test_predictions_require_both_histories_and_stop_at_kickoff_even_from_cache(self):
+        data = pregame_snapshot()
+        self.assertTrue(self.analyzer.can_predict(data))
+        sparse = deepcopy(data)
+        sparse['recent_results']['home'] = sparse['recent_results']['home'][:2]
+        self.assertFalse(self.analyzer.can_predict(sparse))
+        live = deepcopy(data)
+        live['match']['scheduled'] = False
+        self.assertFalse(self.analyzer.can_predict(live))
+        with patch('match_analysis.requests.post', return_value=response(PREGAME_ANSWER)):
+            self.assertIsNotNone(self.analyze(data)['prediction'])
+        after_kickoff = datetime.fromisoformat(data['match']['starts_at']) + timedelta(seconds=1)
+        descriptive = {key: value for key, value in PREGAME_ANSWER.items() if key != 'prediction'}
+        with patch('match_analysis.datetime', wraps=datetime) as clock, patch('match_analysis.requests.post', return_value=response(descriptive)) as post:
+            clock.now.return_value = after_kickoff
+            result = self.analyze(data)
+            self.assertEqual(result['status'], 'ready')
+            self.assertIsNone(result['prediction'])
+            post.assert_called_once()
 
     def test_unknown_evidence_invented_numbers_and_forecasts_rejected(self):
         bad = [None, {}, {**ANSWER, 'prediction': 'home'},
