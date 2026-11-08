@@ -872,7 +872,18 @@ def sports_matches():
         return jsonify({'error': 'Date invalide.'}), 400
     if abs((day - datetime.now(FR_TZ).date()).days) > 30:
         return jsonify({'error': 'Choisis une date dans les 30 jours précédents ou suivants.'}), 400
-    return sports_response(lambda: sports_client.matches(day, query))
+    sport = {'football': 1, 'hockey': 4}.get(request.args.get('sport', 'football'))
+    if sport is None:
+        return jsonify({'error': 'Sport indisponible.'}), 400
+    return sports_response(lambda: sports_client.matches(day, query, sport))
+
+
+@app.get('/api/ai/matches/<int:game_id>/tracker')
+@login_required
+def sports_tracker(game_id):
+    if not 0 < game_id < 10**12:
+        return jsonify({'error': 'Identifiant de rencontre invalide.'}), 400
+    return sports_response(lambda: sports_client.tracker(game_id))
 
 
 @app.get('/api/ai/matches/<int:game_id>')

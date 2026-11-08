@@ -19,14 +19,48 @@
     ? 'Score indisponible' : `${game.home.score} — ${game.away.score}`;
 
   function clearSelection() {
+    window.betTracker.clear();
     if (analysisActive) analysisActive.abort();
     analysisActive = null;
     el('liveAnalysis').removeAttribute('aria-busy');
     el('liveAnalysisContent').hidden = true;
+    el('livePrediction').hidden = true;
+    el('livePredictionStatus').hidden = true;
     el('liveAnalysisStatus').textContent = '';
     el('liveReport').hidden = true;
     el('liveError').hidden = true;
     el('liveMatches').querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', 'false'));
+  }
+
+  function showPrediction(prediction, snapshot) {
+    const game = snapshot.match;
+    if (!game.scheduled || new Date(game.starts_at) <= new Date()) return;
+    if (prediction == null) {
+      el('livePredictionStatus').textContent = 'Pronostic indisponible pour cette rencontre. Il nécessite au moins trois résultats récents vérifiés par équipe et une estimation exploitable.';
+      el('livePredictionStatus').hidden = false;
+      return;
+    }
+    const {home_goals: home, away_goals: away} = prediction;
+    if (![home, away].every(value => Number.isInteger(value) && value >= 0 && value <= 10)
+        || !Array.isArray(prediction.evidence)) throw new Error('Invalid prediction');
+    const winner = home === away ? 'draw' : home > away ? 'home' : 'away';
+    if (prediction.winner !== winner) throw new Error('Inconsistent prediction');
+    el('livePredictionWinner').textContent = winner === 'draw' ? 'Match nul envisagé' : game[winner].name;
+    el('livePredictionScore').textContent = `${game.home.name} ${home} — ${away} ${game.away.name}`;
+    el('livePredictionScorer').textContent = 'Aucun buteur proposé';
+    el('livePredictionScorerNote').textContent = '';
+    if (prediction.scorer != null) {
+      const player = (snapshot.scorer_candidates || []).find(candidate => candidate.id === prediction.scorer.id);
+      if (!player || (player.side === 'home' ? home : away) === 0) throw new Error('Invalid scorer');
+      el('livePredictionScorer').textContent = `${player.name} · ${player.team_name}`;
+      el('livePredictionScorerNote').textContent = `${player.goals} buts indiqués par 365Scores (période non précisée). `
+        + (player.lineup_confirmed ? 'Présence annoncée par la source.' : 'Participation possible, composition à confirmer.');
+    }
+    el('livePredictionEvidence').replaceChildren(...prediction.evidence.map(text => {
+      const item = document.createElement('li'); item.textContent = text; return item;
+    }));
+    el('livePredictionTitle').textContent = game.sport === 'Hockey sur glace' ? 'Pronostic avant-match · temps réglementaire' : 'Pronostic avant-match';
+    el('livePrediction').hidden = false;
   }
 
   async function loadAnalysis(snapshot) {
@@ -66,6 +100,7 @@
         const item = document.createElement('li'); item.textContent = text; return item;
       }));
       el('liveAnalysisDate').textContent = 'Synthèse générée par IA le ' + dateLabel(result.generated_at);
+      showPrediction(result.prediction, snapshot);
       el('liveAnalysisStatus').textContent = 'Analyse disponible, fondée sur les données affichées.';
       el('liveAnalysisContent').hidden = false;
     } catch (_) {
@@ -168,8 +203,9 @@
         return section;
       }));
       el('liveReport').hidden = false;
+      window.betTracker.select(game);
       button.setAttribute('aria-pressed', 'true');
-      el('liveStatus').textContent = 'Données du match chargées. Aucune prédiction calculée.';
+      el('liveStatus').textContent = 'Données du match chargées. Préparation de l’analyse…';
       el('liveReport').focus();
       loadAnalysis(data);
     }, false);
@@ -180,7 +216,7 @@
     if (el('liveFields').disabled || !el('liveForm').reportValidity()) return;
     el('liveMatches').replaceChildren();
     el('liveFreshness').hidden = true;
-    const query = new URLSearchParams({date: el('liveDate').value, q: el('liveQuery').value.trim()});
+    const query = new URLSearchParams({sport: el('liveSport').value, date: el('liveDate').value, q: el('liveQuery').value.trim()});
     load('/api/ai/matches?' + query, data => {
       if (!Array.isArray(data.matches)) throw new Error('Liste de rencontres non reconnue.');
       const buttons = data.matches.map(game => {

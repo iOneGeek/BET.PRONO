@@ -1,8 +1,8 @@
-# Données football 365Scores — intégration expérimentale
+# Données football et hockey 365Scores
 
 ## Fonctionnement et limites
 
-Dans **BET PRONO AI**, « Trouver un vrai match » charge les rencontres de football
+Dans **BET PRONO AI**, « Trouver un vrai match » charge les rencontres du sport choisi
 pour une date (fuseau Europe/Paris, aujourd'hui ±30 jours). Le filtre par équipe
 ou compétition est appliqué côté serveur, sans transmettre les noms saisis au
 fournisseur. Les accents et la casse sont ignorés. Une recherche vide liste la
@@ -23,13 +23,15 @@ de la source (anglais avec le paramètre actuellement testé).
 Le connecteur sportif ne récupère pas de pronostics ou de cotes et ne recommande
 aucune mise. Une [synthèse IA optionnelle](AUTO_ANALYSIS.md) est désormais demandée
 automatiquement après l'affichage du match, sans bouton supplémentaire.
-Elle ne modifie ni les paris ni la bankroll et ne calcule aucune prédiction.
-Le formulaire de démonstration multisport et l'aperçu local d'image restent séparés.
+Pour un match à venir, Gemini peut proposer un score, un vainqueur et un buteur.
+Le panneau « Suivi du match » utilise la fiche 365Scores de la rencontre sélectionnée.
+Il présente le score, les périodes et les derniers événements fournis. Lorsque le
+match est en cours, le panneau ouvert et visible se rafraîchit toutes les 61 secondes.
 
-Pour une rencontre programmée sans statistiques, la fiche récupère les références
+Pour une rencontre programmée, la fiche récupère les références
 `recentMatches` des deux équipes, au maximum 15 chacune. Une consultation groupée
 de `games/allscores/` avec `games=<identifiants>` et `showOdds=false` fournit les résultats.
-Seuls les matchs de football terminés, antérieurs à la fois à maintenant et au coup
+Seuls les matchs terminés du même sport, antérieurs à la fois à maintenant et au coup
 d'envoi sélectionné, avec identifiant demandé, équipe correspondante et scores
 entiers disponibles sont retenus. Ils sont dédupliqués, triés par date et limités
 aux cinq plus récents disponibles pour chaque équipe. Les résultats, dates et
@@ -46,7 +48,7 @@ reste testée avec des réponses simulées jusqu'à validation réelle sur Rende
 Hôte fixe : `https://webws.365scores.com/web/`.
 
 - `games/allscores/` : `appTypeId=5`, `langId=1`, `timezoneName=Europe/Paris`,
-  `sports=1`, `startDate` et `endDate` au format `DD/MM/YYYY`,
+  `sports=1` (football) ou `sports=4` (hockey), `startDate` et `endDate` au format `DD/MM/YYYY`,
   `showOdds=false`, `onlyMajorGames=false`.
 - `game/stats/` : paramètres communs et `games=<identifiant>`.
 - `game/` : paramètres communs et `gameId=<identifiant>`, lorsque les statistiques
@@ -73,8 +75,8 @@ de l'application. Configurer cette variable dans Render > Environment ou dans
 La synthèse automatique utilise séparément `GEMINI_API_KEY`, uniquement côté serveur ;
 elle reste indisponible sans cette clé, tandis que les données sportives fonctionnent.
 
-Seuls des clics explicites déclenchent une recherche ou une fiche. Aucun sondage
-automatique ni téléchargement d'image/logo distant n'est ajouté.
+Le rafraîchissement du suivi consulte uniquement la source sportive. Les appels
+automatiques de suivi ne déclenchent pas de nouvelle génération Gemini.
 
 ## Protections et cache
 
@@ -104,6 +106,7 @@ pas un quota contractuel annoncé par 365Scores.
 - `GET /api/ai/matches?date=YYYY-MM-DD&q=Paris` : liste, source, heure de récupération,
   marqueur de cache, nombre total et indicateur de résultats tronqués/incomplets.
 - `GET /api/ai/matches/<id>` : fiche, statistiques, source, heure, `prediction: null`.
+- `GET /api/ai/matches/<id>/tracker` : score, périodes, événements et heure de récupération.
 
 Erreurs : 400 saisie invalide, 401 session absente, 403 compte banni, 404 rencontre
 introuvable/incomplète, 429 limite atteinte (`Retry-After: 60`), 502 schéma inconnu,
@@ -118,7 +121,7 @@ introuvable/incomplète, 429 limite atteinte (`Retry-After: 60`), 502 schéma in
    Un match à venir peut ne pas avoir de statistiques : cela doit être indiqué.
 5. Changer le filtre : l'ancien rapport disparaît. Vérifier le rendu mobile.
 6. Désactiver le service via `SPORTS_DATA_ENABLED=0`, redémarrer et vérifier le message
-   d'indisponibilité ; le formulaire de démonstration et les paris doivent fonctionner.
+   d'indisponibilité.
 
 ```sh
 python -m unittest discover -s tests -v

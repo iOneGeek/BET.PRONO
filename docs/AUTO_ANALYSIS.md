@@ -6,11 +6,13 @@ supplémentaire et aucun nom de fournisseur de modèle dans l'interface.
 La mention « Synthèse générée par IA » distingue le texte généré des données source.
 
 Les statistiques fonctionnent même sans clé, en cas de panne ou de quota atteint.
-Pour un match programmé sans statistiques, la fiche charge jusqu'à cinq résultats
+Pour un match programmé, la fiche charge jusqu'à cinq résultats
 récents vérifiés de chaque équipe et les transmet à l'analyse. Les dates et scores
 apparaissent dans la fiche et les références de la synthèse. En l'absence de
 statistiques et de résultats récents exploitables, aucune génération n'est demandée.
-Les absences et compositions restent hors des données transmises.
+Avant le début du match, trois résultats vérifiés par équipe permettent de demander
+une estimation du score. Le vainqueur découle de ce score (temps réglementaire au hockey).
+Le buteur est facultatif et doit appartenir aux candidats identifiés par la source.
 
 ## Activer dans Render
 
@@ -56,10 +58,10 @@ cookie ou capture d'écran n'est transmis. La clé est placée dans l'en-tête
 `x-goog-api-key`, jamais dans une URL, un message d'erreur ou la réponse au navigateur.
 
 Le modèle reçoit une instruction de synthèse descriptive en français, sans outil
-de recherche, exécution de code, prédiction ou conseil de mise. Les champs des
+de recherche ou d'exécution de code. Le pronostic éventuel figure dans un champ distinct. Les champs des
 données sont explicitement traités comme des informations, jamais des instructions.
 L'appel utilise l'API REST `generateContent`, une sortie JSON structurée et un
-plafond de 2 048 jetons de sortie avec niveau de raisonnement LOW.
+plafond de 4 096 jetons de sortie avec niveau de raisonnement LOW.
 
 ## Contrôles et limites
 
@@ -69,8 +71,8 @@ plafond de 2 048 jetons de sortie avec niveau de raisonnement LOW.
   côté serveur. HTML, liens et certaines formulations de prédiction sont refusés.
 - Ces contrôles ne prouvent **pas** la justesse sémantique du texte : une lecture
   incorrecte des données reste possible. L'interface rappelle de vérifier les faits.
-- Aucun champ de probabilité, confiance prédictive ou mise recommandée ; `prediction`
-  reste nul. Aucun modèle prédictif évalué n'est ajouté par cette intégration.
+- Le score proposé cite au moins un résultat de chaque équipe. Un buteur proposé cite
+  aussi sa fiche et son équipe doit marquer dans le scénario. La fiabilité des estimations reste à évaluer.
 - Une seule génération simultanée par processus. Les autres demandes reçoivent
   un état d'indisponibilité temporaire, sans attente bloquant les statistiques.
 - Cache partagé des synthèses : 10 minutes, 128 entrées, lié au modèle, à la version
@@ -99,9 +101,8 @@ python -m unittest discover -s tests -v
 python tests/browser_ai.py
 ```
 
-Une vérification réelle avec le compte Google reste à faire après configuration
-de la clé. Aucun appel authentifié réel à Gemini n'a été effectué lors de cette
-implémentation, la clé n'étant pas encore disponible.
+Pour vérifier le pronostic avec le compte Google configuré sur Render, sélectionner
+un match à venir disposant d'au moins trois résultats récents de chaque côté.
 
 Références consultées : [modèle Gemini 3.8 Flash](https://aistudio.google.com/docs/models/gemini-3.8-flash),
 [API generateContent](https://aistudio.google.com/api-reference/generate-content),

@@ -34,8 +34,11 @@ def positive_id(value):
     return type(value) is int and 0 < value < 10**12
 
 
+SPORTS = {1: 'Football', 4: 'Hockey sur glace'}
+
+
 def normalize_game(raw):
-    if not isinstance(raw, dict) or raw.get('sportId') != 1 or not positive_id(raw.get('id')):
+    if not isinstance(raw, dict) or type(raw.get('sportId')) is not int or raw['sportId'] not in SPORTS or not positive_id(raw.get('id')):
         return None
     sides = []
     for key in ('homeCompetitor', 'awayCompetitor'):
@@ -52,9 +55,60 @@ def normalize_game(raw):
             return None
     except (ValueError, TypeError, AttributeError):
         return None
-    return {'id': raw['id'], 'sport': 'Football', 'competition': text(raw.get('competitionDisplayName')) or 'Compétition non précisée',
+    return {'id': raw['id'], 'sport': SPORTS[raw['sportId']], 'competition': text(raw.get('competitionDisplayName')) or 'Compétition non précisée',
             'starts_at': start.isoformat(), 'status': text(raw.get('statusText')) or 'Statut non précisé',
+            'scheduled': raw.get('statusGroup') == 2,
+            'live': raw.get('statusGroup') == 3,
             'home': sides[0], 'away': sides[1]}
+
+
+def scorer_candidates(raw_game, game):
+    """Join named team members, listed starters and provider goal totals by ID."""
+    members = raw_game.get('members', [])
+    performers = raw_game.get('topPerformers', {})
+    if not isinstance(members, list) or not isinstance(performers, dict):
+        return []
+    categories = performers.get('categories', [])
+    if not isinstance(categories, list):
+        return []
+    roster = {member['id']: member for member in members[:100] if isinstance(member, dict) and positive_id(member.get('id'))}
+    candidates = {}
+    for side, raw_side, player_key in (('home', 'homeCompetitor', 'homePlayer'), ('away', 'awayCompetitor', 'awayPlayer')):
+        team = raw_game.get(raw_side, {})
+        lineup = team.get('lineups', {})
+        if not isinstance(lineup, dict) or not isinstance(lineup.get('members'), list):
+            continue
+        listed = {member['id']: member for member in lineup['members'][:60]
+                  if isinstance(member, dict) and positive_id(member.get('id'))}
+        hockey = game['sport'] == 'Hockey sur glace'
+        starters = {member['id'] for member in lineup['members'][:40] if isinstance(member, dict)
+                    and positive_id(member.get('id')) and member.get('status') == 1
+                    and isinstance(member.get('position'), dict) and member['position'].get('id') in (3, 4)}
+        for category in categories[:10]:
+            player = category.get(player_key) if isinstance(category, dict) else None
+            if not isinstance(player, dict) or not positive_id(player.get('id')):
+                continue
+            if hockey:
+                entry = listed.get(player['id'])
+                if (player.get('positionName') not in ('Center', 'Left Wing', 'Right Wing', 'Forward')
+                        or (entry and (entry.get('status') != 1 or entry.get('isDoubtful')))):
+                    continue
+            elif player['id'] not in starters:
+                continue
+            member = roster.get(player['id'], {})
+            if member.get('competitorId') != game[side]['id'] or not text(member.get('name')):
+                continue
+            stats = player.get('stats', [])
+            if not isinstance(stats, list):
+                continue
+            goals = next((stat.get('value') for stat in stats[:20] if isinstance(stat, dict)
+                          and stat.get('type') == 1 and stat.get('name') == 'Goals'), None)
+            if not isinstance(goals, str) or not goals.isascii() or not goals.isdigit() or len(goals) > 3:
+                continue
+            candidates[player['id']] = {'id': player['id'], 'name': text(member['name']),
+                'team_id': game[side]['id'], 'team_name': game[side]['name'], 'side': side,
+                'goals': int(goals), 'lineup_confirmed': lineup.get('status') == 'Confirmed' and player['id'] in listed}
+    return list(candidates.values())[:6]
 
 
 class Scores365Client:
@@ -147,9 +201,9 @@ class Scores365Client:
                 self._cache.popitem(last=False)
             return data, fetched_at, False
 
-    def matches(self, day, query=''):
+    def matches(self, day, query='', sport=1):
         data, fetched_at, cached = self._get('games/allscores/', {
-            'sports': 1, 'startDate': day.strftime('%d/%m/%Y'), 'endDate': day.strftime('%d/%m/%Y'),
+            'sports': sport, 'startDate': day.strftime('%d/%m/%Y'), 'endDate': day.strftime('%d/%m/%Y'),
             'showOdds': 'false', 'onlyMajorGames': 'false'})
         games = []
         skipped = 0
@@ -159,6 +213,8 @@ class Scores365Client:
             game = normalize_game(raw)
             if not game:
                 skipped += 1
+                continue
+            if raw['sportId'] != sport:
                 continue
             # Provider day boundaries can include games from the previous day.
             if datetime.fromisoformat(game['starts_at']).astimezone(ZoneInfo('Europe/Paris')).date() != day:
@@ -188,7 +244,7 @@ class Scores365Client:
             if not isinstance(raw, dict) or raw.get('statusGroup') != 4 or not positive_id(raw.get('id')) or raw['id'] not in ids:
                 continue
             result = normalize_game(raw)
-            if not result or datetime.fromisoformat(result['starts_at']) >= cutoff:
+            if not result or result['sport'] != game['sport'] or datetime.fromisoformat(result['starts_at']) >= cutoff:
                 continue
             if any(type(result[side]['score']) not in (int, float) or not float(result[side]['score']).is_integer()
                    for side in ('home', 'away')):
@@ -212,7 +268,7 @@ class Scores365Client:
         raw_game = next((raw for raw in raw_games if isinstance(raw, dict) and raw.get('id') == game_id), None)
         game = normalize_game(raw_game)
         if not game:
-            raise SportsDataError('Cette rencontre de football est introuvable ou ses données sont incomplètes.', 404)
+            raise SportsDataError('Cette rencontre est introuvable ou ses données sont incomplètes.', 404)
         stats = data.get('statistics', [])
         if not isinstance(stats, list):
             raise SportsDataError('Le format des statistiques 365Scores a changé.')
@@ -232,15 +288,19 @@ class Scores365Client:
             row = rows.setdefault(stat['id'], {'label': text(stat['name']), 'home': None, 'away': None})
             row[side] = str(value)[:80]
         history = {'home': [], 'away': []}
+        players = []
         history_notice = ''
-        if raw_game.get('statusGroup') == 2 and not rows:
+        if raw_game.get('statusGroup') == 2:
             try:
                 if detail is None:
                     detail, detail_fetched_at, detail_cached = self._get('game/', {'gameId': game_id}, deadline)
-                    if detail['game'].get('id') != game_id or normalize_game(detail['game']) != game:
+                    verified = normalize_game(detail['game'])
+                    if (not verified or verified['id'] != game_id or verified['sport'] != game['sport']
+                            or not verified['scheduled'] or any(verified[s]['id'] != game[s]['id'] for s in ('home', 'away'))):
                         raise SportsDataError('Les informations du match ont changé. Actualise sa fiche.')
                     fetched_at = min(fetched_at, detail_fetched_at)
                     cached = cached and detail_cached
+                players = scorer_candidates(detail['game'], game)
                 history, history_fetched_at, history_cached = self._recent_results(detail['game'], game, deadline)
                 if history_fetched_at:
                     fetched_at = min(fetched_at, history_fetched_at)
@@ -250,6 +310,45 @@ class Scores365Client:
                 history_notice = 'Les résultats récents sont temporairement indisponibles. Réessaie dans une minute.'
         return {'mode': 'sports_data', 'match': game, 'statistics': list(rows.values())[:40],
                 'recent_results': history, 'history_notice': history_notice,
+                'scorer_candidates': players,
                 'source': self.SOURCE, 'fetched_at': fetched_at, 'cached': cached,
                 'cache_seconds': self.TTL, 'prediction': None,
-                'notice': 'Données fournies par 365Scores, potentiellement différées. La synthèse IA est chargée séparément ; aucune prédiction n’est calculée.'}
+                'notice': 'Données fournies par 365Scores, potentiellement différées.'}
+
+    def tracker(self, game_id):
+        data, fetched_at, cached = self._get('game/', {'gameId': game_id})
+        raw = data['game']
+        game = normalize_game(raw)
+        if not game or game['id'] != game_id:
+            raise SportsDataError('Suivi indisponible pour cette rencontre.', 404)
+
+        def records(key, limit):
+            value = raw.get(key)
+            return [row for row in value[:limit] if isinstance(row, dict)] if isinstance(value, list) else []
+
+        def period_score(value):
+            return int(value) if type(value) in (int, float) and 0 <= value < 1000 and int(value) == value else None
+
+        periods = []
+        stage_labels = {}
+        for stage in records('stages', 24):
+            label = text(stage.get('shortName'), 32) or text(stage.get('name'), 32)
+            if not positive_id(stage.get('id')) or not label or label.casefold() in ('score', 'total'):
+                continue
+            stage_labels[stage['id']] = label
+            periods.append({'label': label, 'current': stage.get('isCurrent') is True,
+                            'home': period_score(stage.get('homeCompetitorScore')),
+                            'away': period_score(stage.get('awayCompetitorScore'))})
+        teams = {game[side]['id']: game[side]['name'] for side in ('home', 'away')}
+        events = []
+        for event in records('events', 500):
+            kind = event.get('eventType')
+            team = event.get('competitorId')
+            if not isinstance(kind, dict) or not text(kind.get('name')) or not positive_id(team) or team not in teams:
+                continue
+            stage = event.get('stageId')
+            events.append({'label': text(kind['name'], 64), 'team': teams[team],
+                           'period': stage_labels.get(stage, '') if positive_id(stage) else '',
+                           'time': text(event.get('gameTimeDisplay'), 16)})
+        return {'match': game, 'periods': periods, 'events': events[-30:][::-1],
+                'fetched_at': fetched_at, 'cached': cached}

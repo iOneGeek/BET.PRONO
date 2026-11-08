@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 import requests
-from sports_data import Scores365Client, SportsDataError, normalize_game
+from sports_data import Scores365Client, SportsDataError, normalize_game, scorer_candidates
 
 
 GAME = {'id': 1001, 'sportId': 1, 'competitionDisplayName': 'Test League',
@@ -49,6 +49,40 @@ class SportsClientTests(unittest.TestCase):
         self.assertIsNone(normalize_game(game))
         for invalid in [None, {}, {**GAME, 'sportId': 2}, {**GAME, 'homeCompetitor': None}]:
             self.assertIsNone(normalize_game(invalid))
+
+    def test_scorer_requires_team_membership_starting_role_and_goal_data(self):
+        raw = deepcopy(GAME)
+        raw['members'] = [{'id': 77, 'name': 'Test Striker', 'competitorId': 10}]
+        raw['homeCompetitor']['lineups'] = {'status': 'NotConfirmed', 'members': [
+            {'id': 77, 'status': 1, 'position': {'id': 4}}]}
+        raw['topPerformers'] = {'categories': [{'homePlayer': {'id': 77, 'stats': [
+            {'type': 1, 'name': 'Goals', 'value': '5'}]}}]}
+        normalized = normalize_game(raw)
+        players = scorer_candidates(raw, normalized)
+        self.assertEqual(players[0]['name'], 'Test Striker')
+        self.assertEqual(players[0]['goals'], 5)
+        self.assertFalse(players[0]['lineup_confirmed'])
+        variants = []
+        for status in (2, 3, 4, None):
+            changed = deepcopy(raw)
+            changed['homeCompetitor']['lineups']['members'][0]['status'] = status
+            variants.append(changed)
+        changed = deepcopy(raw)
+        changed['members'][0]['competitorId'] = 999
+        variants.append(changed)
+        changed = deepcopy(raw)
+        changed['homeCompetitor']['lineups']['members'][0]['position']['id'] = 1
+        variants.append(changed)
+        changed = deepcopy(raw)
+        changed['members'] = []
+        variants.append(changed)
+        for value in ('-1', '2.5', 'unknown', '9999', True, None):
+            changed = deepcopy(raw)
+            changed['topPerformers']['categories'][0]['homePlayer']['stats'][0]['value'] = value
+            variants.append(changed)
+        for changed in variants:
+            with self.subTest(changed=changed):
+                self.assertEqual(scorer_candidates(changed, normalized), [])
 
     def test_search_date_boundary_query_and_shared_cache(self):
         previous = {**GAME, 'id': 1002, 'startTime': '2026-11-03T20:00:00+01:00'}
