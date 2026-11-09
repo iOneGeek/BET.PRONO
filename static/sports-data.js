@@ -17,8 +17,103 @@
   const freshness = data => `365Scores · Récupéré le ${dateLabel(data.fetched_at)} · ${data.cached ? 'Réponse en cache' : 'Consultation effectuée'} (cache maximal : 60 s).`;
   const score = game => game.home.score == null || game.away.score == null
     ? 'Score indisponible' : `${game.home.score} — ${game.away.score}`;
+  function element(tag, content, className) {
+    const node = document.createElement(tag);
+    node.textContent = content;
+    if (className) node.className = className;
+    return node;
+  }
+  function phase(game) {
+    if (game.scheduled) return 'À venir';
+    if (game.live) return 'En cours';
+    return game.status === 'Ended' ? 'Terminé' : game.status;
+  }
+
+  const frenchNames = new Map([['Wales', 'Pays de Galles'], ['Denmark', 'Danemark'], ['Norway', 'Norvège']]);
+  const teamName = team => frenchNames.get(team.name) || team.name;
+  function emblem(team, host) {
+    const initials = element('span', teamName(team).split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase());
+    host.replaceChildren(initials);
+    if (!Number.isSafeInteger(team.id) || team.id <= 0) return;
+    const img = new Image();
+    img.alt = '';
+    img.referrerPolicy = 'no-referrer';
+    img.addEventListener('load', () => {
+      if (initials.parentNode === host) host.replaceChildren(img);
+    }, {once:true});
+    img.src = 'https://imagecache.365scores.com/image/upload/w_96,h_96,c_limit,f_png/Competitors/' + team.id;
+  }
+  function highlights(game, history) {
+    const rows = [];
+    const add = (team, title, description, date) => {
+      const row = document.createElement('li');
+      const mark = element('span', '⇄', 'mini-emblem');
+      mark.setAttribute('aria-hidden', 'true');
+      if (team) emblem(team, mark);
+      const caption = document.createElement('span');
+      caption.append(element('b', title), ' · ' + description);
+      const stamp = element('time', new Intl.DateTimeFormat('fr-FR', {day:'2-digit', month:'2-digit', timeZone:'Europe/Paris'}).format(new Date(date)));
+      stamp.dateTime = date;
+      row.append(mark, caption, stamp);
+      rows.push(row);
+    };
+    for (const side of ['home', 'away']) {
+      const latest = history?.[side]?.[0];
+      if (!latest) continue;
+      const team = game[side];
+      const home = latest.home.id === team.id;
+      const own = home ? latest.home : latest.away;
+      const other = home ? latest.away : latest.home;
+      const outcome = own.score > other.score ? 'Victoire' : own.score < other.score ? 'Défaite' : 'Nul';
+      add(team, teamName(team), outcome + ' contre ' + teamName(other), latest.starts_at);
+    }
+    const duel = history?.home?.find(match => history.away?.some(other => other.id === match.id)
+      && [match.home.id, match.away.id].includes(game.home.id) && [match.home.id, match.away.id].includes(game.away.id));
+    if (duel) add(null, 'Confrontation directe', teamName(duel.home) + ' ' + score(duel) + ' ' + teamName(duel.away), duel.starts_at);
+    if (!rows.length) rows.push(element('li', 'Aucun résultat récent disponible.'));
+    el('recentHighlights').replaceChildren(...rows);
+  }
+  function setFormView(expanded) {
+    el('overviewView').setAttribute('aria-pressed', String(!expanded));
+    el('formView').setAttribute('aria-pressed', String(expanded));
+    el('reportColumns').classList.toggle('form-expanded', expanded);
+    el('liveAnalysis').hidden = expanded;
+  }
+  el('overviewView').addEventListener('click', () => setFormView(false));
+  el('formView').addEventListener('click', () => setFormView(true));
+  document.querySelectorAll('.dossier-nav a').forEach(link => link.addEventListener('click', event => {
+    event.preventDefault();
+    if (link.id === 'jumpResults') setFormView(true);
+    const target = document.querySelector(link.hash);
+    target.tabIndex = -1;
+    target.focus({preventScroll:true});
+    target.scrollIntoView({block:'start'});
+  }));
+
+  function recentRow(result, teamId) {
+    const atHome = result.home.id === teamId;
+    const opponent = atHome ? result.away : result.home;
+    const ownGoals = atHome ? result.home.score : result.away.score;
+    const otherGoals = opponent.score;
+    const outcome = ownGoals > otherGoals ? 'Victoire' : ownGoals === otherGoals ? 'Nul' : 'Défaite';
+    const row = document.createElement('li');
+    const info = element('span', '', 'result-info');
+    const label = element('strong', opponent.name);
+    const metadata = element('time', dateLabel(result.starts_at).split(' ')[0]);
+    metadata.dateTime = result.starts_at;
+    info.append(label, element('small', (atHome ? 'Domicile' : 'Extérieur') + ' · ' + result.competition));
+    const tally = element('abbr', ownGoals + ' — ' + otherGoals, 'result-score');
+    tally.dataset.outcome = outcome;
+    tally.title = outcome;
+    tally.setAttribute('aria-label', outcome + ', ' + ownGoals + ' à ' + otherGoals);
+    row.append(metadata, info, tally);
+    return row;
+  }
 
   function clearSelection() {
+    setFormView(false);
+    el('forecastSources').hidden = true;
+    el('jumpPrediction').hidden = true;
     window.betTracker.clear();
     if (analysisActive) analysisActive.abort();
     analysisActive = null;
@@ -27,6 +122,7 @@
     el('livePrediction').hidden = true;
     el('livePredictionStatus').hidden = true;
     el('liveAnalysisStatus').textContent = '';
+    el('liveReport').querySelectorAll('.report-disclosure[open]').forEach(detail => { detail.open = false; });
     el('liveReport').hidden = true;
     el('liveError').hidden = true;
     el('liveMatches').querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', 'false'));
@@ -45,9 +141,13 @@
         || !Array.isArray(prediction.evidence)) throw new Error('Invalid prediction');
     const winner = home === away ? 'draw' : home > away ? 'home' : 'away';
     if (prediction.winner !== winner) throw new Error('Inconsistent prediction');
-    el('livePredictionWinner').textContent = winner === 'draw' ? 'Match nul envisagé' : game[winner].name;
-    el('livePredictionScore').textContent = `${game.home.name} ${home} — ${away} ${game.away.name}`;
-    el('livePredictionScorer').textContent = 'Aucun buteur proposé';
+    el('livePredictionWinner').textContent = winner === 'draw' ? 'Match nul envisagé' : teamName(game[winner]);
+    el('livePredictionScore').replaceChildren(
+      element('span', game.home.name, 'ai-sr-only'), ' ',
+      element('strong', home + ' — ' + away), ' ',
+      element('span', game.away.name, 'ai-sr-only')
+    );
+    el('livePredictionScorer').textContent = 'Non proposé';
     el('livePredictionScorerNote').textContent = '';
     if (prediction.scorer != null) {
       const player = (snapshot.scorer_candidates || []).find(candidate => candidate.id === prediction.scorer.id);
@@ -60,6 +160,9 @@
       const item = document.createElement('li'); item.textContent = text; return item;
     }));
     el('livePredictionTitle').textContent = game.sport === 'Hockey sur glace' ? 'Pronostic avant-match · temps réglementaire' : 'Pronostic avant-match';
+    el('forecastScoreLabel').textContent = game.sport === 'Hockey sur glace' ? 'Score estimé · temps réglementaire' : 'Score estimé';
+    el('forecastSources').hidden = false;
+    el('jumpPrediction').hidden = false;
     el('livePrediction').hidden = false;
   }
 
@@ -89,8 +192,11 @@
         if (typeof point.text !== 'string' || !Array.isArray(point.evidence)) throw new Error('Invalid evidence');
         const item = document.createElement('li');
         const explanation = document.createElement('p'); explanation.textContent = point.text;
-        const evidence = document.createElement('p'); evidence.className = 'sub';
-        evidence.textContent = 'Données citées : ' + point.evidence.join(' · ');
+        const evidence = document.createElement('details'); evidence.className = 'report-disclosure';
+        evidence.append(element('summary', 'Données citées'));
+        const cited = document.createElement('ul');
+        cited.append(...point.evidence.map(fact => element('li', fact)));
+        evidence.append(cited);
         item.append(explanation, evidence);
         return item;
       });
@@ -101,7 +207,7 @@
       }));
       el('liveAnalysisDate').textContent = 'Synthèse générée par IA le ' + dateLabel(result.generated_at);
       showPrediction(result.prediction, snapshot);
-      el('liveAnalysisStatus').textContent = 'Analyse disponible, fondée sur les données affichées.';
+      el('liveAnalysisStatus').textContent = '';
       el('liveAnalysisContent').hidden = false;
     } catch (_) {
       if (analysisActive === controller) el('liveAnalysisStatus').textContent = 'L’analyse automatique est momentanément indisponible. Les statistiques restent consultables.';
@@ -161,9 +267,17 @@
     load(`/api/ai/matches/${id}`, data => {
       const game = data.match;
       if (!game || game.id !== id || !game.home || !game.away || !Array.isArray(data.statistics)) throw new Error('Rencontre non reconnue.');
-      el('liveReportTitle').textContent = `${game.home.name} — ${game.away.name}`;
-      el('liveMatchMeta').textContent = `${game.competition} · ${dateLabel(game.starts_at)} · ${game.status} · Référence 365Scores : ${game.id}`;
+      el('liveReportTitle').replaceChildren(teamName(game.home), element('em', ' vs '), teamName(game.away));
+      emblem(game.home, el('homeEmblem'));
+      emblem(game.away, el('awayEmblem'));
+      el('liveMatchMeta').textContent = new Date(game.starts_at).toLocaleString('fr-FR', {dateStyle:'medium', timeStyle:'short', timeZone:'Europe/Paris'}) + ' (Paris)';
+      el('fixturePhase').textContent = phase(game);
+      el('fixtureCompetition').textContent = game.competition.replace(/UEFA Nations League/i, 'Ligue des nations');
+      el('fixtureSourceId').textContent = 'Référence du match : ' + game.id + '.';
       el('liveScore').textContent = score(game);
+      el('liveScore').hidden = game.scheduled;
+      if (game.scheduled) el('reportColumns').after(el('reportMatchData'));
+      else el('reportViews').before(el('reportMatchData'));
       el('liveDetailFreshness').textContent = freshness(data);
       el('liveHomeTitle').textContent = game.home.name;
       el('liveAwayTitle').textContent = game.away.name;
@@ -182,6 +296,9 @@
       el('liveStatsWrap').hidden = !data.statistics.length;
       el('liveNoStats').hidden = !!data.statistics.length;
       el('liveRecent').hidden = !data.history_notice;
+      el('reportViews').hidden = !data.history_notice;
+      el('jumpResults').hidden = !data.history_notice;
+      highlights(game, data.recent_results);
       el('liveRecentNotice').textContent = data.history_notice || '';
       el('liveRecentTeams').replaceChildren(...['home', 'away'].map(side => {
         const section = document.createElement('div');
@@ -194,18 +311,18 @@
           empty.className = 'sub'; empty.textContent = 'Aucun résultat récent vérifié disponible.';
           section.append(empty);
         }
-        for (const result of results) {
-          const item = document.createElement('p');
-          item.className = 'sub';
-          item.textContent = `${dateLabel(result.starts_at)} · ${result.competition} · ${result.home.name} ${score(result)} ${result.away.name}`;
-          section.append(item);
+        if (results.length) {
+          const list = document.createElement('ul');
+          list.className = 'recent-list';
+          list.append(...results.map(result => recentRow(result, game[side].id)));
+          section.append(list);
         }
         return section;
       }));
       el('liveReport').hidden = false;
       window.betTracker.select(game);
       button.setAttribute('aria-pressed', 'true');
-      el('liveStatus').textContent = 'Données du match chargées. Préparation de l’analyse…';
+      el('liveStatus').textContent = '';
       el('liveReport').focus();
       loadAnalysis(data);
     }, false);
@@ -226,7 +343,7 @@
         const title = document.createElement('strong');
         title.textContent = `${game.home.name} — ${game.away.name}`;
         const meta = document.createElement('span');
-        meta.textContent = `${game.competition} · ${dateLabel(game.starts_at)} · ${game.status} · ${score(game)}`;
+        meta.textContent = [game.competition, dateLabel(game.starts_at), phase(game), game.scheduled ? '' : score(game)].filter(Boolean).join(' · ');
         button.append(title, meta);
         button.addEventListener('click', () => showMatch(game.id, button));
         return button;
