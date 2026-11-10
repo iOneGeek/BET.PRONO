@@ -192,11 +192,15 @@ def scorer_candidates(raw_game, game):
                           and stat.get('type') == 1 and stat.get('name') == 'Goals'), None)
             if not isinstance(goals, str) or not goals.isascii() or not goals.isdigit() or len(goals) > 3 or int(goals) == 0:
                 continue
+            apps = next((stat.get('value') for stat in stats[:20] if isinstance(stat, dict)
+                         and stat.get('type') == 5 and stat.get('name') == 'Appearances'), None)
+            apps = int(apps) if isinstance(apps, str) and apps.isascii() and apps.isdigit() and 0 < len(apps) <= 3 else None
             lineup_state = ('confirmed' if lineup.get('status') == 'Confirmed' and player['id'] in listed
                             else 'probable' if player['id'] in listed else 'unknown')
             candidates[player['id']] = {'id': player['id'], 'name': name,
                 'team_id': game[side]['id'], 'team_name': game[side]['name'], 'side': side,
-                'goals': int(goals), 'lineup_confirmed': lineup_state == 'confirmed', 'lineup': lineup_state}
+                'goals': int(goals), 'appearances': apps,
+                'lineup_confirmed': lineup_state == 'confirmed', 'lineup': lineup_state}
     return list(candidates.values())[:6]
 
 
@@ -347,7 +351,7 @@ class Scores365Client:
             completed[result['id']] = result
         ordered = sorted(completed.values(), key=lambda result: (datetime.fromisoformat(result['starts_at']), result['id']), reverse=True)
         history = {side: [result for result in ordered if game[side]['id'] in
-                         (result['home']['id'], result['away']['id'])][:5] for side in ('home', 'away')}
+                         (result['home']['id'], result['away']['id'])][:10] for side in ('home', 'away')}
         return history, fetched_at, cached
 
     def _head_to_head(self, game, deadline):
@@ -443,7 +447,7 @@ class Scores365Client:
                 if history_fetched_at:
                     fetched_at = min(fetched_at, history_fetched_at)
                 cached = cached and history_cached
-                history_notice = 'Jusqu’à cinq résultats récents disponibles par équipe. La couverture de la source peut être partielle.'
+                history_notice = 'Jusqu’à dix résultats récents disponibles par équipe. La couverture de la source peut être partielle.'
             except SportsDataError:
                 history_notice = 'Les résultats récents sont temporairement indisponibles. Réessaie dans une minute.'
             try:

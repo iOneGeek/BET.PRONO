@@ -160,7 +160,7 @@
         : ['—', '—', '—', '—', '—']).map(value => element('td', value)));
       return row;
     }));
-    el('liveFormNote').textContent = 'Calcul sur les résultats récents affichés (jusqu’à cinq par équipe)'
+    el('liveFormNote').textContent = 'Calcul sur les dix derniers résultats au plus, les plus récents comptant davantage'
       + (game.sport === 'Hockey sur glace' ? ', au score de fin de temps réglementaire.' : '.');
     const meetings = Array.isArray(data.head_to_head) ? data.head_to_head : [];
     const summary = data.head_to_head_summary;
@@ -174,6 +174,7 @@
   let trackLoaded = false;
   async function loadTrackRecord() {
     trackLoaded = true;
+    loadFollows();
     el('aiTrackRefresh').disabled = true;
     el('aiTrackStatus').textContent = 'Chargement du bilan…';
     try {
@@ -188,7 +189,6 @@
       show('trackAiWinner', data.ai.winner);
       show('trackAiExact', data.ai.exact_score);
       show('trackAiScorer', data.ai.scorer);
-      show('trackModelWinner', data.model.winner);
       el('aiTrackRecent').replaceChildren(...(data.recent.length ? data.recent.map(item => {
         const row = document.createElement('li');
         const when = element('time', dateLabel(item.starts_at).split(' ')[0]);
@@ -231,6 +231,7 @@
     if (analysisActive) analysisActive.abort();
     analysisActive = null;
     el('liveAnalysis').removeAttribute('aria-busy');
+    el('liveAnalysisStatus').classList.remove('is-loading');
     el('liveAnalysisContent').hidden = true;
     el('livePrediction').hidden = true;
     el('livePredictionStatus').hidden = true;
@@ -241,11 +242,98 @@
     el('liveMatches').querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', 'false'));
   }
 
+  // ---- Pronos suivis -------------------------------------------------------
+  const followed = new Set();
+  let currentPick = null;
+
+  function setFollowButton(on) {
+    const button = el('followPick');
+    button.setAttribute('aria-pressed', String(on));
+    button.replaceChildren(element('span', on ? '★' : '☆'), on ? ' Prono suivi' : ' Suivre ce prono');
+    button.firstChild.setAttribute('aria-hidden', 'true');
+    button.classList.toggle('is-on', on);
+  }
+
+  function followRow(item) {
+    const row = document.createElement('li');
+    const when = element('time', dateLabel(item.starts_at).split(' ')[0]);
+    when.dateTime = item.starts_at;
+    const info = element('span', '', 'result-info');
+    const prono = `Prono ${item.predicted.replace('-', ' — ')}` + (item.scorer ? ` · Buteur ${item.scorer}` : '');
+    let detail = prono;
+    if (item.status === 'settled') {
+      detail += ` · Réel ${item.actual ? item.actual.replace('-', ' — ') : 'nul à 90 min'}`;
+      if (item.exact_hit) detail += ' · Score exact ✓';
+      if (item.scorer_hit != null) detail += item.scorer_hit ? ' · Buteur ✓' : ' · Buteur ✗';
+    }
+    info.append(element('strong', `${item.home} — ${item.away}`), element('small', `${item.competition} · ${detail}`));
+    const label = item.status === 'pending' ? '…' : item.status === 'void' ? '—' : item.winner_hit ? '✓' : '✗';
+    const tally = element('abbr', label, 'result-score');
+    tally.dataset.outcome = item.status === 'settled' ? (item.winner_hit ? 'Victoire' : 'Défaite') : 'Nul';
+    tally.title = item.status === 'pending' ? 'En attente du résultat' : item.status === 'void' ? 'Match non vérifiable'
+      : item.winner_hit ? 'Bon vainqueur' : 'Mauvais vainqueur';
+    const remove = element('button', 'Retirer', 'follow-remove');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `Ne plus suivre ${item.home} — ${item.away}`);
+    remove.addEventListener('click', () => toggleFollow(item.game_id, false));
+    row.append(when, info, tally, remove);
+    return row;
+  }
+
+  async function loadFollows() {
+    try {
+      const response = await fetch('/api/ai/follows', {credentials: 'same-origin'});
+      if (response.status === 401) { location.href = '/login'; return; }
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data.items)) throw new Error('Follows unavailable');
+      followed.clear();
+      data.items.forEach(item => followed.add(item.game_id));
+      if (currentPick) setFollowButton(followed.has(currentPick.id));
+      el('aiFollowsList').replaceChildren(...data.items.map(followRow));
+      const s = data.summary;
+      el('aiFollowsStatus').textContent = data.items.length
+        ? `${s.followed} prono(s) suivi(s) · ${s.pending} en attente` + (s.settled ? ` · ${s.winner.hits} bon(s) vainqueur(s) sur ${s.settled}` : '') + '.'
+        : 'Clique sur « Suivre ce prono » dans la fiche d’un match pour le retrouver ici avec son résultat.';
+      el('trackMine').textContent = s.settled ? percent(s.winner.rate) : (s.followed ? String(s.followed) : '—');
+      el('trackMineN').textContent = s.settled ? `${s.winner.hits} sur ${s.settled} · bon vainqueur` : (s.followed ? 'en attente' : 'Aucun prono suivi');
+    } catch (_) {
+      el('aiFollowsStatus').textContent = 'Tes pronos suivis sont momentanément indisponibles.';
+    }
+  }
+
+  async function toggleFollow(gameId, on, confidence) {
+    const button = el('followPick');
+    if (currentPick && currentPick.id === gameId) button.disabled = true;
+    try {
+      const response = await fetch(`/api/ai/follows/${gameId}`, {
+        method: on ? 'POST' : 'DELETE', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'}, body: on ? JSON.stringify({confidence}) : undefined});
+      if (response.status === 401) { location.href = '/login'; return; }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Action impossible pour le moment.');
+      if (on) followed.add(gameId); else followed.delete(gameId);
+      if (currentPick && currentPick.id === gameId) {
+        setFollowButton(on);
+        el('followStatus').textContent = on ? 'Ajouté à « Mes pronos suivis ». Le résultat s’affichera après le match.' : 'Prono retiré de ta liste.';
+      }
+      loadFollows();
+    } catch (error) {
+      if (currentPick && currentPick.id === gameId) el('followStatus').textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  }
+  el('followPick').addEventListener('click', () => {
+    if (currentPick) toggleFollow(currentPick.id, !followed.has(currentPick.id), currentPick.confidence);
+  });
+
   function showPrediction(prediction, snapshot) {
     const game = snapshot.match;
+    currentPick = null;
+    el('followStatus').textContent = '';
     if (!game.scheduled || new Date(game.starts_at) <= new Date()) return;
     if (prediction == null) {
-      el('livePredictionStatus').textContent = 'Pronostic indisponible pour cette rencontre. Il nécessite au moins trois résultats récents vérifiés par équipe et une estimation exploitable.';
+      el('livePredictionStatus').textContent = 'Pronostic indisponible pour cette rencontre. Il nécessite au moins trois résultats récents vérifiés par équipe.';
       el('livePredictionStatus').hidden = false;
       return;
     }
@@ -254,26 +342,44 @@
         || !Array.isArray(prediction.evidence)) throw new Error('Invalid prediction');
     const winner = home === away ? 'draw' : home > away ? 'home' : 'away';
     if (prediction.winner !== winner) throw new Error('Inconsistent prediction');
+    const hockey = game.sport === 'Hockey sur glace';
     el('livePredictionWinner').textContent = winner === 'draw' ? 'Match nul envisagé' : teamName(game[winner]);
     el('livePredictionScore').replaceChildren(
       element('span', game.home.name, 'ai-sr-only'), ' ',
       element('strong', home + ' — ' + away), ' ',
       element('span', game.away.name, 'ai-sr-only')
     );
+    const model = snapshot.model;
+    const confidence = typeof prediction.confidence === 'number' ? prediction.confidence : null;
+    const parts = [];
+    if (confidence != null) parts.push(`${winner === 'draw' ? 'Nul' : teamName(game[winner])} : ${percent(confidence)}`);
+    if (model && model.double_chance && winner !== 'draw') {
+      const dc = winner === 'home' ? model.double_chance.home_or_draw : model.double_chance.away_or_draw;
+      parts.push(`${teamName(game[winner])} ou nul : ${percent(dc)}`);
+    }
+    if (typeof prediction.score_probability === 'number') parts.push(`score exact : ${percent(prediction.score_probability)}`);
+    el('livePredictionConfidence').textContent = parts.length ? 'Selon le modèle · ' + parts.join(' · ') : '';
     el('livePredictionScorer').textContent = 'Non proposé';
-    el('livePredictionScorerNote').textContent = '';
+    el('livePredictionScorerNote').textContent = (prediction.scorer_options || []).length
+      ? 'Aucun joueur assez probable dans l’équipe qui marque selon le score estimé.'
+      : 'Pas assez de données joueurs pour ce match.';
     if (prediction.scorer != null) {
       const player = (snapshot.scorer_candidates || []).find(candidate => candidate.id === prediction.scorer.id);
       if (!player || (player.side === 'home' ? home : away) === 0) throw new Error('Invalid scorer');
       el('livePredictionScorer').textContent = `${player.name} · ${player.team_name}`;
-      el('livePredictionScorerNote').textContent = `${player.goals} buts indiqués par 365Scores (période non précisée). `
-        + (player.lineup_confirmed ? 'Présence annoncée par la source.' : 'Participation possible, composition à confirmer.');
+      const chance = typeof prediction.scorer.probability === 'number' ? `${percent(prediction.scorer.probability)} de chances de marquer. ` : '';
+      el('livePredictionScorerNote').textContent = chance + `${player.goals} buts`
+        + (player.appearances ? ` en ${player.appearances} matchs` : '') + ' selon 365Scores. '
+        + (player.lineup_confirmed ? 'Présence annoncée par la source.' : 'Composition à confirmer.');
     }
     el('livePredictionEvidence').replaceChildren(...prediction.evidence.map(text => {
       const item = document.createElement('li'); item.textContent = text; return item;
     }));
-    el('livePredictionTitle').textContent = game.sport === 'Hockey sur glace' ? 'Pronostic avant-match · temps réglementaire' : 'Pronostic avant-match';
-    el('forecastScoreLabel').textContent = game.sport === 'Hockey sur glace' ? 'Score estimé · temps réglementaire' : 'Score estimé';
+    el('livePredictionTitle').textContent = hockey ? 'Pronostic avant-match · temps réglementaire' : 'Pronostic avant-match';
+    el('forecastScoreLabel').textContent = hockey ? 'Score estimé · temps réglementaire' : 'Score estimé';
+    currentPick = {id: game.id, confidence};
+    setFollowButton(followed.has(game.id));
+    el('followPick').disabled = false;
     el('forecastSources').hidden = false;
     el('jumpPrediction').hidden = false;
     el('livePrediction').hidden = false;
@@ -283,7 +389,8 @@
     const controller = new AbortController();
     analysisActive = controller;
     el('liveAnalysis').setAttribute('aria-busy', 'true');
-    el('liveAnalysisStatus').textContent = 'Préparation de l’analyse à partir des données du match…';
+    el('liveAnalysisStatus').textContent = 'L’IA analyse le match (jusqu’à 30 secondes)';
+    el('liveAnalysisStatus').classList.add('is-loading');
     const timer = setTimeout(() => controller.abort(), 55000);
     try {
       const response = await fetch(`/api/ai/matches/${snapshot.match.id}/analysis`, {
@@ -319,7 +426,6 @@
         const item = document.createElement('li'); item.textContent = text; return item;
       }));
       el('liveAnalysisDate').textContent = 'Synthèse générée par IA le ' + dateLabel(result.generated_at);
-      showPrediction(result.prediction, snapshot);
       el('liveAnalysisStatus').textContent = '';
       el('liveAnalysisContent').hidden = false;
     } catch (_) {
@@ -329,6 +435,7 @@
       if (analysisActive === controller) {
         analysisActive = null;
         el('liveAnalysis').removeAttribute('aria-busy');
+        el('liveAnalysisStatus').classList.remove('is-loading');
       }
     }
   }
@@ -374,6 +481,7 @@
     el('liveMatches').replaceChildren();
     el('liveFreshness').hidden = true;
     el('liveStatus').textContent = 'Recherche modifiée. Clique sur Chercher les matchs.';
+    el('liveStatus').classList.remove('is-loading');
   });
 
   async function load(path, render, searching) {
@@ -383,7 +491,8 @@
     clearSelection();
     el('liveFields').disabled = searching;
     el('liveForm').setAttribute('aria-busy', 'true');
-    el('liveStatus').textContent = 'Consultation de 365Scores…';
+    el('liveStatus').textContent = searching ? 'Recherche des matchs' : 'Chargement de la fiche du match';
+    el('liveStatus').classList.add('is-loading');
     const timer = setTimeout(() => controller.abort(), searching ? 15000 : 25000);
     try {
       const response = await fetch(path, {credentials: 'same-origin', signal: controller.signal});
@@ -403,6 +512,7 @@
       clearTimeout(timer);
       if (active === controller) {
         active = null;
+        el('liveStatus').classList.remove('is-loading');
         el('liveFields').disabled = false;
         el('liveForm').removeAttribute('aria-busy');
       }
@@ -410,6 +520,9 @@
   }
 
   function showMatch(id, button) {
+    el('liveMatches').querySelectorAll('.is-loading').forEach(other => other.classList.remove('is-loading'));
+    button.classList.add('is-loading');
+    button.setAttribute('aria-busy', 'true');
     load(`/api/ai/matches/${id}`, data => {
       const game = data.match;
       if (!game || game.id !== id || !game.home || !game.away || !Array.isArray(data.statistics)) throw new Error('Rencontre non reconnue.');
@@ -445,6 +558,7 @@
       el('reportViews').hidden = !data.history_notice;
       el('jumpResults').hidden = !data.history_notice;
       highlights(game, data.recent_results);
+      showPrediction(data.prediction, data);
       showModel(data);
       showForm(data);
       el('liveRecentNotice').textContent = data.history_notice || '';
@@ -453,7 +567,7 @@
         const heading = document.createElement('h4');
         heading.textContent = game[side].name;
         section.append(heading);
-        const results = data.recent_results?.[side] || [];
+        const results = (data.recent_results?.[side] || []).slice(0, 5);
         if (!results.length) {
           const empty = document.createElement('p');
           empty.className = 'sub'; empty.textContent = 'Aucun résultat récent vérifié disponible.';
@@ -473,7 +587,10 @@
       el('liveStatus').textContent = '';
       el('liveReport').focus();
       loadAnalysis(data);
-    }, false);
+    }, false).finally(() => {
+      button.classList.remove('is-loading');
+      button.removeAttribute('aria-busy');
+    });
   }
 
   el('liveForm').addEventListener('submit', event => {

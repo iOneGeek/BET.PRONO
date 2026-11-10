@@ -24,9 +24,7 @@ def pregame_snapshot():
 
 
 PREGAME_ANSWER = {'summary': 'Les résultats passés donnent un premier contexte.', 'observations': [
-    {'text': 'Test Paris a perdu face à Test Lyon.', 'fact_ids': ['home_recent_0']}], 'prediction': {
-        'home_goals': 0, 'away_goals': 2, 'scorer_id': 77,
-        'fact_ids': ['home_recent_0', 'away_recent_0', 'player_77']}}
+    {'text': 'Test Paris a perdu face à Test Lyon.', 'fact_ids': ['home_recent_0']}]}
 
 
 def response(answer=ANSWER, finish='STOP'):
@@ -94,59 +92,18 @@ class MatchAnalysisTests(unittest.TestCase):
             # The rejected answer is retried once before giving up.
             self.assertEqual(post.call_count, 3)
 
-    def test_prediction_contract_derives_winner_and_preserves_verified_player(self):
+    def test_pregame_analysis_never_asks_the_model_for_a_score(self):
         data = pregame_snapshot()
         with patch('match_analysis.requests.post', return_value=response(PREGAME_ANSWER)) as post:
             result = self.analyze(data)
         self.assertEqual(result['status'], 'ready')
-        self.assertEqual(result['prediction']['winner'], 'away')
-        self.assertEqual(result['prediction']['scorer'], data['scorer_candidates'][0])
-        self.assertIn('prediction', post.call_args.kwargs['json']['generationConfig']['responseJsonSchema']['required'])
-        self.assertIn('période non précisée', ' '.join(result['prediction']['evidence']))
+        self.assertIsNone(result['prediction'])
+        schema = post.call_args.kwargs['json']['generationConfig']['responseJsonSchema']
+        self.assertNotIn('prediction', schema['properties'])
+        self.assertIn('calculé à part par le serveur', post.call_args.kwargs['json']['systemInstruction']['parts'][0]['text'])
         changed = deepcopy(data)
         changed['scorer_candidates'][0]['lineup_confirmed'] = True
         self.assertNotEqual(snapshot_id(data), snapshot_id(changed))
-
-    def test_prediction_rejects_inconsistent_scores_players_and_evidence(self):
-        data = pregame_snapshot()
-        facts = self.analyzer.facts(data)
-        prediction = PREGAME_ANSWER['prediction']
-        invalid = [
-            {**prediction, 'home_goals': True}, {**prediction, 'home_goals': -1},
-            {**prediction, 'home_goals': 11}, {**prediction, 'away_goals': 1.5},
-            {**prediction, 'scorer_id': 999}, {**prediction, 'scorer_id': True},
-            {**prediction, 'away_goals': 0}, {**prediction, 'winner': 'home'},
-            {**prediction, 'fact_ids': ['home_recent_0', 'away_recent_0']},
-            {**prediction, 'fact_ids': ['home_recent_0', 'player_77']},
-            {**prediction, 'fact_ids': ['home_recent_0', 'away_recent_0', 'invented']},
-        ]
-        for item in invalid:
-            with self.subTest(item=item), self.assertRaises(InvalidAnalysis):
-                self.analyzer.validate_prediction(item, data, facts)
-        draw = {**prediction, 'home_goals': 0, 'away_goals': 0, 'scorer_id': None,
-                'fact_ids': ['home_recent_0', 'away_recent_0']}
-        self.assertEqual(self.analyzer.validate_prediction(draw, data, facts)['winner'], 'draw')
-        self.assertIsNone(self.analyzer.validate_prediction(None, data, facts))
-
-    def test_predictions_require_both_histories_and_stop_at_kickoff_even_from_cache(self):
-        data = pregame_snapshot()
-        self.assertTrue(self.analyzer.can_predict(data))
-        sparse = deepcopy(data)
-        sparse['recent_results']['home'] = sparse['recent_results']['home'][:2]
-        self.assertFalse(self.analyzer.can_predict(sparse))
-        live = deepcopy(data)
-        live['match']['scheduled'] = False
-        self.assertFalse(self.analyzer.can_predict(live))
-        with patch('match_analysis.requests.post', return_value=response(PREGAME_ANSWER)):
-            self.assertIsNotNone(self.analyze(data)['prediction'])
-        after_kickoff = datetime.fromisoformat(data['match']['starts_at']) + timedelta(seconds=1)
-        descriptive = {key: value for key, value in PREGAME_ANSWER.items() if key != 'prediction'}
-        with patch('match_analysis.datetime', wraps=datetime) as clock, patch('match_analysis.requests.post', return_value=response(descriptive)) as post:
-            clock.now.return_value = after_kickoff
-            result = self.analyze(data)
-            self.assertEqual(result['status'], 'ready')
-            self.assertIsNone(result['prediction'])
-            post.assert_called_once()
 
     def test_unknown_evidence_invented_numbers_and_forecasts_rejected(self):
         bad = [None, {}, {**ANSWER, 'prediction': 'home'},
