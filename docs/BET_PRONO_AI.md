@@ -1,116 +1,94 @@
-# BET PRONO AI — Bêta
+# BET PRONO AI — Bêta (V2.3.8)
 
-L'onglet inclut désormais un panneau séparé de données football 365Scores :
-voir [la configuration et les tests du connecteur](365SCORES.md).
-Le présent document décrit le formulaire de **démonstration**, qui reste sans IA
-et n'utilise pas les données du panneau 365Scores pour produire un pronostic.
+L'onglet **BET PRONO AI** (sur mobile : **AI · Bêta**) affiche des rencontres de
+football et de hockey sur glace issues de 365Scores, une fiche par match, une analyse
+générée par Gemini, un modèle statistique et le bilan réel des pronostics.
 
-La page est accessible depuis la navigation du tableau de bord, sur ordinateur
-et mobile. Elle utilise la session existante et ne modifie ni les paris, ni la
-bankroll, ni les statistiques. Aucune migration de base de données n'est requise.
+Voir aussi : [connecteur 365Scores](365SCORES.md) et
+[configuration de l'analyse Gemini](AUTO_ANALYSIS.md).
 
-## Ce qui fonctionne
+## Ce que voit l'utilisateur
 
-- Choix du sport et saisie de deux équipes ou joueurs (2 à 80 caractères).
-- Validation serveur, normalisation des espaces et refus de deux adversaires identiques.
-- Rapport explicitement marqué **Démonstration — aucune prédiction** : rencontre
-  non vérifiée, statistiques indisponibles, probabilités et pronostic non calculés.
-- Aperçu facultatif d'une capture PNG/JPEG, maximum 5 Mio et 16 mégapixels.
-  L'image reste dans le navigateur, sans requête réseau, stockage ou OCR.
-  La sélection est contrôlée par type, signature et décodage ; SVG non accepté.
-  Le bouton Retirer libère l'aperçu. Les URL temporaires sont révoquées au retrait,
-  au remplacement et à la sortie de page. Ne pas confondre cet aperçu avec un
-  téléversement serveur ou une analyse de l'image.
-- États de chargement, erreurs de validation/réseau et délai de réponse de 15 secondes.
-- Accès API limité aux utilisateurs authentifiés et non bannis, sans clé externe.
+1. **Bilan des pronostics** (haut de l'onglet) : pourcentage de bons vainqueurs,
+   de scores exacts et de buteurs trouvés par l'IA, et de bons vainqueurs du modèle
+   statistique, avec les derniers pronostics vérifiés.
+2. **Recherche** : sport, date (±30 jours), équipe ou compétition, et menu
+   **Compétition** rempli avec les compétitions du jour. Ligue 1, Ligue 2,
+   Coupe de France, Ligue des champions, Ligue Europa, Ligue Europa Conférence et
+   Ligue des nations apparaissent en tête (« À la une »), puis les autres par popularité.
+3. **Fiche du match** :
+   - pronostic IA (vainqueur, score estimé, buteur possible) avant le coup d'envoi ;
+   - **modèle statistique** : probabilités victoire / nul / défaite, buts attendus,
+     score le plus probable, plus de 2,5 buts (5,5 au hockey), les deux équipes marquent ;
+   - **forme et confrontations** : victoires-nuls-défaites, buts marqués et encaissés
+     par match, bilan domicile / extérieur, cinq dernières confrontations directes ;
+   - statistiques 365Scores, suivi en direct, résultats récents et analyse IA.
+
+## Fonctionnement
+
+### Données (`sports_data.py`)
+- Chaque match porte `decided` (`regulation`, `overtime`, `shootout`, `extra_time`,
+  `penalties`) et `regulation`, le score en fin de temps réglementaire quand il est
+  connu. Au hockey, un match gagné en prolongation ou aux tirs au but était à égalité
+  au score du perdant après 60 minutes.
+- Les confrontations directes viennent de `games/h2h/` (5 maximum, terminées, avant le match).
+- `final_result()` récupère le score final et les buteurs (hors tirs au but et
+  contre-son-camp) pour vérifier un pronostic.
+
+### Modèle statistique (`match_model.py`)
+Modèle de Poisson volontairement simple et lisible : moyennes de buts marqués et
+encaissés sur les résultats récents (temps réglementaire au hockey), rapprochées d'une
+valeur de référence quand l'échantillon est petit, avantage du terrain léger. Il exige
+trois résultats vérifiés par équipe. C'est un point de repère, pas une garantie : sa
+réussite réelle est mesurée dans le bilan.
+
+### Analyse IA (`match_analysis.py`)
+- Gemini reçoit les faits vérifiés : statistiques, résultats récents, forme calculée,
+  confrontations directes et buts attendus du modèle. Il doit citer ses sources et
+  rester cohérent avec le modèle.
+- Jusqu'à 3 analyses en parallèle ; une analyse déjà prête est toujours servie, même
+  quand d'autres sont en cours.
+- Une réponse mal formée, refusée ou tronquée est **réessayée une fois**. Elle ne bloque
+  pas les autres utilisateurs et n'est pas décomptée du quota de l'utilisateur.
+- Seules les vraies pannes (quota, clé refusée, modèle introuvable, service indisponible)
+  mettent l'analyse en pause pour tous, de 45 s à 5 min selon le cas.
+- Les analyses validées sont gardées **6 h en base** (`ai_analysis_cache`) : un
+  redémarrage du serveur sur Render ne relance pas Gemini.
+
+### Bilan des pronostics (`app.py`)
+- Chaque pronostic IA est enregistré dans `ai_predictions` (dernier pronostic avant
+  le coup d'envoi), avec l'estimation du modèle.
+- `GET /api/ai/track-record` vérifie jusqu'à 3 matchs terminés depuis plus de 3 h à
+  chaque consultation, puis renvoie les taux de réussite.
+- Hockey : comparé au temps réglementaire. Football avec prolongation : seul le match
+  nul après 90 minutes est compté (score exact inconnu). Un match sans résultat après
+  2 jours est écarté.
+
+Les tables sont créées automatiquement au démarrage (SQLite en local, PostgreSQL/Neon
+en production). Aucune migration manuelle.
 
 ## Tester en local
 
-Utiliser une copie de développement du dépôt, sans `local.env` de production.
-Laisser `DATABASE_URL` vide pour rester sur SQLite locale.
+Utiliser une copie de développement, sans `local.env` de production, et laisser
+`DATABASE_URL` vide pour rester sur SQLite.
 
 ```sh
 python -m pip install -r requirements.txt
 python app.py
 ```
 
-Sous Windows, si la base des fuseaux horaires est absente :
-`python -m pip install tzdata`.
-
-1. Ouvrir `http://127.0.0.1:5000/login` et créer un compte de test ou se connecter.
-2. Ouvrir **BET PRONO AI · BÊTA** (sur mobile : **AI · Bêta**).
-3. Choisir Football, saisir Paris Saint-Germain et Olympique de Marseille, puis
-   cliquer sur **Voir le rapport de démonstration**.
-4. Vérifier que le rapport ne contient aucun score, pourcentage ou pronostic inventé.
-5. Modifier un nom : le rapport précédent est masqué jusqu'à la prochaine soumission.
-6. Essayer deux noms identiques, un champ vide et une capture invalide ; vérifier les erreurs.
-7. Choisir une vraie capture PNG/JPEG, puis la retirer. Aucun fichier ne doit être
-   envoyé dans l'onglet Réseau du navigateur.
-8. Revenir aux paris, analyses et réglages ; vérifier que les données sont conservées.
-9. Répéter sur un écran de 320 à 390 px de large, puis sur ordinateur.
+1. Ouvrir `http://127.0.0.1:5000/login`, créer un compte de test.
+2. Ouvrir **BET PRONO AI**, vérifier le bloc **Bilan des pronostics**.
+3. Choisir une date avec de la Ligue 1, cliquer sur **Chercher les matchs**, puis choisir
+   **Ligue 1** dans le menu Compétition : seuls ses matchs restent.
+4. Ouvrir un match à venir : vérifier le modèle statistique et le tableau de forme.
+5. Avec `GEMINI_API_KEY`, vérifier le pronostic IA ; il apparaît ensuite en attente
+   dans le bilan, puis vérifié 3 h après la fin du match.
 
 ## Tests automatisés
 
 ```sh
 python -m unittest discover -s tests -v
-node --check static/app.js
-node --check static/bet-prono-ai.js
 ```
 
-Les tests Flask copient le module dans un répertoire temporaire avant son import,
-neutralisent `DATABASE_URL` et créent leur propre base SQLite jetable. Ils couvrent
-authentification/session expirée/compte banni, saisies mal formées, limites de
-taille, sports acceptés, absence d'appels externes et conservation/isolation des paris.
-
-Tests navigateur optionnels (aucune dépendance ajoutée à la production) :
-
-```sh
-python -m pip install playwright
-python -m playwright install chromium
-python tests/browser_ai.py
-```
-
-`BROWSER_CHANNEL=msedge` permet d'utiliser Edge installé.
-`AI_SCREENSHOT_DIR` permet d'enregistrer deux captures du rendu.
-Le script lance un serveur local sur un port libre avec la même base jetable,
-teste cinq largeurs de 320 à 1440 px, la navigation, les erreurs API, le rendu des
-noms comme texte, les images valides/invalides et la redirection vers la connexion.
-Il ne teste pas le fournisseur Google OAuth ni PostgreSQL/Neon ; ces intégrations
-ne sont pas modifiées par cette bêta.
-
-## API de démonstration
-
-`POST /api/ai/analyze`, cookie de connexion existant et `Content-Type: application/json` :
-
-```json
-{"sport":"football","home_team":"Paris","away_team":"Marseille"}
-```
-
-Réponse 200 : `mode: "demo"`, noms normalisés, liste des informations à vérifier,
-`sources: []`, `prediction: null`, `Cache-Control: no-store`.
-Erreurs : 400 saisie invalide, 401 session absente/invalide, 403 compte banni,
-415 format non JSON ; la limite globale existante de 256 Kio reste inchangée (413).
-Aucun historique d'analyse n'est enregistré. La requête contient uniquement le
-sport et les noms, jamais l'image.
-
-## Avant une analyse réelle
-
-Le connecteur expérimental 365Scores permet maintenant de sélectionner une
-rencontre de football précise, avec date, compétition, identifiant et source.
-Il ne fournit aucune garantie de couverture ou de fraîcheur. Avant une analyse
-prédictive, il faudra disposer de données adaptées et vérifiées dans le temps.
-
-Un modèle d'analyse devra être évalué sur des résultats historiques séparés de
-ses données d'entraînement, avec mesure de calibration et d'incertitude avant
-toute publication de probabilités. Le simple branchement d'un modèle de langage
-ne constitue pas une méthode de prédiction validée. Les clés devront rester
-côté serveur, avec délais, quotas, limites de débit et gestion des pannes.
-
-La lecture de captures nécessitera un service OCR/vision et une confirmation des
-équipes détectées. Tout futur envoi d'image devra avoir sa propre validation
-serveur, des limites de décodage, un stockage privé et une politique de suppression.
-L'aperçu actuel ne fournit aucune de ces capacités serveur.
-
-Une éventuelle sauvegarde d'historique devra être isolée par utilisateur.
-La fusion et le déploiement doivent faire l'objet d'une décision distincte :
-cette livraison prépare uniquement la branche et la pull request.
+Les tests n'appellent ni 365Scores ni Gemini : réponses simulées et base SQLite jetable.

@@ -15,6 +15,9 @@ GAME = {'id': 1001, 'sportId': 1, 'competitionDisplayName': 'Test League',
         'awayCompetitor': {'id': 20, 'name': 'Test Lyon', 'score': 2}}
 
 
+H2H_EMPTY = {'game': {'h2hGames': []}}
+
+
 class FakeResponse:
     def __init__(self, payload=None, status=200, content_type='application/json', raw=None):
         self.status_code = status
@@ -106,6 +109,38 @@ class SportsClientTests(unittest.TestCase):
             self.client.matches(date(2026, 11, 4))
             self.assertEqual(get.call_count, 2)
 
+    def test_competition_filter_and_list_order(self):
+        def game(game_id, comp_id, name):
+            return {**GAME, 'id': game_id, 'competitionId': comp_id, 'competitionDisplayName': name,
+                    'homeCompetitor': {**GAME['homeCompetitor'], 'id': game_id * 10},
+                    'awayCompetitor': {**GAME['awayCompetitor'], 'id': game_id * 10 + 1}}
+        payload = {
+            'games': [game(1, 7, 'Premier League'), game(2, 7, 'Premier League'), game(3, 35, 'Ligue 1'),
+                      game(4, 7016, 'UEFA Nations League'), game(5, 900, 'Ligue 1'), game(6, 'x', 'Broken')],
+            'countries': [{'id': 1, 'name': 'England'}, {'id': 5, 'name': 'France'}, {'id': 9, 'name': 'Algeria'}],
+            'competitions': [
+                {'id': 7, 'name': 'Premier League', 'countryId': 1, 'popularityRank': 98000000},
+                {'id': 35, 'name': 'Ligue 1', 'countryId': 5, 'popularityRank': 51000000},
+                {'id': 7016, 'name': 'UEFA Nations League', 'countryId': 19, 'isInternational': True, 'popularityRank': 2},
+                {'id': 900, 'name': 'Ligue 1', 'countryId': 9, 'popularityRank': 10},
+            ]}
+        with patch('sports_data.requests.get', return_value=FakeResponse(payload)) as get:
+            everything = self.client.matches(date(2026, 11, 4))
+            league = self.client.matches(date(2026, 11, 4), competition=7)
+            searched = self.client.matches(date(2026, 11, 4), 'ligue des nations')
+            self.assertEqual(get.call_count, 1)
+        comps = everything['competitions']
+        # Featured French/European competitions first; a same-named foreign "Ligue 1" is not featured;
+        # games without a valid competition ID stay listed but are absent from the selector.
+        self.assertEqual([(c['id'], c['name'], c['country'], c['count'], c['featured']) for c in comps], [
+            (35, 'Ligue 1', 'France', 1, True), (7016, 'Ligue des nations', '', 1, True),
+            (7, 'Premier League', 'England', 2, False), (900, 'Ligue 1', 'Algeria', 1, False)])
+        self.assertEqual(everything['total'], 6)
+        self.assertEqual([m['id'] for m in league['matches']], [1, 2])
+        self.assertEqual(league['competition'], 7)
+        self.assertEqual(league['competitions'], comps)
+        self.assertEqual([m['id'] for m in searched['matches']], [4])
+
     def test_detail_matches_statistics_to_team_ids_and_preserves_missing(self):
         stats = [
             {'id': 3, 'name': 'Shots', 'competitorId': 20, 'value': '8'},
@@ -133,7 +168,7 @@ class SportsClientTests(unittest.TestCase):
         envelope = {'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}
         for payload in (envelope, {**envelope, 'games': []}):
             with self.subTest(payload=payload), patch('sports_data.requests.get', side_effect=[
-                FakeResponse(payload), FakeResponse({'game': scheduled}),
+                FakeResponse(payload), FakeResponse({'game': scheduled}), FakeResponse(H2H_EMPTY),
             ]) as get:
                 client = Scores365Client()
                 result = client.match(1001)
@@ -142,9 +177,10 @@ class SportsClientTests(unittest.TestCase):
                 self.assertEqual(result['statistics'], [])
                 self.assertFalse(result['cached'])
                 self.assertTrue(client.match(1001)['cached'])
-                self.assertEqual(get.call_count, 2)
-                self.assertTrue(get.call_args.args[0].endswith('/game/'))
-                self.assertEqual(get.call_args.kwargs['params']['gameId'], 1001)
+                self.assertEqual(get.call_count, 3)
+                self.assertTrue(get.call_args_list[1].args[0].endswith('/game/'))
+                self.assertEqual(get.call_args_list[1].kwargs['params']['gameId'], 1001)
+                self.assertTrue(get.call_args.args[0].endswith('/games/h2h/'))
                 # An empty statistics response must not suspend other searches.
                 get.side_effect = None
                 get.return_value = FakeResponse({'games': [scheduled]})
@@ -185,16 +221,18 @@ class SportsClientTests(unittest.TestCase):
             {**GAME, 'id': 9999}, {**GAME, 'id': []},
         ]
         samples = [FakeResponse({'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}),
-                   FakeResponse({'game': scheduled}), FakeResponse({'games': completed + invalid + [completed[2]]})]
+                   FakeResponse({'game': scheduled}), FakeResponse({'games': completed + invalid + [completed[2]]}),
+                   FakeResponse(H2H_EMPTY)]
         with patch('sports_data.requests.get', side_effect=samples) as get:
             result = self.client.match(1001)
             self.assertEqual(result['statistics'], [])
             self.assertEqual([g['id'] for g in result['recent_results']['home']], [2005, 2004, 2003, 2002, 2001])
             self.assertEqual(len(result['recent_results']['away']), 5)
             self.assertTrue(self.client.match(1001)['cached'])
-            self.assertEqual(get.call_count, 3)
-            self.assertLessEqual(len(get.call_args.kwargs['params']['games'].split(',')), 30)
-            self.assertEqual(get.call_args.kwargs['params']['showOdds'], 'false')
+            self.assertEqual(get.call_count, 4)
+            history_call = get.call_args_list[2].kwargs['params']
+            self.assertLessEqual(len(history_call['games'].split(',')), 30)
+            self.assertEqual(history_call['showOdds'], 'false')
 
     def test_history_outage_keeps_match_and_future_results_are_excluded(self):
         scheduled = deepcopy(GAME)
@@ -203,7 +241,7 @@ class SportsClientTests(unittest.TestCase):
         future = {**GAME, 'id': 2000, 'startTime': '2099-10-01T20:00:00+01:00'}
         for history_response in (FakeResponse(status=503), FakeResponse({'games': [future]})):
             samples = [FakeResponse({'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}),
-                       FakeResponse({'game': scheduled}), history_response]
+                       FakeResponse({'game': scheduled}), history_response, FakeResponse(H2H_EMPTY)]
             with patch('sports_data.requests.get', side_effect=samples):
                 result = Scores365Client().match(1001)
                 self.assertEqual(result['match']['id'], 1001)
