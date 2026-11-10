@@ -171,3 +171,20 @@
 .track-tiles small{font-size:.74rem;color:var(--mute)}
 #aiTrackRefresh{margin-top:8px}
 @media(max-width:740px){.model-figures,.track-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* V2.4.0 : chargement animé, prono suivi */
+.is-loading{position:relative}
+#liveStatus.is-loading,#liveAnalysisStatus.is-loading{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:600}
+#liveStatus.is-loading::before,#liveAnalysisStatus.is-loading::before,.ai-live-matches button.is-loading::after{content:"";flex:none;width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,.18);border-top-color:var(--orange);animation:bp-spin .8s linear infinite}
+#liveStatus.is-loading::after,#liveAnalysisStatus.is-loading::after{content:"";display:inline-block;width:1.2em;text-align:left;animation:bp-dots 1.2s steps(4,end) infinite}
+.ai-live-matches button.is-loading{border-color:var(--orange)}
+.ai-live-matches button.is-loading::after{position:absolute;right:14px;top:50%;margin-top:-9px}
+@keyframes bp-spin{to{transform:rotate(360deg)}}
+@keyframes bp-dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+@media(prefers-reduced-motion:reduce){#liveStatus.is-loading::before,#liveAnalysisStatus.is-loading::before,.ai-live-matches button.is-loading::after{animation-duration:2.4s}#liveStatus.is-loading::after,#liveAnalysisStatus.is-loading::after{animation:none;content:"…"}}
+.forecast-confidence{margin:10px 0 0;font-size:.88rem;color:var(--text)}
+.forecast-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:12px}
+.follow-btn{min-height:44px;padding:8px 18px;border-radius:999px;border:1px solid var(--orange);background:transparent;color:var(--orange);font-weight:700;cursor:pointer}
+.follow-btn.is-on{background:var(--orange);color:#1b1206}
+.follow-btn:disabled{opacity:.6;cursor:wait}
+.follows-list li{grid-template-columns:auto minmax(0,1fr) auto auto}
+.follow-remove{min-height:36px;padding:4px 10px;font-size:.78rem;border-radius:8px;background:transparent;border:1px solid var(--rule);color:var(--mute);cursor:pointer}

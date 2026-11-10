@@ -359,7 +359,7 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
 @media (max-width:560px){.topbar{gap:10px}.topbar .brand:before{font-size:.62rem}.topbar .brand:after{font-size:1.03rem}.topbar .brand .sub{display:none}#goProfile,#logout{padding:8px 9px;font-size:.75rem}.stats,.secondary-stats,.analytics-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.card{min-height:118px;padding:12px}.card b{font-size:1.22rem}.metric-head{font-size:.67rem}.metric-icon{width:27px;height:27px}.secondary-stat{padding:10px}.secondary-stat b{font-size:.88rem}.chart{padding:14px 8px 7px}.chart-head{align-items:flex-start}.chart-title h2{font-size:.9rem}.chart-value b{font-size:.92rem}.chart svg{min-height:205px}.per button{padding:7px 9px;font-size:.72rem}.result-content{gap:13px}.result-donut{flex-basis:115px;width:115px;height:115px}.result-donut:after{inset:21px}.results-legend div{font-size:.72rem}.sport-overview-row{grid-template-columns:80px 1fr;gap:8px}.sport-overview-profit{grid-column:2}.analytics-periods button{padding:7px 9px;font-size:.7rem}.panel{padding:14px}.form{grid-template-columns:1fr}.side-menu{display:none}}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 </style>
-<link rel="stylesheet" href="/static/bet-prono-ai.css?v=2.3.8">
+<link rel="stylesheet" href="/static/bet-prono-ai.css?v=2.4.0">
 </head>
 <body>
 <canvas id="bgfx" aria-hidden="true"></canvas>
@@ -571,15 +571,20 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
     <p id="aiTrackStatus" class="sub" role="status" aria-live="polite">Chargement du bilan…</p>
     <div id="aiTrackContent" hidden>
       <div class="track-tiles">
-        <div><span>Bon vainqueur · IA</span><strong id="trackAiWinner">—</strong><small id="trackAiWinnerN"></small></div>
-        <div><span>Score exact · IA</span><strong id="trackAiExact">—</strong><small id="trackAiExactN"></small></div>
-        <div><span>Buteur trouvé · IA</span><strong id="trackAiScorer">—</strong><small id="trackAiScorerN"></small></div>
-        <div><span>Bon vainqueur · Modèle</span><strong id="trackModelWinner">—</strong><small id="trackModelWinnerN"></small></div>
+        <div><span>Bon vainqueur</span><strong id="trackAiWinner">—</strong><small id="trackAiWinnerN"></small></div>
+        <div><span>Score exact</span><strong id="trackAiExact">—</strong><small id="trackAiExactN"></small></div>
+        <div><span>Buteur trouvé</span><strong id="trackAiScorer">—</strong><small id="trackAiScorerN"></small></div>
+        <div><span>Mes pronos suivis</span><strong id="trackMine">—</strong><small id="trackMineN"></small></div>
       </div>
       <details class="report-disclosure"><summary>Derniers pronostics vérifiés</summary><ul id="aiTrackRecent" class="recent-list"></ul></details>
       <p id="aiTrackNotice" class="sub"></p>
     </div>
     <button type="button" id="aiTrackRefresh">Actualiser le bilan</button>
+  </section>
+  <section class="panel ai-follows" id="aiFollows" aria-labelledby="aiFollowsTitle">
+    <h2 id="aiFollowsTitle">Mes pronos suivis</h2>
+    <p id="aiFollowsStatus" class="sub" role="status" aria-live="polite">Clique sur « Suivre ce prono » dans la fiche d’un match pour le retrouver ici avec son résultat.</p>
+    <ul id="aiFollowsList" class="recent-list follows-list"></ul>
   </section>
   <section class="panel ai-live" aria-labelledby="liveTitle">
     <h2 id="liveTitle">Rechercher une rencontre</h2>
@@ -615,7 +620,12 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
           <div><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg><div><h4 id="forecastScoreLabel">Score estimé</h4><p id="livePredictionScore"></p></div></div>
           <div><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m12 8 4 3-1.5 4.5h-5L8 11zM12 8V3m4 8 4.5-1.5m-6 6 3 3.5m-8-3.5L6 19m2-8-4.5-1.5"/></svg><div><h4>Buteur possible</h4><p id="livePredictionScorer"></p><p id="livePredictionScorerNote" class="sub"></p></div></div>
         </div>
-        <p class="forecast-note"><span aria-hidden="true">ⓘ</span> Estimation IA · Scénario possible, non garanti.</p>
+        <p id="livePredictionConfidence" class="forecast-confidence"></p>
+        <div class="forecast-actions">
+          <button id="followPick" type="button" class="follow-btn" aria-pressed="false"><span aria-hidden="true">☆</span> Suivre ce prono</button>
+          <span id="followStatus" class="sub" role="status" aria-live="polite"></span>
+        </div>
+        <p class="forecast-note"><span aria-hidden="true">ⓘ</span> Pronostic calculé par le modèle statistique · Scénario possible, non garanti.</p>
       </section>
       <p id="livePredictionStatus" class="sub" hidden></p>
       <section id="liveModel" class="model-panel" hidden aria-labelledby="liveModelTitle">
@@ -625,7 +635,7 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
         <ul class="model-legend" id="liveModelLegend"></ul>
         <dl class="model-figures">
           <div><dt>Buts attendus</dt><dd id="liveModelXg"></dd></div>
-          <div><dt>Score le plus probable</dt><dd id="liveModelScore"></dd></div>
+          <div><dt>Score le plus fréquent (tous résultats)</dt><dd id="liveModelScore"></dd></div>
           <div><dt id="liveModelOverLabel">Plus de 2,5 buts</dt><dd id="liveModelOver"></dd></div>
           <div><dt>Les deux équipes marquent</dt><dd id="liveModelBoth"></dd></div>
         </dl>
@@ -713,7 +723,7 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V2.3.9 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V2.4.0 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -767,9 +777,9 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=2.3.9-release"></script>
+    <script src="/static/app.js?v=2.4.0-release"></script>
     <script src="/static/bankroll-reconcile.js?v=1"></script>
     <script src="/static/match-tracker.js?v=2.3.5"></script>
-    <script src="/static/sports-data.js?v=2.3.9"></script>
+    <script src="/static/sports-data.js?v=2.4.0"></script>
 </body>
 </html>

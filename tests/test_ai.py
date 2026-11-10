@@ -257,6 +257,51 @@ class AIBetaTests(unittest.TestCase):
         self.assertEqual(len(data['recent']), 3)
         self.assertEqual(self.app.test_client().get('/api/ai/track-record').status_code, 401)
 
+    def test_follow_a_pick_and_see_its_result(self):
+        from datetime import datetime, timedelta, timezone
+        module = self.module
+        kickoff = datetime.now(timezone.utc) + timedelta(days=1)
+        past = [{'id': 700 + i, 'sport': 'Football', 'competition': 'Test', 'starts_at': '2026-10-01T20:00:00+00:00',
+                 'home': {'id': 1, 'name': 'A', 'score': 2}, 'away': {'id': 2, 'name': 'B', 'score': 1},
+                 'decided': 'regulation', 'regulation': {'home': 2, 'away': 1}} for i in range(3)]
+        data = {'match': {'id': 601, 'sport': 'Football', 'competition': 'Ligue 1', 'starts_at': kickoff.isoformat(),
+                          'scheduled': True, 'home': {'id': 1, 'name': 'A', 'score': None},
+                          'away': {'id': 2, 'name': 'B', 'score': None}},
+                'recent_results': {'home': past, 'away': past}}
+        with self.app.app_context():
+            db = module.get_db()
+            for table in ('ai_follows', 'ai_predictions'):
+                db.execute(f'DELETE FROM {table}')
+            db.commit()
+            module.record_prediction(data, {'home_goals': 2, 'away_goals': 1, 'winner': 'home',
+                                            'scorer': {'id': 77, 'name': 'Striker'}})
+        self.assertEqual(self.client.post('/api/ai/follows/999').status_code, 404)
+        self.assertEqual(self.client.post('/api/ai/follows/601', json={'confidence': 0.6}).status_code, 201)
+        self.assertEqual(self.client.post('/api/ai/follows/601').status_code, 200)
+        listing = self.client.get('/api/ai/follows').get_json()
+        self.assertEqual(listing['summary']['followed'], 1)
+        self.assertEqual(listing['items'][0]['status'], 'pending')
+        self.assertEqual(listing['items'][0]['predicted'], '2-1')
+        self.assertEqual(listing['items'][0]['confidence'], 0.6)
+        # Another account does not see this follow.
+        other = self.app.test_client()
+        other.post('/api/register', json={'username': 'other_user', 'password': 'testing123'})
+        self.assertEqual(other.get('/api/ai/follows').get_json()['summary']['followed'], 0)
+        # The match is played: the followed pick is checked against the result.
+        with self.app.app_context():
+            db = module.get_db()
+            db.execute('UPDATE ai_predictions SET starts_at = ?', ((datetime.now(timezone.utc) - timedelta(hours=5)).isoformat(),))
+            db.commit()
+        final = {'match': {'regulation': {'home': 2, 'away': 1}, 'decided': 'regulation'}, 'finished': True, 'scorers': [77, 12]}
+        with patch.object(module.sports_client, 'final_result', return_value=final):
+            item = self.client.get('/api/ai/follows').get_json()['items'][0]
+        self.assertEqual((item['status'], item['actual'], item['winner_hit'], item['exact_hit'], item['scorer_hit']),
+                         ('settled', '2-1', True, True, True))
+        self.assertEqual(self.client.post('/api/ai/follows/601').status_code, 404)
+        self.assertEqual(self.client.delete('/api/ai/follows/601').get_json(), {'following': False})
+        self.assertEqual(self.client.get('/api/ai/follows').get_json()['summary']['followed'], 0)
+        self.assertEqual(self.app.test_client().post('/api/ai/follows/601').status_code, 401)
+
     def test_analysis_cache_survives_a_new_analyzer(self):
         with self.app.app_context():
             store = self.module.AnalysisStore()

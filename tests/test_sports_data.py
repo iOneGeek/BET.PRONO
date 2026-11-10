@@ -249,8 +249,9 @@ class SportsClientTests(unittest.TestCase):
         with patch('sports_data.requests.get', side_effect=samples) as get:
             result = self.client.match(1001)
             self.assertEqual(result['statistics'], [])
-            self.assertEqual([g['id'] for g in result['recent_results']['home']], [2005, 2004, 2003, 2002, 2001])
-            self.assertEqual(len(result['recent_results']['away']), 5)
+            # Up to ten results per team are kept for the model (the screen shows the latest five).
+            self.assertEqual([g['id'] for g in result['recent_results']['home']], [2005, 2004, 2003, 2002, 2001, 2000])
+            self.assertEqual(len(result['recent_results']['away']), 6)
             self.assertTrue(self.client.match(1001)['cached'])
             self.assertEqual(get.call_count, 4)
             history_call = get.call_args_list[2].kwargs['params']
