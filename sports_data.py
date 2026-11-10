@@ -7,6 +7,7 @@ from collections import OrderedDict, deque
 from datetime import datetime, timezone
 import json
 import math
+import re
 import threading
 import time
 import unicodedata
@@ -36,6 +37,52 @@ def positive_id(value):
 
 SPORTS = {1: 'Football', 4: 'Hockey sur glace'}
 
+# French labels for the provider's English competition names.
+COMPETITION_LABELS = {
+    'UEFA Champions League': 'Ligue des champions',
+    'UEFA Europa League': 'Ligue Europa',
+    'UEFA Conference League': 'Ligue Europa Conférence',
+    'UEFA Europa Conference League': 'Ligue Europa Conférence',
+    'UEFA Nations League': 'Ligue des nations',
+    'Friendly International': 'Matchs amicaux internationaux',
+    'World Cup Qualification UEFA': 'Qualifications Coupe du monde (Europe)',
+}
+# Shown first, in this order, whatever the provider popularity says.
+FEATURED_COMPETITIONS = ('Ligue 1', 'Ligue 2', 'Coupe de France', 'Ligue des champions', 'Ligue Europa',
+                         'Ligue Europa Conférence', 'Ligue des nations')
+
+
+def competition_label(name):
+    name = ' '.join(name.split())
+    return COMPETITION_LABELS.get(name, name)
+
+
+def competition_list(data, games):
+    """Competitions present in the given games, featured first, then by provider popularity."""
+    counts = {}
+    for game in games:
+        if game['competition_id']:
+            counts[game['competition_id']] = counts.get(game['competition_id'], 0) + 1
+    countries = {country['id']: text(country.get('name'), 60) for country in data.get('countries', [])[:400]
+                 if isinstance(country, dict) and positive_id(country.get('id'))}
+    known = {comp['id']: comp for comp in data.get('competitions', [])[:600]
+             if isinstance(comp, dict) and positive_id(comp.get('id'))}
+    items = []
+    for comp_id, count in counts.items():
+        comp = known.get(comp_id, {})
+        name = competition_label(text(comp.get('name'), 80))
+        if not name:
+            name = competition_label(next(g['competition'] for g in games if g['competition_id'] == comp_id))
+        country = '' if comp.get('isInternational') else countries.get(comp.get('countryId'), '')
+        rank = comp.get('popularityRank')
+        rank = rank if type(rank) in (int, float) and math.isfinite(rank) else 0
+        featured = (FEATURED_COMPETITIONS.index(name) if name in FEATURED_COMPETITIONS
+                    and (comp.get('isInternational') or country in ('France', '')) else None)
+        items.append(({'id': comp_id, 'name': name, 'country': country, 'count': count, 'featured': featured is not None},
+                      (featured is None, featured or 0, -rank, name)))
+    items.sort(key=lambda item: item[1])
+    return [item[0] for item in items]
+
 
 def normalize_game(raw):
     if not isinstance(raw, dict) or type(raw.get('sportId')) is not int or raw['sportId'] not in SPORTS or not positive_id(raw.get('id')):
@@ -55,11 +102,39 @@ def normalize_game(raw):
             return None
     except (ValueError, TypeError, AttributeError):
         return None
-    return {'id': raw['id'], 'sport': SPORTS[raw['sportId']], 'competition': text(raw.get('competitionDisplayName')) or 'Compétition non précisée',
+    competition_id = raw.get('competitionId')
+    return {'id': raw['id'], 'sport': SPORTS[raw['sportId']],
+            'competition_id': competition_id if positive_id(competition_id) else None, 'competition': text(raw.get('competitionDisplayName')) or 'Compétition non précisée',
             'starts_at': start.isoformat(), 'status': text(raw.get('statusText')) or 'Statut non précisé',
             'scheduled': raw.get('statusGroup') == 2,
             'live': raw.get('statusGroup') == 3,
-            'home': sides[0], 'away': sides[1]}
+            'home': sides[0], 'away': sides[1], **decision(raw, sides)}
+
+
+def decision(raw, sides):
+    """How a finished game was decided, and the score at the end of regulation when it can be derived.
+
+    Overtime is sudden death and a shootout adds one goal to the winner, so a hockey game decided after
+    regulation was tied at the loser's score. A football game that needed extra time was a draw after 90
+    minutes, but its exact 90-minute score is not in the list payload.
+    """
+    if raw.get('statusGroup') != 4:
+        return {'decided': None, 'regulation': None}
+    status = ' '.join(text(raw.get(key), 60) for key in ('statusText', 'shortStatusText'))
+    if re.search(r'\bSO\b|shoot.?out|penalt', status, re.I):
+        decided = 'shootout' if raw.get('sportId') == 4 else 'penalties'
+    elif re.search(r'\bOT\b|overtime|extra.?time|\bAET\b', status, re.I):
+        decided = 'overtime' if raw.get('sportId') == 4 else 'extra_time'
+    else:
+        decided = 'regulation'
+    home, away = sides[0]['score'], sides[1]['score']
+    regulation = None
+    if home is not None and away is not None and float(home).is_integer() and float(away).is_integer():
+        if decided == 'regulation':
+            regulation = {'home': int(home), 'away': int(away)}
+        elif raw.get('sportId') == 4 and home != away:
+            regulation = {'home': int(min(home, away)), 'away': int(min(home, away))}
+    return {'decided': decided, 'regulation': regulation}
 
 
 def scorer_candidates(raw_game, game):
@@ -138,7 +213,7 @@ class Scores365Client:
             times.append(now)
 
     def _get(self, path, params, deadline=None):
-        if path not in ('games/allscores/', 'game/stats/', 'game/'):
+        if path not in ('games/allscores/', 'game/stats/', 'game/', 'games/h2h/'):
             raise ValueError('Unsupported provider path')
         key = (path, tuple(sorted(params.items())))
         # Serialize cache misses to prevent duplicate upstream calls from threads.
@@ -180,7 +255,7 @@ class Scores365Client:
                     data = json.loads(body)
                 if not isinstance(data, dict):
                     raise SportsDataError('Le format des données 365Scores a changé.')
-                if path == 'game/':
+                if path in ('game/', 'games/h2h/'):
                     valid = isinstance(data.get('game'), dict)
                 elif path == 'game/stats/' and 'games' not in data:
                     # Before kickoff the stats endpoint returns only its update envelope.
@@ -201,11 +276,12 @@ class Scores365Client:
                 self._cache.popitem(last=False)
             return data, fetched_at, False
 
-    def matches(self, day, query='', sport=1):
+    def matches(self, day, query='', sport=1, competition=None):
         data, fetched_at, cached = self._get('games/allscores/', {
             'sports': sport, 'startDate': day.strftime('%d/%m/%Y'), 'endDate': day.strftime('%d/%m/%Y'),
             'showOdds': 'false', 'onlyMajorGames': 'false'})
         games = []
+        day_games = []
         skipped = 0
         seen = set()
         words = search_key(query).split()
@@ -219,12 +295,17 @@ class Scores365Client:
             # Provider day boundaries can include games from the previous day.
             if datetime.fromisoformat(game['starts_at']).astimezone(ZoneInfo('Europe/Paris')).date() != day:
                 continue
-            haystack = search_key(game['home']['name'] + ' ' + game['away']['name'] + ' ' + game['competition'])
-            if all(word in haystack for word in words) and game['id'] not in seen:
+            if game['id'] in seen:
+                continue
+            seen.add(game['id'])
+            day_games.append(game)
+            haystack = search_key(' '.join((game['home']['name'], game['away']['name'], game['competition'],
+                                            competition_label(game['competition']))))
+            if all(word in haystack for word in words) and (competition is None or game['competition_id'] == competition):
                 games.append(game)
-                seen.add(game['id'])
         games.sort(key=lambda game: (datetime.fromisoformat(game['starts_at']), game['id']))
         return {'mode': 'sports_data', 'matches': games[:200], 'total': len(games),
+                'competitions': competition_list(data, day_games), 'competition': competition,
                 'truncated': len(games) > 200, 'omitted_invalid': skipped,
                 'source': self.SOURCE, 'fetched_at': fetched_at, 'cached': cached, 'cache_seconds': self.TTL}
 
@@ -254,6 +335,48 @@ class Scores365Client:
         history = {side: [result for result in ordered if game[side]['id'] in
                          (result['home']['id'], result['away']['id'])][:5] for side in ('home', 'away')}
         return history, fetched_at, cached
+
+    def _head_to_head(self, game, deadline):
+        """Up to five finished previous meetings of the same two teams, most recent first."""
+        data, _, _ = self._get('games/h2h/', {'gameId': game['id']}, deadline)
+        raw_games = data['game'].get('h2hGames', [])
+        if not isinstance(raw_games, list):
+            return []
+        teams = {game['home']['id'], game['away']['id']}
+        cutoff = datetime.fromisoformat(game['starts_at'])
+        meetings = {}
+        for raw in raw_games[:40]:
+            if not isinstance(raw, dict) or raw.get('statusGroup') != 4:
+                continue
+            result = normalize_game(raw)
+            if (not result or result['id'] == game['id'] or result['sport'] != game['sport']
+                    or {result['home']['id'], result['away']['id']} != teams
+                    or datetime.fromisoformat(result['starts_at']) >= cutoff
+                    or any(result[side]['score'] is None for side in ('home', 'away'))):
+                continue
+            meetings[result['id']] = result
+        return sorted(meetings.values(), key=lambda r: (datetime.fromisoformat(r['starts_at']), r['id']), reverse=True)[:5]
+
+    def final_result(self, game_id):
+        """Finished game with its goal scorers, to settle a stored prediction. None while not finished."""
+        data, _, _ = self._get('game/', {'gameId': game_id})
+        raw = data['game']
+        game = normalize_game(raw)
+        if not game or game['id'] != game_id:
+            raise SportsDataError('Cette rencontre est introuvable.', 404)
+        if raw.get('statusGroup') != 4:
+            return {'match': game, 'finished': False, 'scorers': []}
+        stages = {stage['id']: text(stage.get('name'), 40) for stage in raw.get('stages', [])[:24]
+                  if isinstance(stage, dict) and positive_id(stage.get('id'))} if isinstance(raw.get('stages'), list) else {}
+        scorers = []
+        for event in raw.get('events', [])[:500] if isinstance(raw.get('events'), list) else []:
+            kind = event.get('eventType') if isinstance(event, dict) else None
+            if (not isinstance(kind, dict) or kind.get('name') != 'Goal' or not positive_id(event.get('playerId'))
+                    or re.search(r'own', text(kind.get('subTypeName'), 40), re.I)
+                    or re.search(r'shoot|penalt', stages.get(event.get('stageId'), ''), re.I)):
+                continue
+            scorers.append(event['playerId'])
+        return {'match': game, 'finished': True, 'scorers': scorers}
 
     def match(self, game_id):
         deadline = time.monotonic() + 22
@@ -289,6 +412,7 @@ class Scores365Client:
             row[side] = str(value)[:80]
         history = {'home': [], 'away': []}
         players = []
+        head_to_head = []
         history_notice = ''
         if raw_game.get('statusGroup') == 2:
             try:
@@ -308,8 +432,12 @@ class Scores365Client:
                 history_notice = 'Jusqu’à cinq résultats récents disponibles par équipe. La couverture de la source peut être partielle.'
             except SportsDataError:
                 history_notice = 'Les résultats récents sont temporairement indisponibles. Réessaie dans une minute.'
+            try:
+                head_to_head = self._head_to_head(game, deadline)
+            except SportsDataError:
+                head_to_head = []
         return {'mode': 'sports_data', 'match': game, 'statistics': list(rows.values())[:40],
-                'recent_results': history, 'history_notice': history_notice,
+                'recent_results': history, 'history_notice': history_notice, 'head_to_head': head_to_head,
                 'scorer_candidates': players,
                 'source': self.SOURCE, 'fetched_at': fetched_at, 'cached': cached,
                 'cache_seconds': self.TTL, 'prediction': None,

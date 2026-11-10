@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from match_model import enrich
+
 ERROR_MESSAGES = {
     'disabled': 'L’analyse automatique est désactivée sur le serveur.',
     'missing_key': 'La clé du service d’analyse est absente de la configuration du serveur.',
@@ -31,6 +33,8 @@ ERROR_MESSAGES = {
 def snapshot_id(data):
     payload = {'match': data['match'], 'statistics': data['statistics'], 'recent_results': data.get('recent_results', {}),
                'scorer_candidates': data.get('scorer_candidates', [])}
+    if data.get('head_to_head'):
+        payload['head_to_head'] = data['head_to_head']
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
@@ -58,9 +62,23 @@ class InvalidAnalysis(ValueError):
     pass
 
 
+# Failures that concern the provider or the configuration, not one generated answer (pause in seconds).
+BLOCKING_FAILURES = {'quota_exceeded': 120, 'access_denied': 300, 'model_unavailable': 300,
+                     'request_rejected': 120, 'provider_unavailable': 45}
+RETRYABLE_FAILURES = {'invalid_response', 'response_refused', 'response_truncated'}
+DECIDED_LABELS = {'overtime': 'après prolongation', 'shootout': 'aux tirs au but',
+                  'extra_time': 'après prolongation', 'penalties': 'aux tirs au but'}
+
+
+def _num(value):
+    return f'{value:g}' if isinstance(value, (int, float)) else str(value)
+
+
 class MatchAnalysis:
     TTL = 600
-    PROMPT_VERSION = '3'
+    STORE_TTL = 6 * 3600
+    MAX_PARALLEL = 3
+    PROMPT_VERSION = '4'
     LIMITATIONS = [
         'Cette synthèse générée par IA peut contenir des erreurs ; vérifie les données citées.',
         'Les résultats et joueurs disponibles peuvent être partiels. Vérifie la composition officielle avant le match.',
@@ -81,18 +99,24 @@ Si le schéma contient prediction, propose une hypothèse prudente de score fina
 Tu peux laisser prediction à null si les données ne permettent pas une estimation.
 Les buts estimés sont des entiers de 0 à 10. Cite au moins un résultat récent de chaque équipe dans fact_ids.
 Pour le hockey, estime le score à la fin du temps réglementaire. Un match nul à ce stade est possible.
+Le fait model_expected vient d'un modèle statistique de Poisson calculé par le serveur sur les mêmes résultats.
+Ton score estimé doit rester cohérent avec ces buts attendus ; cite model_expected dans fact_ids s'il existe.
+Les faits form_* et h2h_* sont des calculs ou résultats vérifiés : tu peux les citer comme les autres faits.
 Pour le buteur possible, choisis uniquement un identifiant de scorer_candidates, avec son fait player_ID cité.
 Son équipe doit marquer dans le score estimé. Si aucun joueur ne convient, laisse scorer_id à null.
 Les totaux de buts des joueurs ont une période non précisée : ne les présente jamais comme des buts de la saison.
 Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du modèle.'''
 
-    def __init__(self):
+    def __init__(self, store=None):
         self._cache = OrderedDict()
         self._users = OrderedDict()
         self._calls = deque()
         self._lock = threading.Lock()
+        self._pending = set()
         self._blocked_until = 0
         self._last_failure = 'provider_unavailable'
+        # Optional persistent cache: object with get(key, max_age) -> dict|None and put(key, result).
+        self.store = store
 
     @staticmethod
     def facts(data):
@@ -104,14 +128,40 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
             home = 'Indisponible' if stat['home'] is None else str(stat['home'])
             away = 'Indisponible' if stat['away'] is None else str(stat['away'])
             facts[f'stat_{index}'] = f"{stat['label']} — {game['home']['name']} : {home} ; {game['away']['name']} : {away}"
+        def describe(result):
+            played = datetime.fromisoformat(result['starts_at']).astimezone(ZoneInfo('Europe/Paris')).date().isoformat()
+            line = (f"le {played} ({result['competition']}) — {result['home']['name']} {result['home']['score']:g} — "
+                    f"{result['away']['score']:g} {result['away']['name']}")
+            label = DECIDED_LABELS.get(result.get('decided'))
+            if label:
+                line += f' ({label}'
+                regulation = result.get('regulation')
+                if regulation and game.get('sport') == 'Hockey sur glace':
+                    line += f" ; {regulation['home']} — {regulation['away']} à la fin du temps réglementaire"
+                elif result.get('decided') in ('extra_time', 'penalties'):
+                    line += ' ; match nul après 90 minutes'
+                line += ')'
+            return line
         for side in ('home', 'away'):
             for index, result in enumerate(data.get('recent_results', {}).get(side, [])[:5]):
-                played = datetime.fromisoformat(result['starts_at']).astimezone(ZoneInfo('Europe/Paris')).date().isoformat()
-                facts[f'{side}_recent_{index}'] = (
-                    f"Résultat passé de {game[side]['name']} le {played} ({result['competition']}) — "
-                    f"{result['home']['name']} {result['home']['score']:g} — "
-                    f"{result['away']['score']:g} {result['away']['name']}"
-                )
+                facts[f'{side}_recent_{index}'] = f"Résultat passé de {game[side]['name']} " + describe(result)
+        for index, result in enumerate(data.get('head_to_head', [])[:5]):
+            facts[f'h2h_{index}'] = 'Confrontation directe ' + describe(result)
+        extra = enrich(data)
+        for side in ('home', 'away'):
+            form = extra['form'][side]
+            if form:
+                scope = ' (temps réglementaire)' if game.get('sport') == 'Hockey sur glace' else ''
+                facts[f'form_{side}'] = (
+                    f"Forme calculée de {game[side]['name']} sur {form['played']} résultats récents{scope} — "
+                    f"{form['wins']} victoires, {form['draws']} nuls, {form['losses']} défaites ; "
+                    f"{_num(form['scored_avg'])} buts marqués et {_num(form['conceded_avg'])} encaissés en moyenne")
+        model = extra['model']
+        if model:
+            facts['model_expected'] = (
+                f"Modèle statistique de Poisson (calcul serveur) — buts attendus : {game['home']['name']} "
+                f"{_num(model['expected_goals']['home'])}, {game['away']['name']} {_num(model['expected_goals']['away'])} ; "
+                f"score le plus probable {model['likely_score']['home']} — {model['likely_score']['away']}")
         for player in data.get('scorer_candidates', []):
             lineup = 'titulaire annoncé, composition confirmée par la source' if player['lineup_confirmed'] else 'titulaire pressenti, composition à confirmer'
             if game.get('sport') == 'Hockey sur glace':
@@ -128,6 +178,10 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
         return (game.get('scheduled') is True
                 and datetime.fromisoformat(game['starts_at']) > datetime.now(timezone.utc)
                 and all(len(data.get('recent_results', {}).get(side, [])) >= 3 for side in ('home', 'away')))
+
+    @classmethod
+    def store_key(cls, model, digest, predictable):
+        return hashlib.sha256(f'{cls.PROMPT_VERSION}|{model}|{digest}|{int(predictable)}'.encode()).hexdigest()
 
     @staticmethod
     def validate_prediction(prediction, data, facts):
@@ -190,6 +244,50 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
             checked.append({'text': comment, 'evidence': [facts[ref] for ref in dict.fromkeys(refs)]})
         return {'summary': summary, 'observations': checked}
 
+    def _schema(self, facts, predictable):
+        schema = {'type': 'object', 'additionalProperties': False,
+                  'properties': {'summary': {'type': 'string'}, 'observations': {
+                      'type': 'array', 'minItems': 1, 'maxItems': 3, 'items': {
+                          'type': 'object', 'additionalProperties': False,
+                          'properties': {'text': {'type': 'string'}, 'fact_ids': {
+                              'type': 'array', 'minItems': 1, 'maxItems': 2,
+                              'items': {'type': 'string', 'enum': list(facts)}}},
+                          'required': ['text', 'fact_ids']}}}, 'required': ['summary', 'observations']}
+        if predictable:
+            schema['properties']['prediction'] = {
+                'type': ['object', 'null'], 'additionalProperties': False,
+                'properties': {
+                    'home_goals': {'type': 'integer', 'minimum': 0, 'maximum': 10},
+                    'away_goals': {'type': 'integer', 'minimum': 0, 'maximum': 10},
+                    'scorer_id': {'type': ['integer', 'null']},
+                    'fact_ids': {'type': 'array', 'minItems': 2, 'maxItems': 4, 'items': {'type': 'string', 'enum': list(facts)}},
+                }, 'required': ['home_goals', 'away_goals', 'scorer_id', 'fact_ids'],
+            }
+            schema['required'].append('prediction')
+        return schema
+
+    def _cached(self, key, store_key, now):
+        entry = self._cache.get(key)
+        if entry and now - entry[0] < self.TTL:
+            self._cache.move_to_end(key)
+            return {**entry[1], 'cached': True}
+        if self.store is not None:
+            try:
+                stored = self.store.get(store_key, self.STORE_TTL)
+            except Exception:  # A database outage must not break the live analysis.
+                logging.getLogger(__name__).warning('Analysis store read failed')
+                stored = None
+            if isinstance(stored, dict) and stored.get('status') == 'ready':
+                self._remember(key, stored)
+                return {**stored, 'cached': True}
+        return None
+
+    def _remember(self, key, result):
+        self._cache[key] = (time.monotonic(), result)
+        self._cache.move_to_end(key)
+        if len(self._cache) > 128:
+            self._cache.popitem(last=False)
+
     def analyze(self, data, user_id, api_key, model, enabled=True):
         error = configuration_error(api_key, model, enabled)
         if error:
@@ -197,18 +295,20 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
         facts = self.facts(data)
         if not facts:
             return {'status': 'insufficient_data', 'message': 'Les données disponibles sont insuffisantes pour une analyse. Les statistiques du match ou des résultats récents vérifiés sont nécessaires.', 'prediction': None}
-        # Keep the UI responsive when another generation is already in progress.
-        if not self._lock.acquire(blocking=False):
-            return unavailable('Une analyse est déjà en préparation. Les statistiques restent disponibles ; reviens dans un instant.')
-        try:
+        digest = snapshot_id(data)
+        predictable = self.can_predict(data)
+        key = (self.PROMPT_VERSION, model, digest, predictable)
+        store_key = self.store_key(model, digest, predictable)
+        with self._lock:
             now = time.monotonic()
-            digest = snapshot_id(data)
-            predictable = self.can_predict(data)
-            key = (self.PROMPT_VERSION, model, digest, predictable)
-            entry = self._cache.get(key)
-            if entry and now - entry[0] < self.TTL:
-                self._cache.move_to_end(key)
-                return {**entry[1], 'cached': True}
+            # Ready analyses are served even while other generations are running.
+            cached = self._cached(key, store_key, now)
+            if cached:
+                return cached
+            if key in self._pending:
+                return unavailable('Cette analyse est déjà en préparation. Les statistiques restent disponibles ; reviens dans un instant.')
+            if len(self._pending) >= self.MAX_PARALLEL:
+                return unavailable('Plusieurs analyses sont en préparation. Les statistiques restent disponibles ; reviens dans un instant.')
             if now < self._blocked_until:
                 return unavailable(reason=self._last_failure)
             calls = self._users.pop(user_id, deque())
@@ -223,64 +323,70 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
                 return unavailable('La limite d’analyses est atteinte pour le moment. Les statistiques restent disponibles.')
             calls.append(now)
             self._calls.append(now)
-            schema = {'type': 'object', 'additionalProperties': False,
-                      'properties': {'summary': {'type': 'string'}, 'observations': {
-                          'type': 'array', 'minItems': 1, 'maxItems': 3, 'items': {
-                              'type': 'object', 'additionalProperties': False,
-                              'properties': {'text': {'type': 'string'}, 'fact_ids': {
-                                  'type': 'array', 'minItems': 1, 'maxItems': 2,
-                                  'items': {'type': 'string', 'enum': list(facts)}}},
-                              'required': ['text', 'fact_ids']}}}, 'required': ['summary', 'observations']}
-            if predictable:
-                schema['properties']['prediction'] = {
-                    'type': ['object', 'null'], 'additionalProperties': False,
-                    'properties': {
-                        'home_goals': {'type': 'integer', 'minimum': 0, 'maximum': 10},
-                        'away_goals': {'type': 'integer', 'minimum': 0, 'maximum': 10},
-                        'scorer_id': {'type': ['integer', 'null']},
-                        'fact_ids': {'type': 'array', 'minItems': 2, 'maxItems': 4, 'items': {'type': 'string', 'enum': list(facts)}},
-                    }, 'required': ['home_goals', 'away_goals', 'scorer_id', 'fact_ids'],
-                }
-                schema['required'].append('prediction')
+            self._pending.add(key)
+        try:
             body = {
                 'systemInstruction': {'parts': [{'text': self.SYSTEM}]},
                 'contents': [{'role': 'user', 'parts': [{'text': json.dumps({
                     'match': data['match'], 'facts': facts, 'scorer_candidates': data.get('scorer_candidates', []), 'source': '365Scores'
                 }, ensure_ascii=False)}]}],
                 'generationConfig': {'maxOutputTokens': 4096, 'responseMimeType': 'application/json',
-                                     'responseJsonSchema': schema, 'thinkingConfig': {'thinkingLevel': 'LOW'}}}
-            try:
-                result = self._generate(api_key, model, body)
-                prediction = None
-                if predictable:
-                    if not isinstance(result, dict) or 'prediction' not in result:
-                        raise InvalidAnalysis('Missing prediction')
-                    prediction = self.validate_prediction(result['prediction'], data, facts)
-                    result = {key: value for key, value in result.items() if key != 'prediction'}
-                checked = self.validate(result, facts)
-            except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
-                if isinstance(exc, AnalysisServiceError):
-                    reason = exc.reason
-                elif isinstance(exc, requests.Timeout):
-                    reason = 'timeout'
-                elif isinstance(exc, requests.RequestException):
-                    reason = 'network_error'
-                else:
-                    reason = 'invalid_response'
-                # Fixed codes only. Never log exceptions, keys, prompts or response bodies.
-                logging.getLogger(__name__).warning('Automatic match analysis failed: %s', reason)
-                self._last_failure = reason
-                self._blocked_until = time.monotonic() + 60
+                                     'responseJsonSchema': self._schema(facts, predictable), 'thinkingConfig': {'thinkingLevel': 'LOW'}}}
+            reason = None
+            started = time.monotonic()
+            for _attempt in range(2):
+                if _attempt and time.monotonic() - started > 15:
+                    break  # Keep the request within the browser and server time limits.
+                try:
+                    result = self._generate(api_key, model, body)
+                    prediction = None
+                    if predictable:
+                        if not isinstance(result, dict) or 'prediction' not in result:
+                            raise InvalidAnalysis('Missing prediction')
+                        prediction = self.validate_prediction(result['prediction'], data, facts)
+                        result = {name: value for name, value in result.items() if name != 'prediction'}
+                    checked = self.validate(result, facts)
+                    reason = None
+                    break
+                except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
+                    if isinstance(exc, AnalysisServiceError):
+                        reason = exc.reason
+                    elif isinstance(exc, requests.Timeout):
+                        reason = 'timeout'
+                    elif isinstance(exc, requests.RequestException):
+                        reason = 'network_error'
+                    else:
+                        reason = 'invalid_response'
+                    # Fixed codes only. Never log exceptions, keys, prompts or response bodies.
+                    logging.getLogger(__name__).warning('Automatic match analysis failed: %s', reason)
+                    # A malformed or refused answer is worth one more try; provider problems are not.
+                    if reason not in RETRYABLE_FAILURES:
+                        break
+            if reason:
+                with self._lock:
+                    self._last_failure = reason
+                    if reason in BLOCKING_FAILURES:
+                        self._blocked_until = time.monotonic() + BLOCKING_FAILURES[reason]
+                    else:
+                        # The user is not charged for an answer that failed our checks or timed out.
+                        user_calls = self._users.get(user_id)
+                        if user_calls:
+                            user_calls.pop()
                 return unavailable(reason=reason)
             result = {**checked, 'status': 'ready', 'cached': False, 'snapshot_id': digest,
                       'generated_at': datetime.now(timezone.utc).isoformat(),
                       'limitations': self.LIMITATIONS, 'prediction': prediction if self.can_predict(data) else None}
-            self._cache[key] = (time.monotonic(), result)
-            if len(self._cache) > 128:
-                self._cache.popitem(last=False)
+            with self._lock:
+                self._remember(key, result)
+            if self.store is not None:
+                try:
+                    self.store.put(store_key, result)
+                except Exception:
+                    logging.getLogger(__name__).warning('Analysis store write failed')
             return result
         finally:
-            self._lock.release()
+            with self._lock:
+                self._pending.discard(key)
 
     @staticmethod
     def _generate(api_key, model, body):

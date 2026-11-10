@@ -101,7 +101,8 @@
     const label = element('strong', opponent.name);
     const metadata = element('time', dateLabel(result.starts_at).split(' ')[0]);
     metadata.dateTime = result.starts_at;
-    info.append(label, element('small', (atHome ? 'Domicile' : 'Extérieur') + ' · ' + result.competition));
+    const decided = {overtime: 'après prolongation', shootout: 'aux tirs au but', extra_time: 'après prolongation', penalties: 'aux tirs au but'}[result.decided];
+    info.append(label, element('small', (atHome ? 'Domicile' : 'Extérieur') + ' · ' + result.competition + (decided ? ' · ' + decided : '')));
     const tally = element('abbr', ownGoals + ' — ' + otherGoals, 'result-score');
     tally.dataset.outcome = outcome;
     tally.title = outcome;
@@ -110,8 +111,120 @@
     return row;
   }
 
+  const percent = value => Math.round(value * 100) + ' %';
+  const decimal = value => String(value).replace('.', ',');
+
+  function showModel(data) {
+    const game = data.match;
+    const model = data.model;
+    el('liveModel').hidden = true;
+    if (!game.scheduled || !model || !model.probabilities || !model.expected_goals) return;
+    const p = model.probabilities;
+    if (![p.home, p.draw, p.away].every(v => typeof v === 'number' && v >= 0 && v <= 1)) return;
+    const hockey = game.sport === 'Hockey sur glace';
+    el('liveModelIntro').textContent = `Calcul sur ${model.sample.home} et ${model.sample.away} résultats récents`
+      + (hockey ? ', au temps réglementaire (le match nul est possible à 60 minutes).' : '.');
+    const parts = [['home', teamName(game.home)], ['draw', 'Nul'], ['away', teamName(game.away)]];
+    el('liveModelBar').replaceChildren(...parts.map(([key, label]) => {
+      const part = element('span', percent(p[key]), 'model-' + key);
+      part.style.flexGrow = String(Math.max(p[key], 0.04));
+      part.title = label + ' : ' + percent(p[key]);
+      return part;
+    }));
+    el('liveModelBar').setAttribute('aria-label', parts.map(([key, label]) => label + ' ' + percent(p[key])).join(', '));
+    el('liveModelLegend').replaceChildren(...parts.map(([key, label]) => {
+      const item = element('li', label + ' · ' + percent(p[key]));
+      item.dataset.part = key;
+      return item;
+    }));
+    el('liveModelXg').textContent = `${decimal(model.expected_goals.home)} — ${decimal(model.expected_goals.away)}`;
+    el('liveModelScore').textContent = `${model.likely_score.home} — ${model.likely_score.away} (${percent(model.likely_score.probability)})`;
+    el('liveModelOverLabel').textContent = `Plus de ${decimal(model.over.line)} buts`;
+    el('liveModelOver').textContent = percent(model.over.probability);
+    el('liveModelBoth').textContent = percent(model.both_score);
+    el('liveModel').hidden = false;
+  }
+
+  function showForm(data) {
+    const game = data.match;
+    const form = data.form || {};
+    el('liveFormPanel').hidden = true;
+    if (!game.scheduled || (!form.home && !form.away)) return;
+    const record = r => r && r.played ? `${r.wins}-${r.draws}-${r.losses}` : '—';
+    el('liveFormBody').replaceChildren(...['home', 'away'].map(side => {
+      const row = document.createElement('tr');
+      const head = element('th', teamName(game[side]));
+      head.scope = 'row';
+      const f = form[side];
+      row.append(head, ...(f ? [record(f), decimal(f.scored_avg), decimal(f.conceded_avg), record(f.home), record(f.away)]
+        : ['—', '—', '—', '—', '—']).map(value => element('td', value)));
+      return row;
+    }));
+    el('liveFormNote').textContent = 'Calcul sur les résultats récents affichés (jusqu’à cinq par équipe)'
+      + (game.sport === 'Hockey sur glace' ? ', au score de fin de temps réglementaire.' : '.');
+    const meetings = Array.isArray(data.head_to_head) ? data.head_to_head : [];
+    const summary = data.head_to_head_summary;
+    el('liveH2hSummary').textContent = summary
+      ? `${summary.played} dernière(s) confrontation(s) : ${summary.home_wins} victoire(s) de ${teamName(game.home)}, ${summary.draws} nul(s), ${summary.away_wins} victoire(s) de ${teamName(game.away)}.`
+      : 'Aucune confrontation directe récente trouvée par la source.';
+    el('liveH2hList').replaceChildren(...meetings.map(result => recentRow(result, game.home.id)));
+    el('liveFormPanel').hidden = false;
+  }
+
+  let trackLoaded = false;
+  async function loadTrackRecord() {
+    trackLoaded = true;
+    el('aiTrackRefresh').disabled = true;
+    el('aiTrackStatus').textContent = 'Chargement du bilan…';
+    try {
+      const response = await fetch('/api/ai/track-record', {credentials: 'same-origin'});
+      if (response.status === 401) { location.href = '/login'; return; }
+      const data = await response.json();
+      if (!response.ok || !data.ai) throw new Error('Track record unavailable');
+      const show = (id, stat) => {
+        el(id).textContent = stat.total ? percent(stat.rate) : '—';
+        el(id + 'N').textContent = stat.total ? `${stat.hits} sur ${stat.total}` : 'Pas encore de match';
+      };
+      show('trackAiWinner', data.ai.winner);
+      show('trackAiExact', data.ai.exact_score);
+      show('trackAiScorer', data.ai.scorer);
+      show('trackModelWinner', data.model.winner);
+      el('aiTrackRecent').replaceChildren(...(data.recent.length ? data.recent.map(item => {
+        const row = document.createElement('li');
+        const when = element('time', dateLabel(item.starts_at).split(' ')[0]);
+        when.dateTime = item.starts_at;
+        const info = element('span', '', 'result-info');
+        info.append(element('strong', `${item.home} — ${item.away}`),
+          element('small', `${item.competition} · Prono ${item.predicted.replace('-', ' — ')} · Réel ${item.actual ? item.actual.replace('-', ' — ') : (item.actual_winner === 'draw' ? 'nul à 90 min' : '—')}`
+            + (item.scorer ? ` · Buteur ${item.scorer} ${item.scorer_hit ? '✓' : '✗'}` : '')));
+        const tally = element('abbr', item.winner_hit ? '✓' : '✗', 'result-score');
+        tally.dataset.outcome = item.winner_hit ? 'Victoire' : 'Défaite';
+        tally.title = item.winner_hit ? 'Bon vainqueur' : 'Mauvais vainqueur';
+        row.append(when, info, tally);
+        return row;
+      }) : [element('li', 'Aucun pronostic vérifié pour l’instant.')]));
+      el('aiTrackNotice').textContent = data.notice + (data.pending ? ` ${data.pending} pronostic(s) en attente du résultat.` : '');
+      el('aiTrackStatus').textContent = data.settled
+        ? `${data.settled} pronostic(s) vérifié(s) après le match.`
+        : 'Les pronostics sont enregistrés automatiquement. Le bilan se remplit quand les matchs sont terminés.';
+      el('aiTrackContent').hidden = false;
+    } catch (_) {
+      el('aiTrackStatus').textContent = 'Bilan momentanément indisponible. Réessaie dans un instant.';
+    } finally {
+      el('aiTrackRefresh').disabled = false;
+    }
+  }
+  el('aiTrackRefresh').addEventListener('click', loadTrackRecord);
+  // Load once, the first time the AI view is opened (not on every dashboard visit).
+  const aiView = el('viewAI');
+  const loadWhenOpen = () => { if (!trackLoaded && (!aiView || aiView.classList.contains('active'))) loadTrackRecord(); };
+  if (aiView) new MutationObserver(loadWhenOpen).observe(aiView, {attributes: true, attributeFilter: ['class']});
+  loadWhenOpen();
+
   function clearSelection() {
     setFormView(false);
+    el('liveModel').hidden = true;
+    el('liveFormPanel').hidden = true;
     el('forecastSources').hidden = true;
     el('jumpPrediction').hidden = true;
     window.betTracker.clear();
@@ -171,7 +284,7 @@
     analysisActive = controller;
     el('liveAnalysis').setAttribute('aria-busy', 'true');
     el('liveAnalysisStatus').textContent = 'Préparation de l’analyse à partir des données du match…';
-    const timer = setTimeout(() => controller.abort(), 35000);
+    const timer = setTimeout(() => controller.abort(), 55000);
     try {
       const response = await fetch(`/api/ai/matches/${snapshot.match.id}/analysis`, {
         method: 'POST', credentials: 'same-origin', signal: controller.signal,
@@ -219,7 +332,40 @@
       }
     }
   }
-  el('liveForm').addEventListener('input', () => {
+  function setCompetitions(list, selected) {
+    const all = document.createElement('option');
+    all.value = ''; all.textContent = 'Toutes les compétitions';
+    const options = [all];
+    const featured = list.filter(comp => comp.featured);
+    const others = list.filter(comp => !comp.featured);
+    const option = comp => {
+      if (!Number.isSafeInteger(comp.id) || typeof comp.name !== 'string') throw new Error('Compétition non reconnue.');
+      const item = document.createElement('option');
+      item.value = String(comp.id);
+      item.textContent = `${comp.name}${comp.country ? ' · ' + comp.country : ''} (${comp.count})`;
+      item.selected = comp.id === selected;
+      return item;
+    };
+    for (const [label, group] of [['À la une', featured], ['Toutes les compétitions du jour', others]]) {
+      if (!group.length) continue;
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = label;
+      optgroup.append(...group.map(option));
+      options.push(optgroup);
+    }
+    el('liveCompetition').replaceChildren(...options);
+    el('liveCompetitionHelp').textContent = list.length
+      ? `${list.length} compétition(s) ce jour-là. Choisis-en une pour filtrer les matchs.`
+      : 'Aucune compétition trouvée pour ce jour.';
+  }
+
+  el('liveCompetition').addEventListener('change', () => el('liveForm').requestSubmit());
+
+  el('liveForm').addEventListener('input', event => {
+    if (event.target === el('liveSport') || event.target === el('liveDate')) {
+      setCompetitions([], null);
+      el('liveCompetitionHelp').textContent = 'La liste se remplit avec les compétitions du jour après une recherche.';
+    }
     if (active) active.abort();
     active = null;
     el('liveFields').disabled = false;
@@ -299,6 +445,8 @@
       el('reportViews').hidden = !data.history_notice;
       el('jumpResults').hidden = !data.history_notice;
       highlights(game, data.recent_results);
+      showModel(data);
+      showForm(data);
       el('liveRecentNotice').textContent = data.history_notice || '';
       el('liveRecentTeams').replaceChildren(...['home', 'away'].map(side => {
         const section = document.createElement('div');
@@ -334,8 +482,10 @@
     el('liveMatches').replaceChildren();
     el('liveFreshness').hidden = true;
     const query = new URLSearchParams({sport: el('liveSport').value, date: el('liveDate').value, q: el('liveQuery').value.trim()});
+    if (el('liveCompetition').value) query.set('competition', el('liveCompetition').value);
     load('/api/ai/matches?' + query, data => {
       if (!Array.isArray(data.matches)) throw new Error('Liste de rencontres non reconnue.');
+      if (Array.isArray(data.competitions)) setCompetitions(data.competitions, data.competition);
       const buttons = data.matches.map(game => {
         if (!Number.isSafeInteger(game.id) || !game.home || !game.away) throw new Error('Rencontre non reconnue.');
         const button = document.createElement('button');

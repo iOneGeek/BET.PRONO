@@ -137,13 +137,18 @@ class AIBetaTests(unittest.TestCase):
             self.assertEqual(anonymous.get('/api/ai/matches?date=' + today).status_code, 401)
             self.assertEqual(anonymous.get('/api/ai/matches/1001').status_code, 401)
             provider.allow_user.assert_not_called()
-            for query in ['date=invalid', 'date=2026-02-31', 'date=2000-01-01', 'date=' + today + '&q=' + 'x' * 81]:
+            for query in ['date=invalid', 'date=2026-02-31', 'date=2000-01-01', 'date=' + today + '&q=' + 'x' * 81,
+                          'date=' + today + '&competition=abc', 'date=' + today + '&competition=0',
+                          'date=' + today + '&competition=-5', 'date=' + today + '&competition=' + '9' * 13]:
                 self.assertEqual(self.client.get('/api/ai/matches?' + query).status_code, 400)
             provider.matches.assert_not_called()
             response = self.client.get('/api/ai/matches', query_string={'date': today, 'q': 'Paris'})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.headers['Cache-Control'], 'no-store')
             self.assertEqual(provider.matches.call_args.args[1], 'Paris')
+            self.assertIsNone(provider.matches.call_args.args[3])
+            self.assertEqual(self.client.get('/api/ai/matches', query_string={'date': today, 'competition': '35'}).status_code, 200)
+            self.assertEqual(provider.matches.call_args.args[3], 35)
             self.assertEqual(self.client.get('/api/ai/matches/1001').status_code, 200)
             provider.match.assert_called_once_with(1001)
             self.assertEqual(self.client.get('/api/ai/matches/0').status_code, 400)
@@ -203,6 +208,62 @@ class AIBetaTests(unittest.TestCase):
             self.assertNotIn('test-secret', response.get_data(as_text=True))
             with patch.dict(self.app.config, {'SPORTS_DATA_ENABLED': False}):
                 self.assertEqual(self.client.post(endpoint, json={'snapshot_id': 'a' * 64}).status_code, 503)
+
+    def test_prediction_ledger_settles_and_reports_track_record(self):
+        from datetime import datetime, timedelta, timezone
+        module = self.module
+        kickoff = datetime.now(timezone.utc) + timedelta(days=1)
+
+        def snapshot(game_id, sport):
+            team = lambda i, n: {'id': i, 'name': n, 'score': None}
+            past = [{'id': game_id * 10 + i, 'sport': sport, 'competition': 'Test', 'starts_at': '2026-10-01T20:00:00+00:00',
+                     'home': {'id': 1, 'name': 'A', 'score': 2}, 'away': {'id': 2, 'name': 'B', 'score': 1},
+                     'decided': 'regulation', 'regulation': {'home': 2, 'away': 1}} for i in range(3)]
+            return {'match': {'id': game_id, 'sport': sport, 'competition': 'Test', 'starts_at': kickoff.isoformat(),
+                              'scheduled': True, 'home': team(1, 'A'), 'away': team(2, 'B')},
+                    'recent_results': {'home': past, 'away': past}}
+        with self.app.app_context():
+            db = module.get_db()
+            db.execute('DELETE FROM ai_predictions')
+            db.commit()
+            module.record_prediction(snapshot(501, 'Football'), {'home_goals': 2, 'away_goals': 1, 'winner': 'home',
+                                                                 'scorer': {'id': 77, 'name': 'Striker'}})
+            module.record_prediction(snapshot(502, 'Hockey sur glace'), {'home_goals': 3, 'away_goals': 2, 'winner': 'home', 'scorer': None})
+            module.record_prediction(snapshot(503, 'Football'), {'home_goals': 1, 'away_goals': 0, 'winner': 'home', 'scorer': None})
+            # A later analysis before kickoff replaces the stored prediction.
+            module.record_prediction(snapshot(501, 'Football'), {'home_goals': 3, 'away_goals': 1, 'winner': 'home',
+                                                                 'scorer': {'id': 77, 'name': 'Striker'}})
+            row = db.execute('SELECT home_goals, model_home, model_outcome FROM ai_predictions WHERE game_id = 501').fetchone()
+            self.assertEqual(row['home_goals'], 3)
+            self.assertIsNotNone(row['model_home'])
+            self.assertEqual(row['model_outcome'], 'home')
+            past = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
+            db.execute('UPDATE ai_predictions SET starts_at = ?', (past,))
+            db.commit()
+        finals = {
+            501: {'match': {'regulation': {'home': 3, 'away': 1}, 'decided': 'regulation'}, 'finished': True, 'scorers': [77]},
+            # Hockey won in overtime: regulation was 2-2, so the "home" pick misses.
+            502: {'match': {'regulation': {'home': 2, 'away': 2}, 'decided': 'overtime'}, 'finished': True, 'scorers': []},
+            503: {'match': {'regulation': None, 'decided': 'extra_time'}, 'finished': True, 'scorers': []},
+        }
+        with patch.object(module.sports_client, 'final_result', side_effect=lambda game_id: finals[game_id]):
+            data = self.client.get('/api/ai/track-record').get_json()
+        self.assertEqual(data['settled'], 3)
+        self.assertEqual(data['pending'], 0)
+        self.assertEqual(data['ai']['winner'], {'hits': 1, 'total': 3, 'rate': 0.333})
+        self.assertEqual(data['ai']['exact_score'], {'hits': 1, 'total': 2, 'rate': 0.5})
+        self.assertEqual(data['ai']['scorer'], {'hits': 1, 'total': 1, 'rate': 1.0})
+        self.assertEqual(data['by_sport']['Hockey sur glace']['hits'], 0)
+        self.assertEqual(len(data['recent']), 3)
+        self.assertEqual(self.app.test_client().get('/api/ai/track-record').status_code, 401)
+
+    def test_analysis_cache_survives_a_new_analyzer(self):
+        with self.app.app_context():
+            store = self.module.AnalysisStore()
+            store.put('k' * 64, {'status': 'ready', 'summary': 'ok'})
+            self.assertEqual(store.get('k' * 64, 60)['summary'], 'ok')
+            self.assertIsNone(store.get('k' * 64, -1))
+            self.assertIsNone(store.get('missing', 60))
 
 
 if __name__ == '__main__':

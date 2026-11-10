@@ -941,7 +941,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='2.3.6', date='2026-11-09';
+  const v='2.3.8', date='2026-11-10';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();

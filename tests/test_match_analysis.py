@@ -91,7 +91,8 @@ class MatchAnalysisTests(unittest.TestCase):
             changed['recent_results']['home'][0]['away']['score'] = 3
             self.assertNotEqual(snapshot_id(data), snapshot_id(changed))
             self.assertEqual(self.analyze(changed)['reason'], 'invalid_response')
-            self.assertEqual(post.call_count, 2)
+            # The rejected answer is retried once before giving up.
+            self.assertEqual(post.call_count, 3)
 
     def test_prediction_contract_derives_winner_and_preserves_verified_player(self):
         data = pregame_snapshot()
@@ -162,17 +163,30 @@ class MatchAnalysisTests(unittest.TestCase):
             with self.subTest(answer=answer), self.assertRaises(InvalidAnalysis):
                 self.analyzer.validate(answer, facts)
 
-    def test_failures_preserve_safe_reason_and_circuit_breaker_prevents_retries(self):
-        cases = [FakeResponse(status=401), FakeResponse(status=429), FakeResponse(status=302),
-                 FakeResponse(content_type='text/html'), FakeResponse(raw=b'not json'),
-                 FakeResponse(raw=b'x' * (128 * 1024 + 1)), FakeResponse({'candidates': []}),
-                 response(finish='MAX_TOKENS'), response(finish='SAFETY'), response({'summary': 'bad'})]
-        for sample in cases:
+    def test_provider_failures_pause_everyone_but_bad_answers_are_retried_once(self):
+        # Provider or configuration problems: one call, then a pause for every user.
+        for sample in [FakeResponse(status=401), FakeResponse(status=429), FakeResponse(status=302)]:
             with self.subTest(sample=sample), patch('match_analysis.requests.post', return_value=sample) as post:
                 self.analyzer = MatchAnalysis()
                 self.assertEqual(self.analyze()['status'], 'unavailable')
-                self.assertEqual(self.analyze()['status'], 'unavailable')
+                self.assertEqual(self.analyze(user=2)['status'], 'unavailable')
                 post.assert_called_once()
+        # One malformed, refused or truncated answer: retried once, no global pause, user not charged.
+        for sample in [FakeResponse(content_type='text/html'), FakeResponse(raw=b'not json'),
+                       FakeResponse(raw=b'x' * (128 * 1024 + 1)), FakeResponse({'candidates': []}),
+                       response(finish='MAX_TOKENS'), response(finish='SAFETY'), response({'summary': 'bad'})]:
+            with self.subTest(sample=sample), patch('match_analysis.requests.post', return_value=sample) as post:
+                self.analyzer = MatchAnalysis()
+                self.assertEqual(self.analyze()['status'], 'unavailable')
+                self.assertEqual(post.call_count, 2)
+                self.assertEqual(self.analyze(user=2)['status'], 'unavailable')
+                self.assertEqual(post.call_count, 4)
+                self.assertEqual(len(self.analyzer._users[1]), 0)
+        # A second attempt that succeeds is returned normally.
+        with patch('match_analysis.requests.post', side_effect=[response({'summary': 'bad'}), response()]) as post:
+            self.analyzer = MatchAnalysis()
+            self.assertEqual(self.analyze()['status'], 'ready')
+            self.assertEqual(post.call_count, 2)
         self.analyzer = MatchAnalysis()
         with patch('match_analysis.requests.post', side_effect=requests.Timeout('secret-value')):
             self.assertNotIn('secret-value', json.dumps(self.analyze()))
@@ -223,11 +237,66 @@ class MatchAnalysisTests(unittest.TestCase):
                 self.assertEqual(self.analyze(data, user=index + 2)['status'], 'ready')
             self.assertEqual(self.analyze(user=99)['status'], 'unavailable')
             self.assertEqual(generate.call_count, 30)
-        self.analyzer._lock.acquire()
-        try:
-            self.assertEqual(self.analyze()['status'], 'unavailable')
-        finally:
-            self.analyzer._lock.release()
+
+    def test_ready_analyses_are_served_while_others_are_generating(self):
+        with patch.object(self.analyzer, '_generate', return_value=ANSWER):
+            self.assertEqual(self.analyze()['status'], 'ready')
+        other = deepcopy(SNAPSHOT)
+        other['match']['id'] = 555
+        other_key = (MatchAnalysis.PROMPT_VERSION, 'gemini-3.8-flash', snapshot_id(other), False)
+        self.analyzer._pending.add(other_key)
+        with patch.object(self.analyzer, '_generate', return_value=ANSWER) as generate:
+            self.assertTrue(self.analyze()['cached'])
+            self.assertIn('déjà en préparation', self.analyze(other)['message'])
+            third = deepcopy(SNAPSHOT)
+            third['match']['id'] = 556
+            self.assertEqual(self.analyze(third)['status'], 'ready')
+            self.analyzer._pending.update({('a',), ('b',), ('c',)})
+            fourth = deepcopy(SNAPSHOT)
+            fourth['match']['id'] = 557
+            self.assertIn('Plusieurs analyses', self.analyze(fourth)['message'])
+            self.assertEqual(generate.call_count, 1)
+
+    def test_persistent_store_survives_restart(self):
+        class Store:
+            def __init__(self):
+                self.rows = {}
+
+            def get(self, key, max_age):
+                return self.rows.get(key)
+
+            def put(self, key, result):
+                self.rows[key] = result
+        store = Store()
+        with patch('match_analysis.requests.post', return_value=response()) as post:
+            first = MatchAnalysis(store).analyze(SNAPSHOT, 1, 'k', 'gemini-3.8-flash')
+            restarted = MatchAnalysis(store).analyze(SNAPSHOT, 2, 'k', 'gemini-3.8-flash')
+            post.assert_called_once()
+        self.assertEqual(first['status'], 'ready')
+        self.assertTrue(restarted['cached'])
+        self.assertEqual(restarted['generated_at'], first['generated_at'])
+
+        class BrokenStore(Store):
+            def get(self, key, max_age):
+                raise ConnectionError('db down')
+        with patch('match_analysis.requests.post', return_value=response()), self.assertLogs('match_analysis', level='WARNING'):
+            self.assertEqual(MatchAnalysis(BrokenStore()).analyze(SNAPSHOT, 1, 'k', 'gemini-3.8-flash')['status'], 'ready')
+
+    def test_pregame_facts_include_form_model_head_to_head_and_hockey_regulation(self):
+        data = pregame_snapshot()
+        data['head_to_head'] = [normalize_game({**GAME, 'id': 950, 'startTime': '2026-08-01T20:00:00+02:00'})]
+        facts = self.analyzer.facts(data)
+        self.assertIn('form_home', facts)
+        self.assertIn('3 défaites', facts['form_home'])
+        self.assertIn('model_expected', facts)
+        self.assertTrue(facts['h2h_0'].startswith('Confrontation directe le 2026-08-01'))
+        self.assertNotEqual(snapshot_id(data), snapshot_id({**data, 'head_to_head': []}))
+        hockey = {**GAME, 'sportId': 4, 'statusText': 'Final/OT', 'shortStatusText': 'Final/OT',
+                  'homeCompetitor': {**GAME['homeCompetitor'], 'score': 4}, 'awayCompetitor': {**GAME['awayCompetitor'], 'score': 3}}
+        game = normalize_game(hockey)
+        self.assertEqual((game['decided'], game['regulation']), ('overtime', {'home': 3, 'away': 3}))
+        data = {'match': {**game, 'scheduled': True}, 'statistics': [], 'recent_results': {'home': [game], 'away': []}}
+        self.assertIn('après prolongation ; 3 — 3 à la fin du temps réglementaire', self.analyzer.facts(data)['home_recent_0'])
 
     def test_snapshot_ignores_fetch_time_and_model_thoughts(self):
         self.assertEqual(snapshot_id(SNAPSHOT), snapshot_id({**SNAPSHOT, 'fetched_at': 'different'}))

@@ -75,7 +75,7 @@ pour rechercher des matchs de football et consulter les scores/statistiques
 disponibles, avec source et heure de récupération. Aucune prédiction n'est calculée.
 Une [analyse descriptive intégrée](docs/AUTO_ANALYSIS.md) se charge automatiquement
 dans la fiche lorsque les données et la clé serveur sont disponibles.
-La [démonstration IA et l'aperçu local de captures](docs/BET_PRONO_AI.md) restent disponibles.
+Le [fonctionnement de BET PRONO AI](docs/BET_PRONO_AI.md) décrit le filtre par compétition, le modèle statistique, l'analyse IA et le bilan des pronostics.
 
 ## Structure
 
