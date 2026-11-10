@@ -79,13 +79,36 @@ class SportsClientTests(unittest.TestCase):
         changed = deepcopy(raw)
         changed['members'] = []
         variants.append(changed)
-        for value in ('-1', '2.5', 'unknown', '9999', True, None):
+        for value in ('-1', '2.5', 'unknown', '9999', '0', True, None):
             changed = deepcopy(raw)
             changed['topPerformers']['categories'][0]['homePlayer']['stats'][0]['value'] = value
             variants.append(changed)
         for changed in variants:
             with self.subTest(changed=changed):
                 self.assertEqual(scorer_candidates(changed, normalized), [])
+
+    def test_scorer_before_lineups_uses_club_top_scorers_except_listed_absentees(self):
+        # Real pre-match shape: no line-up yet, `members` only lists absentees, names come from topPerformers.
+        raw = deepcopy(GAME)
+        raw['members'] = [{'id': 55, 'name': 'Injured Player', 'competitorId': 20}]
+        raw['awayCompetitor']['lineups'] = {'members': [{'id': 55, 'status': 3, 'statusText': 'Missing'}]}
+        raw['topPerformers'] = {'categories': [
+            {'homePlayer': {'id': 77, 'name': 'Home Striker', 'stats': [{'type': 1, 'name': 'Goals', 'value': '9'}]},
+             'awayPlayer': {'id': 55, 'name': 'Injured Player', 'stats': [{'type': 1, 'name': 'Goals', 'value': '6'}]}},
+            {'homePlayer': {'id': 78, 'name': 'Home Defender', 'stats': [{'type': 38, 'name': 'Tackles', 'value': '2'}]},
+             'awayPlayer': {'id': 56, 'name': 'Away Winger', 'stats': [{'type': 1, 'name': 'Goals', 'value': '3'}]}}]}
+        normalized = normalize_game(raw)
+        players = scorer_candidates(raw, normalized)
+        self.assertEqual([(p['id'], p['name'], p['side'], p['goals'], p['lineup']) for p in players],
+                         [(77, 'Home Striker', 'home', 9, 'unknown'), (56, 'Away Winger', 'away', 3, 'unknown')])
+        self.assertFalse(any(p['lineup_confirmed'] for p in players))
+        # Once starters are published, only listed attacking starters stay.
+        raw['homeCompetitor']['lineups'] = {'status': 'Confirmed', 'members': [
+            {'id': 99, 'status': 1, 'position': {'id': 4}}, {'id': 77, 'status': 2, 'position': {'id': 4}}]}
+        self.assertEqual([p['id'] for p in scorer_candidates(raw, normalized)], [56])
+        raw['homeCompetitor']['lineups']['members'][1]['status'] = 1
+        home = next(p for p in scorer_candidates(raw, normalized) if p['id'] == 77)
+        self.assertTrue(home['lineup_confirmed'])
 
     def test_search_date_boundary_query_and_shared_cache(self):
         previous = {**GAME, 'id': 1002, 'startTime': '2026-11-03T20:00:00+01:00'}

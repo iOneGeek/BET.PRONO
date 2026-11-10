@@ -164,6 +164,8 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
                 f"score le plus probable {model['likely_score']['home']} — {model['likely_score']['away']}")
         for player in data.get('scorer_candidates', []):
             lineup = 'titulaire annoncé, composition confirmée par la source' if player['lineup_confirmed'] else 'titulaire pressenti, composition à confirmer'
+            if player.get('lineup') == 'unknown':
+                lineup = 'meilleur buteur du club selon la source, composition pas encore publiée'
             if game.get('sport') == 'Hockey sur glace':
                 lineup = 'participation à confirmer' if not player['lineup_confirmed'] else 'présence confirmée par la source'
             facts[f"player_{player['id']}"] = (

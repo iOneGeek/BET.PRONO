@@ -138,7 +138,12 @@ def decision(raw, sides):
 
 
 def scorer_candidates(raw_game, game):
-    """Join named team members, listed starters and provider goal totals by ID."""
+    """Scorer candidates from the provider's top performers, checked against the team and the line-up.
+
+    Before line-ups are published (about an hour before kick-off), the club's leading scorers are
+    proposed unless the source lists them as missing, doubtful or on the bench. Once starters are
+    published, only listed attacking starters remain.
+    """
     members = raw_game.get('members', [])
     performers = raw_game.get('topPerformers', {})
     if not isinstance(members, list) or not isinstance(performers, dict):
@@ -148,41 +153,50 @@ def scorer_candidates(raw_game, game):
         return []
     roster = {member['id']: member for member in members[:100] if isinstance(member, dict) and positive_id(member.get('id'))}
     candidates = {}
+    hockey = game['sport'] == 'Hockey sur glace'
     for side, raw_side, player_key in (('home', 'homeCompetitor', 'homePlayer'), ('away', 'awayCompetitor', 'awayPlayer')):
         team = raw_game.get(raw_side, {})
-        lineup = team.get('lineups', {})
+        lineup = team.get('lineups') if isinstance(team, dict) else None
         if not isinstance(lineup, dict) or not isinstance(lineup.get('members'), list):
-            continue
+            lineup = {'members': []}
         listed = {member['id']: member for member in lineup['members'][:60]
                   if isinstance(member, dict) and positive_id(member.get('id'))}
-        hockey = game['sport'] == 'Hockey sur glace'
-        starters = {member['id'] for member in lineup['members'][:40] if isinstance(member, dict)
-                    and positive_id(member.get('id')) and member.get('status') == 1
+        announced = any(member.get('status') == 1 for member in listed.values())
+        starters = {member_id for member_id, member in listed.items() if member.get('status') == 1
                     and isinstance(member.get('position'), dict) and member['position'].get('id') in (3, 4)}
         for category in categories[:10]:
             player = category.get(player_key) if isinstance(category, dict) else None
             if not isinstance(player, dict) or not positive_id(player.get('id')):
                 continue
+            entry = listed.get(player['id'])
             if hockey:
-                entry = listed.get(player['id'])
                 if (player.get('positionName') not in ('Center', 'Left Wing', 'Right Wing', 'Forward')
                         or (entry and (entry.get('status') != 1 or entry.get('isDoubtful')))):
                     continue
-            elif player['id'] not in starters:
+            elif announced:
+                if player['id'] not in starters:
+                    continue
+            elif entry is not None:
+                # Line-up not out yet: anyone the source lists (missing, doubtful, bench) is left out.
                 continue
-            member = roster.get(player['id'], {})
-            if member.get('competitorId') != game[side]['id'] or not text(member.get('name')):
+            member = roster.get(player['id'])
+            if member is not None and member.get('competitorId') != game[side]['id']:
+                continue
+            name = text((member or {}).get('name')) or text(player.get('name'))
+            if not name:
                 continue
             stats = player.get('stats', [])
             if not isinstance(stats, list):
                 continue
             goals = next((stat.get('value') for stat in stats[:20] if isinstance(stat, dict)
                           and stat.get('type') == 1 and stat.get('name') == 'Goals'), None)
-            if not isinstance(goals, str) or not goals.isascii() or not goals.isdigit() or len(goals) > 3:
+            if not isinstance(goals, str) or not goals.isascii() or not goals.isdigit() or len(goals) > 3 or int(goals) == 0:
                 continue
-            candidates[player['id']] = {'id': player['id'], 'name': text(member['name']),
+            lineup_state = ('confirmed' if lineup.get('status') == 'Confirmed' and player['id'] in listed
+                            else 'probable' if player['id'] in listed else 'unknown')
+            candidates[player['id']] = {'id': player['id'], 'name': name,
                 'team_id': game[side]['id'], 'team_name': game[side]['name'], 'side': side,
-                'goals': int(goals), 'lineup_confirmed': lineup.get('status') == 'Confirmed' and player['id'] in listed}
+                'goals': int(goals), 'lineup_confirmed': lineup_state == 'confirmed', 'lineup': lineup_state}
     return list(candidates.values())[:6]
 
 
