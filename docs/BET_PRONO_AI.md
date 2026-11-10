@@ -1,4 +1,4 @@
-# BET PRONO AI — Bêta (V2.3.8)
+# BET PRONO AI — Bêta (V2.3.9)
 
 L'onglet **BET PRONO AI** (sur mobile : **AI · Bêta**) affiche des rencontres de
 football et de hockey sur glace issues de 365Scores, une fiche par match, une analyse
