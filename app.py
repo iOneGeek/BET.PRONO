@@ -148,11 +148,12 @@ class Conn:
     """Enveloppe une connexion sqlite3 OU psycopg avec une API unifiée
        (execute / fetchone / fetchall / lastrowid / commit / close)."""
 
-    def __init__(self, backend, real):
+    def __init__(self, backend, real, release=None):
         self.backend = backend  # "sqlite" ou "pg"
         self._c = real
         self._cur = None
         self._lastid = None
+        self._release = release  # Rend la connexion au pool au lieu de la fermer.
 
     def execute(self, sql, args=()):
         if self._c is None:
@@ -197,7 +198,16 @@ class Conn:
         self._c.rollback()
 
     def close(self):
-        self._c.close()
+        if self._c is None:
+            return
+        if self._release is not None:
+            try:
+                self._c.rollback()  # Termine la transaction de lecture ouverte avant de rendre la connexion.
+            except Exception:
+                pass
+            self._release(self._c)
+        else:
+            self._c.close()
 
     @staticmethod
     def _translate(sql):
@@ -205,18 +215,57 @@ class Conn:
         return sql.replace("?", "%s")
 
 
+_pg_pool = None
+_pg_pool_lock = threading.Lock()
+
+
+def _get_pg_pool():
+    """Pool de connexions PostgreSQL partagé par les requêtes (créé à la première utilisation).
+
+    Ouvrir une connexion chiffrée vers Neon coûtait ~1,3 s à chaque requête ; les connexions sont
+    désormais gardées ouvertes et réutilisées. `check` vérifie chaque connexion avant usage, ce qui
+    couvre la mise en veille de Neon (les connexions coupées sont recréées automatiquement).
+    """
+    global _pg_pool
+    if _pg_pool is None:
+        with _pg_pool_lock:
+            if _pg_pool is None:
+                from psycopg_pool import ConnectionPool
+                _pg_pool = ConnectionPool(
+                    DATABASE_URL, min_size=1, max_size=int(os.getenv('DB_POOL_SIZE', '6')), timeout=10,
+                    max_idle=240, kwargs={'connect_timeout': 5}, check=ConnectionPool.check_connection,
+                    name='bet-prono', open=True)
+    return _pg_pool
+
+
+def _release_pg(conn):
+    try:
+        _get_pg_pool().putconn(conn)
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def get_db():
     if "db" not in g:
         if USE_PG:
             real = None
-            for attempt in range(2):
-                try:
-                    real = psycopg.connect(DATABASE_URL, connect_timeout=5)
-                    break
-                except Exception:
-                    if attempt < 1:
-                        time.sleep(1)
-            g.db = Conn("pg", real)
+            release = None
+            try:
+                real = _get_pg_pool().getconn()
+                release = _release_pg
+            except Exception:
+                app.logger.warning('Database pool unavailable, falling back to a direct connection')
+                for attempt in range(2):
+                    try:
+                        real = psycopg.connect(DATABASE_URL, connect_timeout=5)
+                        break
+                    except Exception:
+                        if attempt < 1:
+                            time.sleep(1)
+            g.db = Conn("pg", real, release)
         else:
             real = sqlite3.connect(DB_PATH)
             real.row_factory = sqlite3.Row
@@ -709,9 +758,22 @@ def sitemap_xml():
     return resp
 
 
+STATIC_VERSIONED_MAX_AGE = 365 * 24 * 3600   # Fichiers appelés avec ?v= : nouvelle URL à chaque version.
+STATIC_DEFAULT_MAX_AGE = 24 * 3600           # Images sans version (logos, icônes).
+
+
 @app.get("/static/<path:filename>")
 def static_files(filename):
-    return send_from_directory(STATIC_DIR, filename)
+    if filename.startswith('downloads/'):
+        max_age = 0                       # Le widget téléchargé doit toujours être la dernière version.
+    elif request.args.get('v'):
+        max_age = STATIC_VERSIONED_MAX_AGE
+    else:
+        max_age = STATIC_DEFAULT_MAX_AGE
+    response = send_from_directory(STATIC_DIR, filename, max_age=max_age)
+    if max_age == STATIC_VERSIONED_MAX_AGE:
+        response.headers['Cache-Control'] = f'public, max-age={max_age}, immutable'
+    return response
 
 
 @app.get("/uploads/<path:filename>")

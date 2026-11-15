@@ -7,3 +7,4 @@ requests==2.31.0
 gunicorn==21.2.0
 psycopg[binary,pool]>=3.2.10
 Pillow>=10.0.0
+psycopg-pool>=3.2
