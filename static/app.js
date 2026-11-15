@@ -27,7 +27,7 @@ function nulEl(id){
 
 // Un element manquant ne doit plus jamais casser toute la page (clics morts).
 const $=id=>document.getElementById(id)||nulEl(id);
-const SP={F:'Foot',M:'Mixte',T:'Tennis',B:'MLB',N:'NFL',H:'NHL'},TY={C:'Combiné',S:'Simple',F:'Combiné FUN',4:'Combiné x4',5:'Combiné x5'};
+const SP={F:'Foot',M:'Mixte',T:'Tennis',B:'MLB',N:'NFL',H:'NHL'},TY={C:'Combiné',S:'Simple',F:'Combiné FUN',4:'Combiné x4',5:'Combiné x5',P:'Palier'};
 const SPORTS=['Foot','Mixte','Tennis','NBA','F1','MMA','MLB','NFL','NHL'];
 
 let BETS=[], INIT=100;
@@ -941,7 +941,7 @@ function promptScores(pick){
 
 // Version de l'application (affichée dans le pied de page)
 (function(){
-  const v='2.7.0', date='2026-11-15';
+  const v='2.7.1', date='2026-11-15';
   const el=document.getElementById('appVersionDate');
   if(el) el.textContent = 'v' + v + ' · ' + date;
 })();
