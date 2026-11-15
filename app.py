@@ -1386,7 +1386,7 @@ def montantes_create():
 @login_required
 @admin_required
 def montantes_update_step(montante_id, step_no):
-    """Cote, retrait, pari et match lié d'un palier à venir ; résultat du palier en cours seulement."""
+    """Cote, retrait, pari et match lié d'un palier (joué ou à venir, pour corriger) ; résultat du palier en cours seulement."""
     db = get_db()
     row = db.execute("SELECT * FROM montantes WHERE id = ?", (montante_id,)).fetchone()
     if not row:
@@ -1400,12 +1400,12 @@ def montantes_update_step(montante_id, step_no):
     data = request.get_json(silent=True) or {}
     changes = {}
     if 'odds' in data:
-        if step['state'] not in ('current', 'simulation') or not montante_calc.valid_odds(data['odds']):
-            return jsonify({'error': 'Cote modifiable seulement sur un palier non joué (1,01 à 20).'}), 400
+        if step['state'] == 'off' or not montante_calc.valid_odds(data['odds']):
+            return jsonify({'error': 'Cote invalide (1,01 à 20).'}), 400
         changes['odds'] = float(data['odds'])
     if 'withdrawal' in data:
-        if step['state'] not in ('current', 'simulation') or _number(data['withdrawal'], 0, 10000000) is None:
-            return jsonify({'error': 'Retrait modifiable seulement sur un palier non joué.'}), 400
+        if step['state'] == 'off' or _number(data['withdrawal'], 0, 10000000) is None:
+            return jsonify({'error': 'Retrait invalide.'}), 400
         changes['withdrawal'] = float(data['withdrawal'])
     if 'pick' in data:
         if not isinstance(data['pick'], str) or len(data['pick']) > 120:
