@@ -9,6 +9,7 @@
   let timer = null;
   let loading = false;
 
+  const names = window.betNames || {team: x => x, competition: x => x};
   const node = (tag, text, className) => {
     const item = document.createElement(tag);
     if (text != null) item.textContent = text;
@@ -52,14 +53,17 @@
       const mark = item.status === 'settled' ? (item.winner_hit ? '✓ Bon prono' : '✕ Raté') : item.status === 'void' ? 'Non vérifiable' : 'Terminé · vérification en cours';
       top.append(node('span', mark, 'fh-badge ' + (item.status === 'settled' ? (item.winner_hit ? 'fh-good' : 'fh-bad') : '')));
     }
-    top.append(node('span', item.competition || '', 'fh-comp'));
+    const comp = node('span', names.competition(item.competition), 'fh-comp');
+    comp.title = item.competition || '';
+    top.append(comp);
 
     const match = node('div', null, 'fh-match');
     let shown = null;
     if (item.phase === 'live' && item.live && item.live.home != null && item.live.away != null) shown = [item.live.home, item.live.away];
     else if (item.phase === 'finished' && item.actual) shown = item.actual.split('-').map(Number);
     else if (item.phase === 'finished' && item.live && item.live.home != null) shown = [item.live.home, item.live.away];
-    match.append(node('span', item.home, 'fh-team'), node('strong', shown ? `${shown[0]} – ${shown[1]}` : 'vs', 'fh-score'), node('span', item.away, 'fh-team fh-team-away'));
+    match.append(node('span', names.team(item.home), 'fh-team'), node('strong', shown ? `${shown[0]} – ${shown[1]}` : 'vs', 'fh-score'),
+      node('span', names.team(item.away), 'fh-team fh-team-away'));
 
     const prono = node('p', null, 'fh-prono');
     let text = `Prono ${score(item.predicted)}`;
