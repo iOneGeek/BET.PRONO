@@ -347,13 +347,15 @@ class AIBetaTests(unittest.TestCase):
         from datetime import datetime, timedelta, timezone
         module = self.module
         now = datetime.now(timezone.utc)
+        midnight = datetime.now(module.FR_TZ).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+        today_finished = midnight + (now - midnight) / 2   # Plus tôt aujourd'hui (heure de Paris).
         with self.app.app_context():
             db = module.get_db()
             for table in ('ai_follows', 'ai_predictions'):
                 db.execute(f'DELETE FROM {table}')
             user_id = db.execute("SELECT id FROM users WHERE username = 'beta_user'").fetchone()['id']
             rows = ((901, now + timedelta(hours=5), 'pending', None), (902, now - timedelta(minutes=50), 'pending', None),
-                    (903, now - timedelta(hours=10), 'settled', (2, 1)), (904, now - timedelta(days=3), 'settled', (0, 0)),
+                    (903, today_finished, 'settled', (2, 1)), (906, midnight - timedelta(hours=1), 'settled', (1, 1)), (904, now - timedelta(days=3), 'settled', (0, 0)),
                     (905, now + timedelta(days=40), 'pending', None))
             for game_id, start, status, actual in rows:
                 db.execute("""INSERT INTO ai_predictions (game_id, sport, competition, home_name, away_name, starts_at, home_goals,

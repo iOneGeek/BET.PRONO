@@ -1487,8 +1487,12 @@ LIVE_FETCH_LIMIT = 4       # Scores en direct demandés à 365Scores par actuali
 @app.get('/api/ai/follows/dashboard')
 @login_required
 def ai_follows_dashboard():
-    """Pronos suivis pour le tableau de bord : en direct d'abord, puis à venir (30 jours), puis terminés depuis 24 h."""
+    """Pronos suivis pour le tableau de bord : en direct d'abord, puis à venir (30 jours), puis terminés du jour.
+
+    Un match terminé disparaît de l'accueil le lendemain (minuit, heure de Paris) ; il reste dans « Tout voir ».
+    """
     now = datetime.now(timezone.utc)
+    today_fr = now.astimezone(FR_TZ).date()
     rows = get_db().execute("""SELECT f.game_id, f.home_goals, f.away_goals, f.winner, f.scorer_id, f.scorer_name,
                                       f.confidence, f.created_at, p.sport, p.competition, p.home_name, p.away_name,
                                       p.starts_at, p.status, p.actual_home, p.actual_away, p.actual_winner, p.scorers
@@ -1526,6 +1530,8 @@ def ai_follows_dashboard():
             item['phase'] = 'finished'
         else:
             item['phase'] = 'upcoming'
+        if item['phase'] == 'finished' and start.astimezone(FR_TZ).date() < today_fr:
+            continue  # Match d'un jour précédent : plus sur l'accueil.
         items.append(item)
     order = {'live': 0, 'upcoming': 1, 'finished': 2}
     items.sort(key=lambda item: (order[item['phase']], item['starts_at'] if item['phase'] != 'finished' else ''))
