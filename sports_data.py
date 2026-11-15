@@ -616,4 +616,5 @@ class Scores365Client:
                            'period': stage_labels.get(stage, '') if positive_id(stage) else '',
                            'time': text(event.get('gameTimeDisplay'), 16)})
         return {'match': game, 'periods': periods, 'events': events[-30:][::-1],
+                'clock': text(raw.get('gameTimeDisplay'), 16), 'finished': raw.get('statusGroup') == 4,
                 'fetched_at': fetched_at, 'cached': cached}
