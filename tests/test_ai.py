@@ -302,6 +302,41 @@ class AIBetaTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/ai/follows').get_json()['summary']['followed'], 0)
         self.assertEqual(self.app.test_client().post('/api/ai/follows/601').status_code, 401)
 
+    def test_quality_of_percentages_and_protected_settle_endpoint(self):
+        from datetime import datetime, timedelta, timezone
+        module = self.module
+        with self.app.app_context():
+            db = module.get_db()
+            db.execute('DELETE FROM ai_predictions')
+            # Two settled picks: model 70 % home (right) and 55 % home (wrong, draw); bookmakers 80 % / 40 %.
+            for game_id, p_home, m_home, winner, actual in ((801, 0.7, 0.8, 'home', (2, 0)), (802, 0.55, 0.4, 'home', (1, 1))):
+                db.execute("""INSERT INTO ai_predictions (game_id, sport, competition, home_name, away_name, starts_at, home_goals,
+                              away_goals, winner, status, actual_home, actual_away, actual_winner, created_at, updated_at,
+                              p_home, p_draw, p_away, m_home, m_draw, m_away, over_line, p_over, p_btts)
+                              VALUES (?, 'Football', 'L1', 'A', 'B', ?, 2, 0, ?, 'settled', ?, ?, ?, 'x', 'x', ?, ?, ?, ?, ?, ?, 2.5, 0.4, 0.3)""",
+                           (game_id, (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(), winner, actual[0], actual[1],
+                            'home' if actual[0] > actual[1] else 'draw', p_home, (1 - p_home) / 2, (1 - p_home) / 2,
+                            m_home, (1 - m_home) / 2, (1 - m_home) / 2))
+            db.commit()
+        quality = self.client.get('/api/ai/track-record').get_json()['quality']
+        self.assertEqual([b['label'] for b in quality['calibration']], ['50 à 60 %', '70 % et plus'])
+        self.assertEqual(quality['calibration'][1]['observed'], 1.0)
+        brier_model = ((0.7 - 1) ** 2 + 2 * 0.15 ** 2 + 0.55 ** 2 + (0.225 - 1) ** 2 + 0.225 ** 2) / 2
+        self.assertAlmostEqual(quality['brier']['model'], brier_model, places=3)
+        self.assertEqual(quality['market_winner'], {'hits': 1, 'total': 2, 'rate': 0.5})
+        self.assertEqual(quality['over'], {'hits': 2, 'total': 2, 'rate': 1.0})
+        self.assertEqual(quality['both_score']['hits'], 1)
+        self.assertFalse(quality['enough_data'])
+        # The scheduler endpoint is invisible without a long secret, and needs the exact token.
+        anonymous = self.app.test_client()
+        self.assertEqual(anonymous.post('/api/ai/settle').status_code, 404)
+        with patch.dict(os.environ, {'CRON_TOKEN': 'k' * 32}):
+            self.assertEqual(anonymous.post('/api/ai/settle', headers={'X-Cron-Token': 'wrong'}).status_code, 404)
+            with patch.object(module, 'settle_predictions', return_value=3) as settle:
+                response = anonymous.post('/api/ai/settle', headers={'X-Cron-Token': 'k' * 32})
+            self.assertEqual(response.get_json(), {'settled': 3})
+            settle.assert_called_once_with(limit=10)
+
     def test_analysis_cache_survives_a_new_analyzer(self):
         with self.app.app_context():
             store = self.module.AnalysisStore()

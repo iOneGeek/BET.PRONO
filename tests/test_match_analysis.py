@@ -200,7 +200,7 @@ class MatchAnalysisTests(unittest.TestCase):
             self.assertEqual(self.analyze()['status'], 'ready')
         other = deepcopy(SNAPSHOT)
         other['match']['id'] = 555
-        other_key = (MatchAnalysis.PROMPT_VERSION, 'gemini-3.8-flash', snapshot_id(other), False)
+        other_key = (MatchAnalysis.PROMPT_VERSION, 'gemini-3.8-flash', snapshot_id(other), False, '')
         self.analyzer._pending.add(other_key)
         with patch.object(self.analyzer, '_generate', return_value=ANSWER) as generate:
             self.assertTrue(self.analyze()['cached'])

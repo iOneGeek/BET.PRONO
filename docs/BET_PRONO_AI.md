@@ -1,4 +1,4 @@
-# BET PRONO AI — Bêta (V2.4.0)
+# BET PRONO AI — Bêta (V2.5.0)
 
 L'onglet **BET PRONO AI** (sur mobile : **AI · Bêta**) affiche des rencontres de
 football et de hockey sur glace issues de 365Scores, une fiche par match, une analyse
@@ -83,6 +83,43 @@ sa réussite réelle est mesurée dans le bilan.
 
 Les tables sont créées automatiquement au démarrage (SQLite en local, PostgreSQL/Neon
 en production). Aucune migration manuelle.
+
+## Nouveautés V2.5.0
+
+### Données en plus (`sports_data.py`)
+- **Classement** (`standings/`, cache 30 min) : matchs joués, buts marqués et encaissés des deux
+  équipes, et moyenne de buts de la compétition. Absent si les équipes ne partagent pas de tableau
+  (coupe entre divisions).
+- **Cotes** (`bets/lines/`, cache 5 min) : 1N2, plus/moins de buts (2,5 au football, 5,5 au hockey) et
+  « les deux équipes marquent », converties en probabilités sans la marge du bookmaker. 365Scores ne
+  les sert pas pour la France : un pays international est utilisé, en lecture seule, sans lien de pari.
+- **Absents** : joueurs listés absents ou incertains avant le match, avec leurs buts. Un absent n'est
+  jamais proposé comme buteur.
+- Ces données sont facultatives : si elles manquent, le modèle fonctionne comme avant et leur échec
+  ne met pas en pause l'accès 365Scores.
+
+### Modèle (`match_model.py`)
+- Moyenne de buts **de la compétition** quand le classement est connu.
+- **Force sur la saison** (attaque et défense rapportées à la moyenne de la compétition), mélangée à
+  55 % avec la forme récente.
+- **Absents** : un buteur absent réduit l'attaque de son équipe de la moitié de sa part des buts
+  (au plus −25 %).
+- Prono : marchés (double chance, plus/moins de buts, les deux équipes marquent) comparés aux cotes,
+  et indicateur **« match serré »** quand le résultat le plus probable est sous 45 % (42 % au hockey).
+- Non disponible : gardien titulaire au hockey (la source ne le donne pas avant le match).
+
+### Gemini explique le prono (`match_analysis.py`, prompt v6)
+« Pourquoi ce prono ? » : deux ou trois phrases qui citent le fait `pick_model`. Les chiffres doivent
+venir des faits cités ; conseils de mise et certitudes (« garanti », « 100 % »…) sont refusés.
+
+### Justesse des pourcentages et vérification automatique (`app.py`)
+- Les probabilités du modèle et des bookmakers sont enregistrées avec chaque prono.
+- Bilan : réussite attendue / réelle par tranche (calibration), score de Brier du modèle et des
+  bookmakers sur les mêmes matchs, réussite des marchés de buts. Avis « peu de matchs » sous 100 pronos.
+- Vérification toutes les 30 min tant que le serveur tourne, plus `POST /api/ai/settle` (en-tête
+  `X-Cron-Token`, invisible sans la variable `CRON_TOKEN`) appelé chaque heure par
+  `.github/workflows/settle-predictions.yml` pour réveiller le site. À configurer : `CRON_TOKEN` (24
+  caractères minimum) dans Render **et** dans les secrets GitHub du dépôt.
 
 ## Tester en local
 

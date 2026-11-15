@@ -137,6 +137,42 @@ def decision(raw, sides):
     return {'decided': decided, 'regulation': regulation}
 
 
+def absences(raw_game, game):
+    """Players the source lists as missing or doubtful before the match, per side."""
+    members = raw_game.get('members', [])
+    names = {m['id']: text(m.get('name')) for m in members[:100] if isinstance(m, dict) and positive_id(m.get('id'))} \
+        if isinstance(members, list) else {}
+    # Goals of the club's top performers, to weigh what an absence costs.
+    goals = {}
+    categories = (raw_game.get('topPerformers') or {}).get('categories') if isinstance(raw_game.get('topPerformers'), dict) else None
+    for category in (categories or [])[:10] if isinstance(categories, list) else []:
+        for key in ('homePlayer', 'awayPlayer'):
+            player = category.get(key) if isinstance(category, dict) else None
+            if not isinstance(player, dict) or not positive_id(player.get('id')) or not isinstance(player.get('stats'), list):
+                continue
+            value = next((stat.get('value') for stat in player['stats'][:20] if isinstance(stat, dict)
+                          and stat.get('type') == 1 and stat.get('name') == 'Goals'), None)
+            if isinstance(value, str) and value.isascii() and value.isdigit() and len(value) <= 3:
+                goals[player['id']] = int(value)
+            if not names.get(player['id']) and text(player.get('name')):
+                names[player['id']] = text(player['name'])
+    out = {'home': [], 'away': []}
+    for side, raw_side in (('home', 'homeCompetitor'), ('away', 'awayCompetitor')):
+        lineup = (raw_game.get(raw_side) or {}).get('lineups')
+        listed = lineup.get('members') if isinstance(lineup, dict) else None
+        for member in (listed or [])[:60]:
+            if not isinstance(member, dict) or not positive_id(member.get('id')):
+                continue
+            missing, doubtful = member.get('status') == 3, bool(member.get('isDoubtful'))
+            if not (missing or doubtful):
+                continue
+            position = member.get('position') if isinstance(member.get('position'), dict) else {}
+            out[side].append({'id': member['id'], 'name': names.get(member['id']) or 'Joueur non nommé',
+                              'status': 'missing' if missing else 'doubtful',
+                              'position': text(position.get('name'), 30), 'goals': goals.get(member['id'])})
+    return out
+
+
 def scorer_candidates(raw_game, game):
     """Scorer candidates from the provider's top performers, checked against the team and the line-up.
 
@@ -230,15 +266,21 @@ class Scores365Client:
                 raise SportsDataError('Trop de demandes. Réessaie dans une minute.', 429)
             times.append(now)
 
+    # Longer cache for slow-moving data; optional paths never pause the main access on failure.
+    PATH_TTL = {'standings/': 1800, 'bets/lines/': 300}
+    OPTIONAL_PATHS = ('standings/', 'bets/lines/')
+    ODDS_COUNTRY = 1  # Odds are not served for the French locale; an international one is used, read-only.
+
     def _get(self, path, params, deadline=None):
-        if path not in ('games/allscores/', 'game/stats/', 'game/', 'games/h2h/'):
+        if path not in ('games/allscores/', 'game/stats/', 'game/', 'games/h2h/', 'standings/', 'bets/lines/'):
             raise ValueError('Unsupported provider path')
+        ttl = self.PATH_TTL.get(path, self.TTL)
         key = (path, tuple(sorted(params.items())))
         # Serialize cache misses to prevent duplicate upstream calls from threads.
         with self._lock:
             now = time.monotonic()
             cached = self._cache.get(key)
-            if cached and now - cached[0] < self.TTL:
+            if cached and now - cached[0] < ttl:
                 self._cache.move_to_end(key)
                 return cached[1], cached[2], True
             if now < self._blocked_until:
@@ -278,21 +320,85 @@ class Scores365Client:
                 elif path == 'game/stats/' and 'games' not in data:
                     # Before kickoff the stats endpoint returns only its update envelope.
                     valid = all(type(data.get(key)) is int for key in ('lastUpdateId', 'requestedUpdateId', 'ttl'))
+                elif path == 'standings/':
+                    valid = isinstance(data.get('standings'), list)
+                elif path == 'bets/lines/':
+                    valid = isinstance(data.get('lines', []), list)
                 else:
                     valid = isinstance(data.get('games'), list)
                 if not valid:
                     raise SportsDataError('Le format des données 365Scores a changé.')
             except (requests.RequestException, ValueError, UnicodeError) as exc:
-                self._blocked_until = time.monotonic() + 30
+                if path not in self.OPTIONAL_PATHS:
+                    self._blocked_until = time.monotonic() + 30
                 raise SportsDataError('Impossible de récupérer les données 365Scores. Réessaie plus tard.', 503) from exc
             except SportsDataError:
-                self._blocked_until = max(self._blocked_until, time.monotonic() + 30)
+                if path not in self.OPTIONAL_PATHS:
+                    self._blocked_until = max(self._blocked_until, time.monotonic() + 30)
                 raise
             fetched_at = datetime.now(timezone.utc).isoformat()
             self._cache[key] = (time.monotonic(), data, fetched_at)
-            if len(self._cache) > 32:
+            if len(self._cache) > 48:
                 self._cache.popitem(last=False)
             return data, fetched_at, False
+
+    def _standings(self, game, competition_id, deadline):
+        """Season table of both teams and the competition's goals per team and game, if they share a table."""
+        if not positive_id(competition_id):
+            return None
+        data, _, _ = self._get('standings/', {'competitions': competition_id}, deadline)
+        rows = {}
+        for table in data['standings'][:12]:
+            for row in (table.get('rows') or [])[:60] if isinstance(table, dict) else []:
+                team = row.get('competitor') if isinstance(row, dict) else None
+                played, scored, conceded = row.get('gamePlayed'), row.get('for'), row.get('against')
+                if (isinstance(team, dict) and positive_id(team.get('id')) and type(played) is int and played > 0
+                        and all(type(v) in (int, float) and 0 <= v < 10000 for v in (scored, conceded))):
+                    rows[team['id']] = {'played': played, 'scored': scored, 'conceded': conceded,
+                                        'position': row.get('position') if type(row.get('position')) is int else None,
+                                        'points': row.get('points') if type(row.get('points')) in (int, float) else None}
+        if len(rows) < 4 or any(game[side]['id'] not in rows for side in ('home', 'away')):
+            return None
+        played = sum(r['played'] for r in rows.values())
+        league = sum(r['scored'] for r in rows.values()) / played if played else None
+        if not league:
+            return None
+        return {'home': rows[game['home']['id']], 'away': rows[game['away']['id']],
+                'league_goals_per_team': round(league, 3), 'teams': len(rows)}
+
+    def _odds(self, game, deadline):
+        """Bookmaker probabilities (margin removed) for 1X2, total goals and both teams to score."""
+        data, _, _ = self._get('bets/lines/', {'games': game['id'], 'userCountryId': self.ODDS_COUNTRY}, deadline)
+        line_for_total = '2.5' if game['sport'] == 'Football' else '5.5'
+
+        def implied(options, names):
+            prices = {}
+            for option in options if isinstance(options, list) else []:
+                rate = (option.get('rate') or {}).get('decimal') if isinstance(option, dict) else None
+                if option.get('name') in names and type(rate) in (int, float) and 1.0 < rate < 1000:
+                    prices[option['name']] = 1 / rate
+            if set(prices) != set(names):
+                return None
+            total = sum(prices.values())
+            return {name: round(value / total, 3) for name, value in prices.items()}
+        odds = {}
+        for line in data.get('lines', [])[:200]:
+            if not isinstance(line, dict) or line.get('gameId') != game['id'] or not isinstance(line.get('lineType'), dict):
+                continue
+            kind = line.get('lineTypeId')
+            if kind == 1 and 'result' not in odds:
+                result = implied(line.get('options'), ('1', 'X', '2'))
+                if result:
+                    odds['result'] = {'home': result['1'], 'draw': result['X'], 'away': result['2']}
+            elif kind == 3 and str(line.get('internalOptionValue')) == line_for_total and 'over' not in odds:
+                total = implied(line.get('options'), ('Under', 'Over'))
+                if total:
+                    odds['over'] = {'line': float(line_for_total), 'probability': total['Over']}
+            elif kind == 12 and 'both_score' not in odds:
+                both = implied(line.get('options'), ('Yes', 'No'))
+                if both:
+                    odds['both_score'] = both['Yes']
+        return odds or None
 
     def matches(self, day, query='', sport=1, competition=None):
         data, fetched_at, cached = self._get('games/allscores/', {
@@ -431,6 +537,8 @@ class Scores365Client:
         history = {'home': [], 'away': []}
         players = []
         head_to_head = []
+        missing = {'home': [], 'away': []}
+        standings = odds = None
         history_notice = ''
         if raw_game.get('statusGroup') == 2:
             try:
@@ -443,6 +551,9 @@ class Scores365Client:
                     fetched_at = min(fetched_at, detail_fetched_at)
                     cached = cached and detail_cached
                 players = scorer_candidates(detail['game'], game)
+                missing = absences(detail['game'], game)
+                missing_ids = {player['id'] for side in missing.values() for player in side if player['status'] == 'missing'}
+                players = [player for player in players if player['id'] not in missing_ids]
                 history, history_fetched_at, history_cached = self._recent_results(detail['game'], game, deadline)
                 if history_fetched_at:
                     fetched_at = min(fetched_at, history_fetched_at)
@@ -454,9 +565,17 @@ class Scores365Client:
                 head_to_head = self._head_to_head(game, deadline)
             except SportsDataError:
                 head_to_head = []
+            try:
+                standings = self._standings(game, raw_game.get('competitionId'), deadline)
+            except SportsDataError:
+                standings = None
+            try:
+                odds = self._odds(game, deadline)
+            except SportsDataError:
+                odds = None
         return {'mode': 'sports_data', 'match': game, 'statistics': list(rows.values())[:40],
                 'recent_results': history, 'history_notice': history_notice, 'head_to_head': head_to_head,
-                'scorer_candidates': players,
+                'scorer_candidates': players, 'absences': missing, 'standings': standings, 'odds': odds,
                 'source': self.SOURCE, 'fetched_at': fetched_at, 'cached': cached,
                 'cache_seconds': self.TTL, 'prediction': None,
                 'notice': 'Données fournies par 365Scores, potentiellement différées.'}
