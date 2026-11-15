@@ -534,7 +534,7 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
   <form id="f" class="form">
     <label>Date<input id="d" type="date" required></label>
     <label>Sport<select id="sp"><option value="Foot">⚽ Foot</option><option value="Mixte">🎯 Mixte</option><option value="Tennis">🎾 Tennis</option><option value="NBA">🏀 NBA</option><option value="F1">🏎️ F1</option><option value="MMA">🥊 MMA</option><option value="MLB">⚾ MLB</option><option value="NFL">🏈 NFL</option><option value="NHL">🏒 NHL</option></select></label>
-    <label>Type<select id="ty"><option>Simple</option><option selected>Combiné</option><option>Combiné FUN</option><option>Combiné x4</option><option>Combiné x5</option></select></label>
+    <label>Type<select id="ty"><option>Simple</option><option selected>Combiné</option><option>Combiné FUN</option><option>Combiné x4</option><option>Combiné x5</option><option>Palier</option></select></label>
     <label>Mise ou retrait (€)<input id="s" type="number" min="0.01" step="0.01" required></label>
     <label>Cote<input id="o" type="number" min="1.01" step="0.01"></label>
     <label>Bonus (€)<input id="bo" type="number" min="0" step="0.01"></label>
@@ -754,7 +754,7 @@ footer{background:transparent;border:0;box-shadow:none;color:#8199b8}.form{gap:1
 
 <footer><span class="tg-footer-links"><a class="tg-footer-link" href="https://t.me/bet_prono_fr" target="_blank" rel="noopener noreferrer nofollow">Telegram</a> · <a class="tg-footer-link" href="https://www.instagram.com/bet.prono/" target="_blank" rel="noopener noreferrer nofollow">Instagram</a></span><br>
 Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépendance. Besoin d'aide ? Appelez le 09 74 75 13 13 (appel non surtaxé).<br>
-<span style="opacity:.7">BET.PRONO V2.7.0 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
+<span style="opacity:.7">BET.PRONO V2.7.1 · <span id="appVersionDate"></span><br><a id="adminLink" href="/admin" hidden style="color:var(--accent)">Administration</a></span></footer>
 </main>
 
 <div id="jsError" class="jserror" hidden>
@@ -775,7 +775,7 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
   <form method="dialog" class="share-form" id="editBetForm">
     <label>Date<input type="date" id="ebDate"></label>
     <label>Sport<select id="ebSport"><option value="Foot">⚽ Foot</option><option value="Mixte">🎯 Mixte</option><option value="Tennis">🎾 Tennis</option><option value="NBA">🏀 NBA</option><option value="F1">🏎️ F1</option><option value="MMA">🥊 MMA</option><option value="MLB">⚾ MLB</option><option value="NFL">🏈 NFL</option><option value="NHL">🏒 NHL</option></select></label>
-    <label>Type de pari<select id="ebType"><option>Simple</option><option>Combiné</option><option>Combiné FUN</option><option>Combiné x4</option><option>Combiné x5</option></select></label>
+    <label>Type de pari<select id="ebType"><option>Simple</option><option>Combiné</option><option>Combiné FUN</option><option>Combiné x4</option><option>Combiné x5</option><option>Palier</option></select></label>
     <label>Mise (€)<input type="number" id="ebStake" min="0.1" step="0.5"></label>
     <label>Montant réellement crédité (€)<input type="number" id="ebPayout" min="0" step="0.01" placeholder="Facultatif"></label><p class="sub">Total reversé par le bookmaker, mise et bonus compris. Vide : calcul depuis la cote. Zéro est un montant valide.</p>
     <label>Cote<input type="number" id="ebOdds" min="1" step="0.01"></label>
@@ -808,7 +808,7 @@ Interdit aux mineurs. Jouer comporte des risques : endettement, isolement, dépe
 })();
 </script>
 <canvas id="canvas"></canvas>
-    <script src="/static/app.js?v=2.7.0-release"></script>
+    <script src="/static/app.js?v=2.7.1-release"></script>
     <script src="/static/bankroll-reconcile.js?v=1"></script>
     <script src="/static/match-tracker.js?v=2.3.5"></script>
     <script src="/static/sports-data.js?v=2.6.0"></script>
