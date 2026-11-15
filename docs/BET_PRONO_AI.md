@@ -80,7 +80,7 @@ sa réussite réelle est mesurée dans le bilan.
 - `POST` / `DELETE /api/ai/follows/<id>` suit ou retire un prono (table `ai_follows`,
   500 au maximum par compte) ; `GET /api/ai/follows` renvoie la liste et sa réussite.
   Les matchs suivis sont vérifiés en priorité.
-- `GET /api/ai/track-record` vérifie jusqu'à 3 matchs terminés depuis plus de 3 h à
+- `GET /api/ai/track-record` vérifie jusqu'à 3 matchs commencés depuis plus de 2 h à
   chaque consultation, puis renvoie les taux de réussite.
 - Hockey : comparé au temps réglementaire. Football avec prolongation : seul le match
   nul après 90 minutes est compté (score exact inconnu). Un match sans résultat après
@@ -142,7 +142,7 @@ python app.py
    **Ligue 1** dans le menu Compétition : seuls ses matchs restent.
 4. Ouvrir un match à venir : vérifier le modèle statistique et le tableau de forme.
 5. Avec `GEMINI_API_KEY`, vérifier le pronostic IA ; il apparaît ensuite en attente
-   dans le bilan, puis vérifié 3 h après la fin du match.
+   dans le bilan, puis vérifié dès 2 h après le coup d'envoi (puis toutes les 30 min).
 
 ## Tests automatisés
 

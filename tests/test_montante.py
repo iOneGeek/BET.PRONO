@@ -132,6 +132,14 @@ class MontanteApiTests(unittest.TestCase):
         rows = {row['step_no']: row for row in view['steps']}
         self.assertEqual((rows[3]['stake'], rows[3]['return']), (20.03, 30.45))
         self.assertEqual(self.member.patch(url + '2', json={'withdrawal': 0}).status_code, 403)
+        # Même correction en tapant directement la mise jouée au palier 3.
+        self.admin.patch(url + '2', json={'withdrawal': 0})
+        view = self.admin.patch(url + '3', json={'stake': 20.03}).get_json()
+        rows = {row['step_no']: row for row in view['steps']}
+        self.assertEqual((rows[2]['withdrawal'], rows[3]['stake'], rows[3]['return']), (1.0, 20.03, 30.45))
+        self.assertEqual(self.admin.patch(url + '3', json={'stake': 25}).status_code, 400)   # plus que le gain du palier 2
+        self.assertEqual(self.admin.patch(url + '1', json={'stake': 12}).get_json()['start_stake'], 12.0)
+        self.assertEqual(self.member.patch(url + '3', json={'stake': 20}).status_code, 403)
 
     def test_live_score_of_the_current_step_and_stop(self):
         montante_id = self.create().get_json()['id']
