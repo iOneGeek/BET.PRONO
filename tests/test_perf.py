@@ -102,3 +102,38 @@ class PerformanceTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class FewerRoundTripsTests(unittest.TestCase):
+    def test_recent_connections_skip_the_check_and_idle_ones_are_checked(self):
+        module = PerformanceTests.module if hasattr(PerformanceTests, 'module') else None
+        if module is None:
+            PerformanceTests.setUpClass()
+            module = PerformanceTests.module
+        conn = FakeConnection()
+        with patch('psycopg_pool.ConnectionPool.check_connection') as check:
+            module._pg_last_used[id(conn)] = module.time.monotonic()
+            module._check_if_idle(conn)
+            check.assert_not_called()
+            module._pg_last_used[id(conn)] = module.time.monotonic() - 120
+            module._check_if_idle(conn)
+            check.assert_called_once_with(conn)
+
+    def test_last_activity_is_written_at_most_every_five_minutes(self):
+        if not hasattr(PerformanceTests, 'module'):
+            PerformanceTests.setUpClass()
+        module, app = PerformanceTests.module, PerformanceTests.app
+        client = app.test_client()
+        client.post('/api/register', json={'username': 'perf_user', 'password': 'testing123'})
+        with app.app_context():
+            db = module.get_db()
+            db.execute("UPDATE users SET last_activity = NULL WHERE username = 'perf_user'")
+            db.commit()
+        client.get('/api/me')
+        with app.app_context():
+            first = module.get_db().execute("SELECT last_activity FROM users WHERE username = 'perf_user'").fetchone()[0]
+        client.get('/api/me')
+        with app.app_context():
+            second = module.get_db().execute("SELECT last_activity FROM users WHERE username = 'perf_user'").fetchone()[0]
+        self.assertIsNotNone(first)
+        self.assertEqual(first, second)

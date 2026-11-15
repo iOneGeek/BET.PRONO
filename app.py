@@ -217,6 +217,18 @@ class Conn:
 
 _pg_pool = None
 _pg_pool_lock = threading.Lock()
+_pg_last_used = {}            # id(connexion) -> instant où elle a été rendue au pool.
+PG_RECHECK_AFTER_SECONDS = 60
+LAST_ACTIVITY_EVERY_MINUTES = 5
+
+
+def _check_if_idle(conn):
+    """Vérifie une connexion seulement si elle dort depuis plus d'une minute (un aller-retour de moins sinon)."""
+    last = _pg_last_used.get(id(conn))
+    if last is not None and time.monotonic() - last < PG_RECHECK_AFTER_SECONDS:
+        return
+    from psycopg_pool import ConnectionPool
+    ConnectionPool.check_connection(conn)
 
 
 def _get_pg_pool():
@@ -233,12 +245,15 @@ def _get_pg_pool():
                 from psycopg_pool import ConnectionPool
                 _pg_pool = ConnectionPool(
                     DATABASE_URL, min_size=1, max_size=int(os.getenv('DB_POOL_SIZE', '6')), timeout=10,
-                    max_idle=240, kwargs={'connect_timeout': 5}, check=ConnectionPool.check_connection,
+                    max_idle=240, kwargs={'connect_timeout': 5}, check=_check_if_idle,
                     name='bet-prono', open=True)
     return _pg_pool
 
 
 def _release_pg(conn):
+    if len(_pg_last_used) > 64:
+        _pg_last_used.clear()
+    _pg_last_used[id(conn)] = time.monotonic()
     try:
         _get_pg_pool().putconn(conn)
     except Exception:
@@ -669,11 +684,16 @@ def login_required(fn):
         if user["banned"]:
             return jsonify({"error": "Compte suspendu (banni)."}), 403
         g.user = user
-        # Mise à jour de la dernière activité (une fois par requête environ).
+        # Dernière activité : réécrite au plus toutes les 5 min (chaque écriture = 2 allers-retours vers la base).
         if "last_activity" in user.keys():
-            now = datetime.now(timezone.utc).isoformat()
-            db.execute("UPDATE users SET last_activity = ? WHERE id = ?", (now, uid))
-            db.commit()
+            now = datetime.now(timezone.utc)
+            try:
+                previous = datetime.fromisoformat(user["last_activity"]) if user["last_activity"] else None
+            except (TypeError, ValueError):
+                previous = None
+            if previous is None or now - previous >= timedelta(minutes=LAST_ACTIVITY_EVERY_MINUTES):
+                db.execute("UPDATE users SET last_activity = ? WHERE id = ?", (now.isoformat(), uid))
+                db.commit()
         return fn(*args, **kwargs)
 
     return wrapper
