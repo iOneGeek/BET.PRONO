@@ -11,7 +11,7 @@ Voir aussi : [connecteur 365Scores](365SCORES.md) et
 
 0. **Tableau de bord** (V2.6.0) : en haut, la carte « ⭐ Mes pronos suivis » montre les matchs suivis
    en direct (score, minute, « en bonne voie » ou non), puis à venir (30 jours, compte à rebours) et
-   terminés depuis 24 h (✓ / ✕). Actualisation chaque minute pendant un match, sinon toutes les 5 min,
+   terminés du jour (✓ / ✕), retirés le lendemain à minuit. Actualisation chaque minute pendant un match, sinon toutes les 5 min,
    en pause quand l'onglet est masqué (`GET /api/ai/follows/dashboard`, 4 scores en direct au plus).
 
 1. **Bilan des pronostics** (haut de l'onglet) : pourcentage de bons vainqueurs,
