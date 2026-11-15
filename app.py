@@ -1199,7 +1199,9 @@ def settle_predictions(limit=3, user_id=None):
     Les matchs suivis par l'utilisateur passent en premier."""
     db = get_db()
     now = datetime.now(timezone.utc)
-    ready = (now - timedelta(hours=3)).isoformat()
+    # 2 h après le coup d'envoi : un match de foot est presque toujours fini ; sinon (prolongations…)
+    # 365Scores le dit encore en cours et on revérifie 30 min plus tard.
+    ready = (now - timedelta(hours=2)).isoformat()
     recheck = (now - timedelta(minutes=30)).isoformat()
     rows = db.execute("""SELECT p.id, p.game_id, p.starts_at, p.scorer_id,
                                 CASE WHEN f.id IS NULL THEN 1 ELSE 0 END AS later
@@ -1399,6 +1401,24 @@ def montantes_update_step(montante_id, step_no):
         return jsonify({'error': 'Palier introuvable.'}), 404
     data = request.get_json(silent=True) or {}
     changes = {}
+    extra = []  # Mises à jour d'une autre ligne (mise réelle → retrait du palier précédent ou départ).
+    if 'stake' in data:
+        # Mise réellement jouée : au palier 1 c'est le départ ; ensuite, la différence avec le retour
+        # du palier précédent devient son retrait (ex. 21,03 gagnés, 20,03 misés → 1 € retiré).
+        stake = _number(data['stake'], 0.01, 10000000)
+        if step['state'] == 'off' or stake is None:
+            return jsonify({'error': 'Mise invalide.'}), 400
+        if step_no == 1:
+            if stake < 1:
+                return jsonify({'error': 'Mise de départ : 1 € minimum.'}), 400
+            extra.append(("UPDATE montantes SET start_stake = ? WHERE id = ?", (float(stake), montante_id)))
+        else:
+            previous = view['steps'][step_no - 2]
+            gap = round((previous['return'] or 0) - stake, 2)
+            if previous['state'] == 'off' or gap < 0:
+                return jsonify({'error': f'La mise ne peut pas dépasser le gain du palier {step_no - 1}.'}), 400
+            extra.append(("UPDATE montante_steps SET withdrawal = ? WHERE montante_id = ? AND step_no = ?",
+                          (gap, montante_id, step_no - 1)))
     if 'odds' in data:
         if step['state'] == 'off' or not montante_calc.valid_odds(data['odds']):
             return jsonify({'error': 'Cote invalide (1,01 à 20).'}), 400
@@ -1427,10 +1447,13 @@ def montantes_update_step(montante_id, step_no):
             return jsonify({'error': 'Le résultat se saisit sur le palier en cours.'}), 400
         changes['result'] = data['result']
         changes['settled_at'] = None if data['result'] == 'pending' else datetime.now(timezone.utc).isoformat()
-    if not changes:
+    if not changes and not extra:
         return jsonify({'error': 'Aucune modification.'}), 400
-    db.execute(f"UPDATE montante_steps SET {', '.join(k + ' = ?' for k in changes)} WHERE montante_id = ? AND step_no = ?",
-               (*changes.values(), montante_id, step_no))
+    for sql, params in extra:
+        db.execute(sql, params)
+    if changes:
+        db.execute(f"UPDATE montante_steps SET {', '.join(k + ' = ?' for k in changes)} WHERE montante_id = ? AND step_no = ?",
+                   (*changes.values(), montante_id, step_no))
     now = datetime.now(timezone.utc).isoformat()
     updated = _montante_view(db.execute("SELECT * FROM montantes WHERE id = ?", (montante_id,)).fetchone())
     if updated['status'] in ('won', 'lost'):

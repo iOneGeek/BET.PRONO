@@ -60,7 +60,16 @@
     tr.append(number);
     // L'admin peut aussi corriger cote et retrait d'un palier déjà joué : les mises suivantes se recalculent.
     const pending = step.state !== 'off';
-    tr.append(amountCell(step.stake));
+    if (editable && pending) {
+      // Mise réellement jouée : l'écart avec le gain du palier précédent devient son retrait.
+      const stakeCell = node('td', null, 'mt-num');
+      const input = node('input', null, 'mt-input');
+      Object.assign(input, {type: 'number', step: '0.01', min: '0.01', value: step.stake, title: 'Mise réellement jouée'});
+      input.setAttribute('aria-label', `Mise du palier ${step.step_no}`);
+      input.addEventListener('change', () => patch(view.id, step.step_no, {stake: Number(input.value)}));
+      stakeCell.append(input);
+      tr.append(stakeCell);
+    } else tr.append(amountCell(step.stake));
     const oddsCell = node('td', null, 'mt-num');
     if (editable && pending) {
       const input = node('input', null, 'mt-input');
