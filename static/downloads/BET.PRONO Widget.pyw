@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import queue
 import shutil
 import subprocess
 import sys
@@ -25,7 +26,10 @@ from tkinter import messagebox, simpledialog
 
 
 APP_NAME = "BET.PRONO Widget"
-WIDGET_VERSION = "V2.5.0"
+WIDGET_VERSION = "V2.6.0"
+# Render met jusqu'à une minute à « réveiller » le site après une période sans visite.
+REQUEST_TIMEOUT = 45
+AUTO_REFRESH_MS = 5 * 60 * 1000
 CONFIG_PATH = Path(os.environ.get("APPDATA", str(Path.home()))) / APP_NAME / "config.json"
 BRAND_IMAGE_NAME = "bet-prono-widget-logo.png"
 BRAND_IMAGE_PATH = CONFIG_PATH.parent / BRAND_IMAGE_NAME
@@ -163,27 +167,37 @@ class BetPronoApi:
             method="POST" if payload is not None else "GET",
         )
         try:
-            with self.opener.open(request, timeout=12) as response:
-                return json.loads(response.read().decode("utf-8"))
+            with self.opener.open(request, timeout=REQUEST_TIMEOUT) as response:
+                body = response.read()
         except urllib.error.HTTPError as error:
             try:
                 detail = json.loads(error.read().decode("utf-8")).get("error")
-            except (json.JSONDecodeError, UnicodeDecodeError):
+            except (json.JSONDecodeError, UnicodeDecodeError, AttributeError, OSError):
                 detail = None
             if error.code == 401:
-                raise RuntimeError("Connecte-toi d’abord à ton compte BET.PRONO.") from error
+                raise RuntimeError("Session expirée ou code invalide : génère un nouveau code dans le site.") from error
+            if error.code in (502, 503, 504):
+                raise RuntimeError("Le site BET.PRONO redémarre. Réessaie dans une minute.") from error
             raise RuntimeError(detail or f"Erreur BET.PRONO ({error.code}).") from error
-        except urllib.error.URLError as error:
-            raise RuntimeError("Adresse introuvable. Vérifie que BET.PRONO est ouvert et que son adresse est correcte.") from error
-
-    def login(self, username: str, password: str) -> None:
-        self.request("api/login", {"username": username, "password": password})
+        except (TimeoutError, OSError) as error:
+            # Couvre les délais dépassés (site en veille) et les coupures réseau, avec ou sans URLError.
+            reason = getattr(error, "reason", error)
+            if isinstance(reason, TimeoutError) or "timed out" in str(reason).lower():
+                raise RuntimeError("Le site met trop de temps à répondre (il se réveille peut-être). Réessaie dans une minute.") from error
+            raise RuntimeError("Site injoignable. Vérifie ta connexion Internet et l’adresse de BET.PRONO.") from error
+        try:
+            return json.loads(body.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            raise RuntimeError("Réponse inattendue du site (maintenance en cours ?). Réessaie dans un instant.") from error
 
     def pair(self, code: str) -> None:
         self.request("api/widget/pair", {"code": code})
 
     def bets(self) -> dict:
         return self.request("api/bets")
+
+    def follows(self) -> dict:
+        return self.request("api/ai/follows")
 
 
 class BetPronoWidget(tk.Tk):
@@ -193,7 +207,8 @@ class BetPronoWidget(tk.Tk):
         self.configure(bg=BG)
         self.resizable(False, False)
         self.attributes("-topmost", True)
-        self.geometry("480x860+48+48")
+        # Un peu plus haut qu'avant pour les onglets, sans dépasser l'écran (barre des tâches comprise).
+        self.geometry(f"480x{min(900, self.winfo_screenheight() - 90)}+48+24")
         self.client: BetPronoApi | None = None
         self.base_url = self._load_url()
         self.period_days: int | None = 30
@@ -205,10 +220,27 @@ class BetPronoWidget(tk.Tk):
         self._brand_image_full: tk.PhotoImage | None = None
         self._brand_image: tk.PhotoImage | None = None
         self.metric_details: dict[str, tk.Label] = {}
+        self.action_buttons: list[tk.Button] = []
+        self.view_buttons: dict[str, tk.Button] = {}
+        self.views: dict[str, tk.Frame] = {}
+        self._busy = False
+        self._busy_text = ""
+        self._busy_dots = 0
+        self._auto_job: str | None = None
+        # Les fils d'arrière-plan ne touchent jamais la fenêtre : ils déposent ici, la fenêtre exécute.
+        self._ui_queue: queue.Queue = queue.Queue()
 
         self._build()
+        self._show_view("bankroll")
+        self.after(100, self._drain_ui_queue)
         self.after(80, self._load_brand_image)
         self._set_status("Connecte ton compte pour afficher tes statistiques.")
+
+    def report_callback_exception(self, exc, value, traceback) -> None:  # noqa: D401 - Tk hook
+        """Sans console (pythonw), une erreur passait inaperçue : on l'affiche au lieu de ne rien faire."""
+        self._set_busy(False)
+        self._set_status(f"Erreur inattendue : {value}")
+        messagebox.showerror(APP_NAME, f"Une erreur inattendue est survenue :\n\n{value}", parent=self)
 
     def _build(self) -> None:
         header = tk.Frame(self, bg=HEADER, height=88)
@@ -233,8 +265,22 @@ class BetPronoWidget(tk.Tk):
         self.connection_badge = tk.Label(header, text="● HORS LIGNE", bg="#172235", fg=MUTED, font=("Segoe UI", 8, "bold"), padx=10, pady=5)
         self.connection_badge.pack(side="right", padx=(0, 2), pady=22)
 
-        periods = tk.Frame(self, bg=BG)
-        periods.pack(fill="x", padx=16, pady=(13, 4))
+        tabs = tk.Frame(self, bg=BG)
+        tabs.pack(fill="x", padx=16, pady=(12, 0))
+        for key, label in (("bankroll", "📊  Bankroll"), ("follows", "⭐  Pronos suivis")):
+            button = tk.Button(tabs, text=label, command=lambda value=key: self._show_view(value), relief="flat", bd=0,
+                               pady=7, font=("Segoe UI", 9, "bold"), cursor="hand2")
+            button.pack(side="left", expand=True, fill="x", padx=(0, 6) if key == "bankroll" else 0)
+            self.view_buttons[key] = button
+
+        self.view_host = tk.Frame(self, bg=BG)
+        self.view_host.pack(fill="x")
+        bankroll_view = tk.Frame(self.view_host, bg=BG)
+        self.views["bankroll"] = bankroll_view
+        self._build_follows_view()
+
+        periods = tk.Frame(bankroll_view, bg=BG)
+        periods.pack(fill="x", padx=16, pady=(10, 4))
         tk.Label(periods, text="PÉRIODE", bg=BG, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(side="left", padx=(0, 11))
         for label, days in (("7 jours", 7), ("30 jours", 30), ("90 jours", 90), ("Tout", None)):
             button = tk.Button(periods, text=label, command=lambda value=days: self._set_period(value), relief="flat", bd=0, padx=11, pady=6, font=("Segoe UI", 9, "bold"), cursor="hand2")
@@ -242,14 +288,14 @@ class BetPronoWidget(tk.Tk):
             self.period_buttons[days] = button
         self._paint_periods()
 
-        cards = tk.Frame(self, bg=BG)
+        cards = tk.Frame(bankroll_view, bg=BG)
         cards.pack(fill="x", padx=16)
         self.bankroll = self._metric(cards, "BANKROLL", "—", 0, 0, "#38bdf8", "bankroll", "◉")
         self.profit = self._metric(cards, "BÉNÉFICE", "—", 0, 1, GOOD, "profit", "▥")
         self.roi = self._metric(cards, "ROI", "—", 1, 0, ACCENT, "roi", "%")
         self.win_rate = self._metric(cards, "RÉUSSITE", "—", 1, 1, "#a78bfa", "win_rate", "◎")
 
-        chart_box = tk.Frame(self, bg=PANEL, highlightbackground="#35516d", highlightthickness=1)
+        chart_box = tk.Frame(bankroll_view, bg=PANEL, highlightbackground="#35516d", highlightthickness=1)
         chart_box.pack(fill="x", padx=16, pady=(8, 7))
         chart_head = tk.Frame(chart_box, bg=PANEL)
         chart_head.pack(fill="x", padx=13, pady=(10, 0))
@@ -262,13 +308,13 @@ class BetPronoWidget(tk.Tk):
         self.chart_caption = tk.Label(chart_box, text="Connecte ton compte pour voir ta courbe.", bg=PANEL, fg=MUTED, font=("Segoe UI", 8), anchor="w")
         self.chart_caption.pack(fill="x", padx=13, pady=(0, 10))
 
-        summary_box = tk.Frame(self, bg="#142238", highlightbackground="#263b55", highlightthickness=1)
+        summary_box = tk.Frame(bankroll_view, bg="#142238", highlightbackground="#263b55", highlightthickness=1)
         summary_box.pack(fill="x", padx=16, pady=(0, 7))
         tk.Label(summary_box, text="BILAN DE PÉRIODE", bg="#142238", fg=MUTED, font=("Segoe UI", 8, "bold")).pack(side="left", padx=12, pady=9)
         self.summary = tk.Label(summary_box, text="Aucune statistique disponible", bg="#142238", fg=TEXT, font=("Segoe UI", 8, "bold"), anchor="e")
         self.summary.pack(side="right", padx=12)
 
-        sport_box = tk.Frame(self, bg=PANEL, highlightbackground="#30445f", highlightthickness=1)
+        sport_box = tk.Frame(bankroll_view, bg=PANEL, highlightbackground="#30445f", highlightthickness=1)
         sport_box.pack(fill="x", padx=16, pady=(0, 7))
         sport_head = tk.Frame(sport_box, bg=PANEL)
         sport_head.pack(fill="x", padx=12, pady=(9, 3))
@@ -415,9 +461,156 @@ class BetPronoWidget(tk.Tk):
 
         tick()
 
-    @staticmethod
-    def _action(parent: tk.Frame, text: str, command, background: str, foreground: str, fill: bool = False) -> tk.Button:
-        return tk.Button(parent, text=text, command=command, bg=background, fg=foreground, activebackground=ACCENT_DARK if background == ACCENT else background, activeforeground=foreground, relief="flat", bd=0, padx=12 if fill else 10, pady=8 if fill else 7, font=("Segoe UI", 9, "bold"), cursor="hand2")
+    def _action(self, parent: tk.Frame, text: str, command, background: str, foreground: str, fill: bool = False) -> tk.Button:
+        button = tk.Button(parent, text=text, command=command, bg=background, fg=foreground, activebackground=ACCENT_DARK if background == ACCENT else background, activeforeground=foreground, disabledforeground="#64748b", relief="flat", bd=0, padx=12 if fill else 10, pady=8 if fill else 7, font=("Segoe UI", 9, "bold"), cursor="hand2")
+        self.action_buttons.append(button)
+        return button
+
+    # ---- Vues : Bankroll / Pronos suivis -------------------------------------------------
+    def _build_follows_view(self) -> None:
+        view = tk.Frame(self.view_host, bg=BG)
+        self.views["follows"] = view
+        tiles = tk.Frame(view, bg=BG)
+        tiles.pack(fill="x", padx=16, pady=(10, 4))
+        self.follow_tiles: dict[str, tk.Label] = {}
+        self.follow_tile_details: dict[str, tk.Label] = {}
+        for index, (key, label, accent) in enumerate((("winner", "BON VAINQUEUR", GOOD), ("exact", "SCORE EXACT", ACCENT),
+                                                      ("scorer", "BUTEUR TROUVÉ", "#a78bfa"), ("count", "SUIVIS", "#38bdf8"))):
+            row, column = divmod(index, 2)
+            tiles.grid_columnconfigure(column, weight=1)
+            card = tk.Frame(tiles, bg=PANEL, highlightbackground=accent, highlightthickness=1, height=70)
+            card.grid(row=row, column=column, padx=(0, 5) if column == 0 else (5, 0), pady=5, sticky="nsew")
+            card.grid_propagate(False)
+            tk.Frame(card, bg=accent, height=2).pack(fill="x")
+            tk.Label(card, text=label, bg=PANEL, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=10, pady=(5, 0))
+            value = tk.Label(card, text="—", bg=PANEL, fg=TEXT, font=("Segoe UI", 15, "bold"))
+            value.pack(anchor="w", padx=10)
+            detail = tk.Label(card, text="", bg=PANEL, fg=MUTED, font=("Segoe UI", 7))
+            detail.pack(anchor="w", padx=10)
+            self.follow_tiles[key] = value
+            self.follow_tile_details[key] = detail
+        box = tk.Frame(view, bg=PANEL, highlightbackground="#30445f", highlightthickness=1)
+        box.pack(fill="x", padx=16, pady=(4, 7))
+        head = tk.Frame(box, bg=PANEL)
+        head.pack(fill="x", padx=12, pady=(9, 3))
+        tk.Label(head, text="⭐  MES DERNIERS PRONOS SUIVIS", bg=PANEL, fg=TEXT, font=("Segoe UI", 9, "bold")).pack(side="left")
+        self.follow_rows = tk.Frame(box, bg=PANEL)
+        self.follow_rows.pack(fill="x", padx=12, pady=(0, 9))
+        self._render_follows(None)
+
+    def _show_view(self, key: str) -> None:
+        for name, frame in self.views.items():
+            if name == key:
+                frame.pack(fill="x")
+            else:
+                frame.pack_forget()
+        for name, button in self.view_buttons.items():
+            active = name == key
+            button.configure(bg=ACCENT if active else PANEL, fg="#ffffff" if active else MUTED,
+                             activebackground=ACCENT if active else PANEL, activeforeground="#ffffff" if active else MUTED)
+
+    def _render_follows(self, data: dict | None) -> None:
+        for child in self.follow_rows.winfo_children():
+            child.destroy()
+        if data is None:
+            message = "Connecte ton compte pour voir tes pronos suivis." if not self.client else "Pronos suivis indisponibles pour le moment."
+            tk.Label(self.follow_rows, text=message, bg=PANEL, fg=MUTED, font=("Segoe UI", 8), anchor="w").pack(fill="x", pady=(3, 5))
+            return
+        summary = data.get("summary", {})
+        items = data.get("items", [])
+
+        def rate(stat: dict | None) -> tuple[str, str]:
+            if not stat or not stat.get("total"):
+                return "—", "Pas encore de résultat"
+            return percent(stat["rate"] * 100), f"{stat['hits']} sur {stat['total']}"
+        for key, stat in (("winner", summary.get("winner")), ("exact", summary.get("exact_score")), ("scorer", summary.get("scorer"))):
+            value, detail = rate(stat)
+            self.follow_tiles[key].configure(text=value)
+            self.follow_tile_details[key].configure(text=detail)
+        self.follow_tiles["count"].configure(text=str(summary.get("followed", 0)))
+        self.follow_tile_details["count"].configure(text=f"{summary.get('pending', 0)} en attente")
+        if not items:
+            tk.Label(self.follow_rows, text="Aucun prono suivi. Dans le site : fiche d’un match → « Suivre ce prono ».",
+                     bg=PANEL, fg=MUTED, font=("Segoe UI", 8), anchor="w", wraplength=400, justify="left").pack(fill="x", pady=(3, 5))
+            return
+        for item in items[:7]:
+            row = tk.Frame(self.follow_rows, bg=PANEL)
+            row.pack(fill="x", pady=3)
+            status = item.get("status")
+            mark, color = ("…", MUTED) if status == "pending" else ("—", MUTED) if status == "void" else \
+                ("✓", GOOD) if item.get("winner_hit") else ("✕", BAD)
+            tk.Label(row, text=mark, bg="#182943", fg=color, font=("Segoe UI", 11, "bold"), width=2).pack(side="left", padx=(0, 8))
+            copy = tk.Frame(row, bg=PANEL)
+            copy.pack(side="left", fill="x", expand=True)
+            tk.Label(copy, text=f"{item.get('home', '')} — {item.get('away', '')}", bg=PANEL, fg=TEXT,
+                     font=("Segoe UI", 8, "bold"), anchor="w").pack(fill="x")
+            detail = f"Prono {str(item.get('predicted', '')).replace('-', '–')}"
+            if status == "settled":
+                detail += f" · Réel {str(item.get('actual') or 'nul à 90 min').replace('-', '–')}"
+            elif status == "pending":
+                detail += f" · {str(item.get('starts_at', ''))[8:10]}/{str(item.get('starts_at', ''))[5:7]}"
+            if item.get("scorer"):
+                detail += f" · {item['scorer']}" + (" ✓" if item.get("scorer_hit") else " ✕" if item.get("scorer_hit") is False else "")
+            tk.Label(copy, text=detail, bg=PANEL, fg=MUTED, font=("Segoe UI", 7), anchor="w").pack(fill="x")
+
+    # ---- Travail réseau en arrière-plan : la fenêtre ne se fige plus ------------------------
+    def _drain_ui_queue(self) -> None:
+        try:
+            while True:
+                self._ui_queue.get_nowait()()
+        except queue.Empty:
+            pass
+        self.after(100, self._drain_ui_queue)
+
+    def _set_busy(self, busy: bool, text: str = "") -> None:
+        self._busy = busy
+        self._busy_text = text
+        for button in self.action_buttons:
+            if button.cget("text").strip() in ("Code", "Actualiser") or "Google" in button.cget("text"):
+                button.configure(state="disabled" if busy else "normal")
+        if busy:
+            self._busy_dots = 0
+            self._tick_busy()
+
+    def _tick_busy(self) -> None:
+        if not self._busy:
+            return
+        self._busy_dots = (self._busy_dots + 1) % 4
+        self._set_status(self._busy_text + "." * self._busy_dots)
+        self.after(400, self._tick_busy)
+
+    def _run_in_background(self, text: str, work, done) -> None:
+        """Lance `work()` hors de la fenêtre, puis `done(result, error)` dans la fenêtre."""
+        if self._busy:
+            return
+        self._set_busy(True, text)
+
+        def runner() -> None:
+            try:
+                result, error = work(), None
+            except RuntimeError as exc:
+                result, error = None, str(exc)
+            except Exception as exc:  # Toute autre erreur est montrée au lieu d'être perdue.
+                result, error = None, f"Erreur inattendue : {exc}"
+            self._ui_queue.put(lambda: self._finish(done, result, error))
+
+        threading.Thread(target=runner, daemon=True).start()
+
+    def _finish(self, done, result, error) -> None:
+        self._set_busy(False)
+        done(result, error)
+
+    def _schedule_auto_refresh(self) -> None:
+        if self._auto_job:
+            self.after_cancel(self._auto_job)
+        self._auto_job = self.after(AUTO_REFRESH_MS, self._auto_refresh)
+
+    def _auto_refresh(self) -> None:
+        self._auto_job = None
+        if self.client and not self._busy:
+            self.refresh(silent=True)
+        elif self.client:
+            self._schedule_auto_refresh()
 
     def _start_drag(self, event) -> None:
         self._drag_origin = (event.x, event.y)
@@ -464,7 +657,7 @@ class BetPronoWidget(tk.Tk):
             base_url = (self.base_url or DEFAULT_SITE_URL).rstrip("/")
             request = urllib.request.Request(
                 base_url + BRAND_IMAGE_URL,
-                headers={"User-Agent": "BET.PRONO-Widget/2.5"},
+                headers={"User-Agent": "BET.PRONO-Widget/2.6"},
             )
             with urllib.request.urlopen(request, timeout=6) as response:
                 image_data = response.read(3_000_000)
@@ -476,7 +669,7 @@ class BetPronoWidget(tk.Tk):
             temporary_path.replace(BRAND_IMAGE_PATH)
         except (OSError, urllib.error.URLError):
             return
-        self.after(0, lambda: self._apply_brand_image(BRAND_IMAGE_PATH))
+        self._ui_queue.put(lambda: self._apply_brand_image(BRAND_IMAGE_PATH))
 
     def _download_brand_icon(self) -> None:
         """Met l'icône Windows en cache pour le raccourci Bureau et la barre des tâches."""
@@ -484,7 +677,7 @@ class BetPronoWidget(tk.Tk):
             base_url = (self.base_url or DEFAULT_SITE_URL).rstrip("/")
             request = urllib.request.Request(
                 base_url + BRAND_ICON_URL,
-                headers={"User-Agent": "BET.PRONO-Widget/2.5"},
+                headers={"User-Agent": "BET.PRONO-Widget/2.6"},
             )
             with urllib.request.urlopen(request, timeout=6) as response:
                 icon_data = response.read(1_000_000)
@@ -496,7 +689,7 @@ class BetPronoWidget(tk.Tk):
             temporary_path.replace(BRAND_ICON_PATH)
         except (OSError, urllib.error.URLError):
             return
-        self.after(0, self._set_window_icon)
+        self._ui_queue.put(self._set_window_icon)
 
     def _apply_brand_image(self, path: Path) -> None:
         try:
@@ -581,49 +774,81 @@ class BetPronoWidget(tk.Tk):
             "Colle le code créé dans BET.PRONO :\nProfil → Widget bureau → Générer un code",
             parent=self,
         )
-        if not code:
+        if not code or not code.strip():
             return
-        try:
-            client = BetPronoApi(address)
-            client.pair(code)
+        client = BetPronoApi(address)
+
+        def work() -> tuple[dict, dict | None]:
+            client.pair(code.strip())
+            return self._fetch(client)
+
+        def done(result, error) -> None:
+            if error:
+                self._set_connected_badge(False)
+                self._set_status(error)
+                messagebox.showerror(APP_NAME, error, parent=self)
+                return
             self.client = client
             self._set_connected_badge(True)
-            self._set_status("Widget connecté de façon sécurisée. Actualisation des statistiques…")
-            self.refresh()
-        except RuntimeError as error:
-            self._set_connected_badge(False)
-            messagebox.showerror(APP_NAME, error, parent=self)
+            self._apply(*result)
 
-    def refresh(self) -> None:
-        if not self.client:
-            self._set_status("Connecte-toi via Google, puis choisis « Entrer le code » pour afficher tes statistiques.")
-            messagebox.showinfo(APP_NAME, "Utilise « Connexion Google », puis « Entrer le code » pour lier le widget sans mot de passe.", parent=self)
-            return
+        self._run_in_background("Connexion à BET.PRONO (jusqu’à 1 min si le site se réveille)", work, done)
+
+    @staticmethod
+    def _fetch(client: BetPronoApi) -> tuple[dict, dict | None]:
+        bets = client.bets()
         try:
-            data = self.client.bets()
-            metrics = compute_metrics(data.get("bets", []), data.get("initial_bankroll", 0), self.period_days)
-            self.bankroll.configure(text=eur(metrics["bankroll"]), fg=GOOD if metrics["bankroll"] >= 0 else BAD)
-            self.profit.configure(text=eur(metrics["profit"]), fg=GOOD if metrics["profit"] >= 0 else BAD)
-            self.roi.configure(text=percent(metrics["roi"]), fg=GOOD if (metrics["roi"] or 0) > 0 else BAD if (metrics["roi"] or 0) < 0 else TEXT)
-            self.win_rate.configure(text=percent(metrics["win_rate"]), fg=TEXT)
-            self.metric_details["bankroll"].configure(text=f"Initiale : {eur(data.get('initial_bankroll', 0))}")
-            self.metric_details["profit"].configure(text=f"{metrics['settled']} pari(s) réglé(s)")
-            self.metric_details["roi"].configure(text="Bénéfice net / mises")
-            decisive = metrics["decisive"]
-            self.metric_details["win_rate"].configure(text=f"{metrics['wins']} gagnés / {decisive}" if decisive else "Aucun pari décisif")
-            self.chart_value.configure(text=eur(metrics["curve"][-1]) if metrics["curve"] else "—")
-            label = "tout l’historique" if self.period_days is None else f"les {self.period_days} derniers jours"
-            self.chart_caption.configure(text=f"Bankroll sur {label} • animation à chaque actualisation")
-            self._animate_sparkline(metrics["curve"])
-            self._render_sports(metrics["sports"])
-            self.summary.configure(
-                text=f"✓ {metrics['wins']} gagnés   ✕ {metrics['losses']} perdus   • {metrics['pending']} en attente"
-            )
-            self._set_status(f"{metrics['settled']} pari(s) réglé(s), {metrics['pending']} en attente — {label}.\nMis à jour à {dt.datetime.now().strftime('%H:%M')}")
-        except RuntimeError as error:
-            self._set_connected_badge(False)
-            self._set_status("Session expirée : reconnecte-toi pour actualiser les chiffres.")
-            messagebox.showwarning(APP_NAME, str(error), parent=self)
+            follows = client.follows()
+        except RuntimeError:
+            follows = None  # Les pronos suivis sont un bonus : la bankroll reste affichée.
+        return bets, follows
+
+    def refresh(self, silent: bool = False) -> None:
+        if not self.client:
+            self._set_status("Connecte-toi via Google, puis clique sur « Code » pour afficher tes statistiques.")
+            if not silent:
+                messagebox.showinfo(APP_NAME, "Utilise « Connexion Google », puis « Code » pour lier le widget sans mot de passe.", parent=self)
+            return
+        client = self.client
+
+        def done(result, error) -> None:
+            if error:
+                if "Session expirée" in error:
+                    self.client = None
+                    self._set_connected_badge(False)
+                self._set_status(error)
+                if not silent:
+                    messagebox.showwarning(APP_NAME, error, parent=self)
+                self._schedule_auto_refresh()
+                return
+            self._apply(*result)
+
+        self._run_in_background("Actualisation des statistiques", lambda: self._fetch(client), done)
+
+    def _apply(self, data: dict, follows: dict | None) -> None:
+        metrics = compute_metrics(data.get("bets", []), data.get("initial_bankroll", 0), self.period_days)
+        self.bankroll.configure(text=eur(metrics["bankroll"]), fg=GOOD if metrics["bankroll"] >= 0 else BAD)
+        self.profit.configure(text=eur(metrics["profit"]), fg=GOOD if metrics["profit"] >= 0 else BAD)
+        self.roi.configure(text=percent(metrics["roi"]), fg=GOOD if (metrics["roi"] or 0) > 0 else BAD if (metrics["roi"] or 0) < 0 else TEXT)
+        self.win_rate.configure(text=percent(metrics["win_rate"]), fg=TEXT)
+        self.metric_details["bankroll"].configure(text=f"Initiale : {eur(as_number(data.get('initial_bankroll', 0)))}")
+        self.metric_details["profit"].configure(text=f"{metrics['settled']} pari(s) réglé(s)")
+        self.metric_details["roi"].configure(text="Bénéfice net / mises")
+        decisive = metrics["decisive"]
+        self.metric_details["win_rate"].configure(text=f"{metrics['wins']} gagnés / {decisive}" if decisive else "Aucun pari décisif")
+        self.chart_value.configure(text=eur(metrics["curve"][-1]) if metrics["curve"] else "—")
+        label = "tout l’historique" if self.period_days is None else f"les {self.period_days} derniers jours"
+        self.chart_caption.configure(text=f"Bankroll sur {label} • animation à chaque actualisation")
+        self._animate_sparkline(metrics["curve"])
+        self._render_sports(metrics["sports"])
+        self.summary.configure(
+            text=f"✓ {metrics['wins']} gagnés   ✕ {metrics['losses']} perdus   • {metrics['pending']} en attente"
+        )
+        self._render_follows(follows)
+        self._set_connected_badge(True)
+        self._set_status(f"{metrics['settled']} pari(s) réglé(s), {metrics['pending']} en attente — {label}.\n"
+                         f"Mis à jour à {dt.datetime.now().strftime('%H:%M')} • actualisation automatique toutes les 5 min")
+        self._schedule_auto_refresh()
 
     def open_site(self) -> None:
         address = self.base_url or self._ask_site_address("Adresse publique de BET.PRONO :")
