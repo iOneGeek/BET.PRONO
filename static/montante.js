@@ -58,7 +58,8 @@
     const mark = STATE_MARK[step.state];
     if (mark) number.prepend(node('span', mark, 'mt-mark'));
     tr.append(number);
-    const pending = step.state === 'current' || step.state === 'simulation';
+    // L'admin peut aussi corriger cote et retrait d'un palier déjà joué : les mises suivantes se recalculent.
+    const pending = step.state !== 'off';
     tr.append(amountCell(step.stake));
     const oddsCell = node('td', null, 'mt-num');
     if (editable && pending) {
@@ -74,7 +75,7 @@
     const out = node('td', null, 'mt-num');
     if (editable && pending) {
       const input = node('input', null, 'mt-input');
-      Object.assign(input, {type: 'number', step: '1', min: '0', value: step.withdrawal || 0, title: 'Retrait après ce palier'});
+      Object.assign(input, {type: 'number', step: '0.01', min: '0', value: step.withdrawal || 0, title: 'Retrait après ce palier'});
       input.setAttribute('aria-label', `Retrait après le palier ${step.step_no}`);
       input.addEventListener('change', () => patch(view.id, step.step_no, {withdrawal: Number(input.value)}));
       out.append(input);

@@ -110,7 +110,7 @@ class MontanteApiTests(unittest.TestCase):
         self.assertEqual(self.admin.patch(url + '2', json={'result': 'won'}).status_code, 400)
         view = self.admin.patch(url + '1', json={'result': 'won', 'pick': 'PSG gagne'}).get_json()
         self.assertEqual((view['current_step'], view['steps'][0]['pick']), (2, 'PSG gagne'))
-        self.assertEqual(self.admin.patch(url + '1', json={'odds': 2.0}).status_code, 400)
+        self.assertEqual(self.admin.patch(url + '1', json={'odds': 99}).status_code, 400)
         self.assertEqual(self.admin.patch(url + '3', json={'odds': 1.7, 'withdrawal': 5, 'game_id': 4735202}).status_code, 200)
         self.assertEqual(self.admin.patch(url + '3', json={'odds': 50}).status_code, 400)
         undone = self.admin.patch(url + '1', json={'result': 'pending'}).get_json()
@@ -122,6 +122,16 @@ class MontanteApiTests(unittest.TestCase):
         self.assertIsNone(data['active'])
         self.assertEqual(data['history'][0]['lost_step'], 2)
         self.assertEqual(self.create().status_code, 201)
+
+    def test_correct_a_played_step_to_match_the_real_ticket(self):
+        url = f"/api/montantes/{self.create().get_json()['id']}/steps/"
+        for n in (1, 2, 3):
+            self.admin.patch(url + str(n), json={'result': 'won'})
+        self.assertEqual(self.admin.patch(url + '3', json={'odds': 1.52}).status_code, 200)
+        view = self.admin.patch(url + '2', json={'withdrawal': 1}).get_json()   # 1 € gardé après le palier 2
+        rows = {row['step_no']: row for row in view['steps']}
+        self.assertEqual((rows[3]['stake'], rows[3]['return']), (20.03, 30.45))
+        self.assertEqual(self.member.patch(url + '2', json={'withdrawal': 0}).status_code, 403)
 
     def test_live_score_of_the_current_step_and_stop(self):
         montante_id = self.create().get_json()['id']
