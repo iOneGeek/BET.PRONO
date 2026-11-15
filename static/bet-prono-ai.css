@@ -226,3 +226,16 @@
 .fh-update{margin:8px 0 0}
 @keyframes fh-pulse{50%{opacity:.55}}
 @media(prefers-reduced-motion:reduce){.fh-badge-live{animation:none}}
+/* V2.6.1 : chaque prono suivi dans son propre bloc (les variables de couleur n'existaient que dans la fiche match) */
+.follows-home{--rule:#2f4769;--orange:#ffa427;--mute:#a9b4c6}
+.fh-list{gap:12px}
+.fh-item{background:linear-gradient(160deg,#16294a,#0f1d36);border:1px solid #2f4769;border-radius:14px;padding:12px 14px;gap:8px;box-shadow:0 6px 18px rgba(0,0,0,.25);transition:border-color .15s,transform .15s}
+.fh-item:hover{border-color:#4a6894;transform:translateY(-1px)}
+.fh-upcoming{border-left:4px solid #ffa427}
+.fh-live{border-left:4px solid #e5484d}
+.fh-finished{border-left:4px solid #4a5568}
+.fh-match{padding:6px 0}
+.fh-score{min-width:44px;text-align:center;padding:2px 10px;border-radius:8px;background:#0b1528;color:#cbd5e1;font-size:1rem}
+.fh-live .fh-score{background:#3b1418}
+.fh-prono{border-top:1px solid #2f4769;padding-top:8px;color:#c2cbde}
+@media(prefers-reduced-motion:reduce){.fh-item{transition:none}.fh-item:hover{transform:none}}
