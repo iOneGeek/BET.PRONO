@@ -215,7 +215,14 @@
   function renderBanner(view) {
     const banner = el('homeMontante');
     if (!banner) return;
-    if (!view || view.status !== 'active') { banner.hidden = true; return; }
+    if (!view || view.status !== 'active') {
+      // L'admin voit le raccourci même sans montante, pour la créer (utile sur mobile).
+      banner.hidden = !(data && data.can_edit);
+      el('homeMontanteText').textContent = 'Aucune montante en cours · Créer ta montante →';
+      el('homeMontanteLive').replaceChildren();
+      el('homeMontanteBar').style.width = '0%';
+      return;
+    }
     const current = view.steps.find(step => step.state === 'current');
     el('homeMontanteText').textContent = `Palier ${view.current_step} / ${view.total_steps} · mise ${euro(view.current_stake)} · cote ${odds(current.odds)}`
       + (current.pick ? ` · ${current.pick}` : '');

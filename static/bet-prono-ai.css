@@ -308,3 +308,5 @@
 @media(max-width:560px){.montante-panel .mt-card{padding:14px 8px}.mt-table-wrap{border-radius:10px}.mt-table{font-size:.74rem;border-spacing:0 3px;padding:2px}.mt-table thead th{padding:6px 3px;font-size:.6rem;letter-spacing:.03em}.mt-table tbody tr:not(.mt-detail) > *{padding:7px 3px}.mt-cur{display:none}.mt-unit{display:inline}.mt-mark{width:.9em;margin-right:1px}.mt-pill{padding:1px 6px}.mt-detail td{padding:0 6px 5px 22px}.mt-table .mt-input{width:58px;padding:3px 4px}}
 .montante-panel .mt-table{min-width:0}
 .montante-panel .mt-table th,.montante-panel .mt-table td{border-bottom:0}
+.mobile-nav{grid-template-columns:repeat(7,minmax(0,1fr))}
+@media(max-width:380px){.mobile-nav button{font-size:.6rem;padding:7px 0}}
