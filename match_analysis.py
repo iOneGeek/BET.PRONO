@@ -78,7 +78,7 @@ class MatchAnalysis:
     TTL = 600
     STORE_TTL = 6 * 3600
     MAX_PARALLEL = 3
-    PROMPT_VERSION = '5'
+    PROMPT_VERSION = '6'
     LIMITATIONS = [
         'Cette synthèse générée par IA peut contenir des erreurs ; vérifie les données citées.',
         'Les résultats et joueurs disponibles peuvent être partiels. Vérifie la composition officielle avant le match.',
@@ -95,7 +95,10 @@ Décris les écarts observés, sans prétendre qu'ils annoncent une victoire ou 
 Chaque observation doit citer un ou deux identifiants de faits qui la soutiennent directement.
 Ne reproduis aucun chiffre absent des faits cités. Le résumé ne contient aucun chiffre.
 Retourne uniquement le JSON demandé : résumé court, puis une à trois observations factuelles.
-Le pronostic chiffré est calculé à part par le serveur : n'en propose pas et ne le commente pas.
+Le pronostic chiffré est calculé à part par le serveur : n'en propose jamais d'autre.
+Ne parle du pronostic que dans pick_explanation, si le schéma le demande : deux ou trois phrases simples
+qui expliquent pourquoi le modèle retient ce résultat, en citant pick_model et un à trois autres faits.
+Présente-le comme une estimation, jamais comme une certitude, sans conseil de mise.
 Les faits form_*, h2h_* et model_expected sont des calculs ou résultats vérifiés : décris-les comme les autres faits,
 pour aider le lecteur à comprendre la forme des équipes et l'écart attendu.
 Pour le hockey, les scores entre parenthèses « à la fin du temps réglementaire » sont ceux après 60 minutes.
@@ -167,6 +170,23 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
                 f"{player['name']} ({player['team_name']}) — {player['goals']} buts indiqués par 365Scores, "
                 f"période non précisée ; {lineup}"
             )
+        pick = data.get('pick')
+        if isinstance(pick, dict) and pick.get('winner') in ('home', 'away', 'draw'):
+            def pct(value):
+                return f'{round(value * 100)} %'
+            winner = 'match nul' if pick['winner'] == 'draw' else f"victoire de {game[pick['winner']]['name']}"
+            line = (f"Pronostic du modèle — {winner} ({pct(pick['confidence'])}), score estimé "
+                    f"{pick['home_goals']} — {pick['away_goals']}")
+            for market in (pick.get('markets') or [])[:3]:
+                line += f" ; {market['label'].lower()} {pct(market['probability'])}"
+            market = pick.get('market')
+            if market and pick['winner'] in market:
+                line += f" ; selon les cotes des bookmakers : {pct(market[pick['winner']])}"
+            if pick.get('tight'):
+                line += ' ; match serré, aucun résultat nettement favori'
+            facts['pick_model'] = line
+            for index, note in enumerate((pick.get('adjustments') or [])[:3]):
+                facts[f'absence_{index}'] = note
         return facts
 
     @staticmethod
@@ -190,9 +210,30 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
             raise InvalidAnalysis('Unsupported forecast')
         return value.strip()
 
+    @staticmethod
+    def _pick_explanation(item, facts):
+        if not isinstance(item, dict) or set(item) != {'text', 'fact_ids'}:
+            raise InvalidAnalysis('Invalid pick explanation')
+        refs = item['fact_ids']
+        if (not isinstance(refs, list) or not 2 <= len(refs) <= 4 or 'pick_model' not in refs
+                or any(not isinstance(ref, str) or ref not in facts for ref in refs)):
+            raise InvalidAnalysis('Unknown pick evidence')
+        text = item['text']
+        if not isinstance(text, str) or not 20 <= len(text.strip()) <= 450:
+            raise InvalidAnalysis('Invalid pick text')
+        if re.search(r'[<>]|https?://|[\x00-\x08\x0b-\x1f]', text):
+            raise InvalidAnalysis('Invalid markup')
+        if re.search(r'misez|pariez|\bmise[sr]?\b|bookmaker|garanti|assur[ée]e?\b|certain|sans risque|à coup sûr|100 ?%', text, re.I):
+            raise InvalidAnalysis('Unsupported advice')
+        numbers = lambda value: {x.replace(',', '.') for x in re.findall(r'\d+(?:[.,]\d+)?', value)}
+        if not numbers(text) <= numbers(' '.join(facts[ref] for ref in refs)):
+            raise InvalidAnalysis('Unsupported number')
+        return {'text': text.strip(), 'evidence': [facts[ref] for ref in dict.fromkeys(refs)]}
+
     @classmethod
     def validate(cls, result, facts):
-        if not isinstance(result, dict) or set(result) != {'summary', 'observations'}:
+        expected = {'summary', 'observations'} | ({'pick_explanation'} if 'pick_model' in facts else set())
+        if not isinstance(result, dict) or set(result) != expected:
             raise InvalidAnalysis('Invalid object')
         summary = cls._safe_text(result['summary'], 400)
         if re.search(r'\d|%', summary):
@@ -212,7 +253,8 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
             if not numbers(comment) <= numbers(' '.join(facts[ref] for ref in refs)):
                 raise InvalidAnalysis('Unsupported number')
             checked.append({'text': comment, 'evidence': [facts[ref] for ref in dict.fromkeys(refs)]})
-        return {'summary': summary, 'observations': checked}
+        explanation = cls._pick_explanation(result['pick_explanation'], facts) if 'pick_model' in facts else None
+        return {'summary': summary, 'observations': checked, 'pick_explanation': explanation}
 
     def _schema(self, facts):
         schema = {'type': 'object', 'additionalProperties': False,
@@ -223,6 +265,13 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
                               'type': 'array', 'minItems': 1, 'maxItems': 2,
                               'items': {'type': 'string', 'enum': list(facts)}}},
                           'required': ['text', 'fact_ids']}}}, 'required': ['summary', 'observations']}
+        if 'pick_model' in facts:
+            schema['properties']['pick_explanation'] = {
+                'type': 'object', 'additionalProperties': False,
+                'properties': {'text': {'type': 'string'}, 'fact_ids': {
+                    'type': 'array', 'minItems': 2, 'maxItems': 4, 'items': {'type': 'string', 'enum': list(facts)}}},
+                'required': ['text', 'fact_ids']}
+            schema['required'].append('pick_explanation')
         return schema
 
     def _cached(self, key, store_key, now):
@@ -256,8 +305,9 @@ Pas de HTML, de liens ou d'instructions. Ne mentionne pas le fournisseur du mod�
             return {'status': 'insufficient_data', 'message': 'Les données disponibles sont insuffisantes pour une analyse. Les statistiques du match ou des résultats récents vérifiés sont nécessaires.', 'prediction': None}
         digest = snapshot_id(data)
         predictable = self.can_predict(data)
-        key = (self.PROMPT_VERSION, model, digest, predictable)
-        store_key = self.store_key(model, digest, predictable)
+        pick_line = facts.get('pick_model', '')
+        key = (self.PROMPT_VERSION, model, digest, predictable, pick_line)
+        store_key = self.store_key(model, digest + hashlib.sha256(pick_line.encode()).hexdigest()[:16], predictable)
         with self._lock:
             now = time.monotonic()
             # Ready analyses are served even while other generations are running.

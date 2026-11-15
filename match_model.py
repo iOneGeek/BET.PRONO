@@ -23,6 +23,12 @@ MIN_RESULTS = 3
 # A player whose line-up status is unknown may not start.
 AVAILABILITY = {'confirmed': 1.0, 'probable': 0.9, 'unknown': 0.8}
 MIN_SCORER_PROBABILITY = 0.15
+SEASON_PRIOR_GAMES = 4     # Season ratings are pulled toward average while few games are played.
+SEASON_WEIGHT = 0.55       # Share of the season-strength estimate when the league table is available.
+ABSENCE_IMPACT = 0.5       # Share of a missing scorer's goals assumed lost (team-mates cover the rest).
+MIN_ATTACK_FACTOR = 0.75
+# Below this chance for the most likely outcome, the match is flagged as too close to call.
+TIGHT_THRESHOLD = {'Football': 0.45, 'Hockey sur glace': 0.42}
 
 
 def _goals(result, team_id, sport):
@@ -102,6 +108,38 @@ def _forms(data):
     return {side: team_form(history.get(side, []), game[side]['id'], game.get('sport')) for side in ('home', 'away')}
 
 
+def _season_expected(data, base, factor):
+    """Expected goals from season strength: attack and defence relative to this competition's average."""
+    table = data.get('standings')
+    if not table or any(table[side]['played'] < 3 for side in ('home', 'away')):
+        return None
+
+    def rating(value, played):
+        return (value / played / base * played + SEASON_PRIOR_GAMES) / (played + SEASON_PRIOR_GAMES)
+    home, away = table['home'], table['away']
+    home_attack, home_defence = rating(home['scored'], home['played']), rating(home['conceded'], home['played'])
+    away_attack, away_defence = rating(away['scored'], away['played']), rating(away['conceded'], away['played'])
+    return base * home_attack * away_defence * factor, base * away_attack * home_defence / factor
+
+
+def _absence_factors(data):
+    """Attack reduction for each side from missing scorers, with a readable note for each."""
+    factors, notes = {'home': 1.0, 'away': 1.0}, []
+    table = data.get('standings') or {}
+    game = data['match']
+    for side in ('home', 'away'):
+        team_goals = (table.get(side) or {}).get('scored')
+        for player in (data.get('absences') or {}).get(side, []):
+            goals = player.get('goals')
+            if player.get('status') != 'missing' or not goals:
+                continue
+            share = min(0.5, goals / team_goals) if team_goals else min(0.3, goals / 20)
+            factors[side] *= 1 - ABSENCE_IMPACT * share
+            notes.append(f"Absence de {player['name']} ({goals} buts) : attaque de {game[side]['name']} réduite")
+        factors[side] = max(MIN_ATTACK_FACTOR, factors[side])
+    return factors, notes
+
+
 def poisson_model(data, form=None):
     """Expected goals, outcome and score probabilities, or None without three verified results per team."""
     game = data['match']
@@ -111,7 +149,10 @@ def poisson_model(data, form=None):
     form = form or _forms(data)
     if any(not f or f['played'] < MIN_RESULTS for f in form.values()):
         return None
-    base = BASELINE[sport]
+    table = data.get('standings') or {}
+    # The competition's own scoring level when its table is known; the sport average otherwise.
+    league = table.get('league_goals_per_team')
+    base = league if isinstance(league, (int, float)) and 0.3 < league < 6 else BASELINE[sport]
 
     def shrink(value, played):
         return (value * played + base * PRIOR_GAMES) / (played + PRIOR_GAMES)
@@ -120,8 +161,15 @@ def poisson_model(data, form=None):
     away_attack = shrink(form['away']['scored_weighted'], form['away']['played'])
     away_defence = shrink(form['away']['conceded_weighted'], form['away']['played'])
     factor = HOME_FACTOR[sport]
-    lam_home = max(0.2, min(6.0, (home_attack + away_defence) / 2 * factor))
-    lam_away = max(0.2, min(6.0, (away_attack + home_defence) / 2 / factor))
+    lam_home = (home_attack + away_defence) / 2 * factor
+    lam_away = (away_attack + home_defence) / 2 / factor
+    season = _season_expected(data, base, factor)
+    if season:
+        lam_home = (1 - SEASON_WEIGHT) * lam_home + SEASON_WEIGHT * season[0]
+        lam_away = (1 - SEASON_WEIGHT) * lam_away + SEASON_WEIGHT * season[1]
+    absence, notes = _absence_factors(data)
+    lam_home = max(0.2, min(6.0, lam_home * absence['home']))
+    lam_away = max(0.2, min(6.0, lam_away * absence['away']))
     rho = DIXON_COLES_RHO.get(sport, 0)
     grid = {}
     for h in range(MAX_GOALS + 1):
@@ -146,6 +194,8 @@ def poisson_model(data, form=None):
         'both_score': round(sum(p for (h, a), p in grid.items() if h and a), 3),
         'sample': {side: form[side]['played'] for side in ('home', 'away')},
         'regulation_only': sport == 'Hockey sur glace',
+        'inputs': {'league_average': round(base, 2), 'league_from_table': base != BASELINE[sport],
+                   'season_strength': bool(season), 'absences': notes},
         '_grid': grid,
     }
 
@@ -185,8 +235,35 @@ def predict(data):
     options = scorer_probabilities(data, model, form)
     scoring_sides = {side for side, goals in (('home', home_goals), ('away', away_goals)) if goals > 0}
     scorer = next((p for p in options if p['side'] in scoring_sides and p['probability'] >= MIN_SCORER_PROBABILITY), None)
+    odds = data.get('odds') or {}
+    market = odds.get('result')
+    sport = game['sport']
+    names = {'home': game['home']['name'], 'away': game['away']['name']}
+    markets = []
+    if winner != 'draw':
+        key = f'{winner}_or_draw'
+        markets.append({'key': key, 'label': f"{names[winner]} ou nul", 'probability': model['double_chance'][key],
+                        'market': round(market[winner] + market['draw'], 3) if market else None})
+    over = model['over']
+    over_side = over['probability'] >= 0.5
+    market_over = odds.get('over') if (odds.get('over') or {}).get('line') == over['line'] else None
+    markets.append({'key': 'over' if over_side else 'under',
+                    'label': f"{'Plus' if over_side else 'Moins'} de {str(over['line']).replace('.', ',')} buts",
+                    'probability': round(over['probability'] if over_side else 1 - over['probability'], 3),
+                    'market': None if not market_over else round(market_over['probability'] if over_side else 1 - market_over['probability'], 3)})
+    both = model['both_score'] >= 0.5
+    market_both = odds.get('both_score')
+    markets.append({'key': 'both_score' if both else 'not_both_score',
+                    'label': 'Les deux équipes marquent' if both else 'Au moins une équipe ne marque pas',
+                    'probability': round(model['both_score'] if both else 1 - model['both_score'], 3),
+                    'market': None if market_both is None else round(market_both if both else 1 - market_both, 3)})
+    markets.sort(key=lambda m: -m['probability'])
+    confidence = model['probabilities'][winner]
     return {'source': 'model', 'home_goals': home_goals, 'away_goals': away_goals, 'winner': winner,
-            'confidence': model['probabilities'][winner], 'score_probability': round(grid[home_goals, away_goals], 3),
+            'confidence': confidence, 'score_probability': round(grid[home_goals, away_goals], 3),
+            'tight': confidence < TIGHT_THRESHOLD.get(sport, 0.45),
+            'probabilities': model['probabilities'], 'market': market,
+            'markets': markets, 'adjustments': model['inputs']['absences'],
             'scorer': scorer, 'scorer_options': options[:4]}
 
 

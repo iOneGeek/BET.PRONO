@@ -1,0 +1,34 @@
+# Vérifie les pronostics BET PRONO AI terminés, même quand personne n'ouvre le site.
+# Render met le site en veille : cet appel horaire le réveille, puis le site compare
+# jusqu'à 10 pronos au résultat réel (temps réglementaire au hockey).
+#
+# À configurer une fois :
+#   1. Render → Environment : CRON_TOKEN = une longue valeur aléatoire (24 caractères minimum).
+#   2. GitHub → Settings → Secrets and variables → Actions → New repository secret :
+#      CRON_TOKEN = la même valeur.
+# Sans ce secret, la tâche ne fait rien et reste verte.
+name: Vérifier les pronostics
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Réveiller le site et vérifier les pronos terminés
+        env:
+          CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://bet-prono.onrender.com' }}
+        run: |
+          if [ -z "$CRON_TOKEN" ]; then
+            echo "Secret CRON_TOKEN absent : rien à faire."
+            exit 0
+          fi
+          curl -fsS --retry 3 --retry-delay 20 --retry-all-errors --max-time 120 \
+            -X POST -H "X-Cron-Token: $CRON_TOKEN" "$SITE_URL/api/ai/settle"

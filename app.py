@@ -1,4 +1,6 @@
 import hashlib
+import hmac
+import threading
 import json
 import math
 import os
@@ -339,9 +341,15 @@ def init_pg_db():
                  .replace(" REAL", " DOUBLE PRECISION").replace("game_id INTEGER", "game_id BIGINT")
                  .replace("scorer_id INTEGER", "scorer_id BIGINT").replace("user_id INTEGER", "user_id BIGINT"))
         _run_ddl(conn, "ALTER TABLE ai_predictions ADD COLUMN IF NOT EXISTS scorers TEXT")
+        for column in PREDICTION_PROBABILITY_COLUMNS:
+            _run_ddl(conn, f"ALTER TABLE ai_predictions ADD COLUMN IF NOT EXISTS {column} DOUBLE PRECISION")
     finally:
         conn.close()
 
+
+# V2.5.0 : probabilités du modèle (p_*) et des bookmakers (m_*) gardées pour mesurer leur justesse.
+PREDICTION_PROBABILITY_COLUMNS = ('p_home', 'p_draw', 'p_away', 'm_home', 'm_draw', 'm_away',
+                                  'over_line', 'p_over', 'm_over', 'p_btts', 'm_btts')
 
 # V2.3.8 : analyses IA conservées entre deux redémarrages et suivi de la réussite des pronostics.
 AI_TABLES_DDL = """
@@ -499,8 +507,12 @@ def init_sqlite_db():
         """
     )
     db.executescript(AI_TABLES_DDL)
-    if "scorers" not in [r[1] for r in db.execute("PRAGMA table_info(ai_predictions)").fetchall()]:
+    prediction_cols = [r[1] for r in db.execute("PRAGMA table_info(ai_predictions)").fetchall()]
+    if "scorers" not in prediction_cols:
         db.execute("ALTER TABLE ai_predictions ADD COLUMN scorers TEXT")
+    for column in PREDICTION_PROBABILITY_COLUMNS:
+        if column not in prediction_cols:
+            db.execute(f"ALTER TABLE ai_predictions ADD COLUMN {column} REAL")
     db.commit()
     db.close()
 
@@ -1017,6 +1029,8 @@ def automatic_match_analysis(game_id):
         data = sports_client.match(game_id)
         if snapshot_id(data) != payload['snapshot_id']:
             return {'status': 'outdated', 'message': 'Les données du match ont changé. Sélectionne à nouveau la rencontre pour actualiser sa fiche.', 'prediction': None}
+        # Gemini explique le prono calculé par le modèle (il ne le choisit pas).
+        data['pick'] = enrich(data)['prediction']
         return match_analyzer.analyze(data, g.user['id'], app.config['GEMINI_API_KEY'], app.config['GEMINI_MODEL'])
     return sports_response(analyze_snapshot)
 
@@ -1047,6 +1061,17 @@ def record_prediction(data, prediction):
                       winner, scorer_id, scorer_name, model_home, model_away, model_outcome, model_score, updated_at,
                       game_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                    values + (game['id'], now))
+    probabilities = prediction.get('probabilities') or model.get('probabilities') or {}
+    market = prediction.get('market') or {}
+    odds = data.get('odds') or {}
+    over = model.get('over') or {}
+    market_over = odds.get('over') if (odds.get('over') or {}).get('line') == over.get('line') else None
+    db.execute(f"""UPDATE ai_predictions SET {', '.join(c + ' = ?' for c in PREDICTION_PROBABILITY_COLUMNS)}
+                   WHERE game_id = ? AND status = 'pending'""",
+               (probabilities.get('home'), probabilities.get('draw'), probabilities.get('away'),
+                market.get('home'), market.get('draw'), market.get('away'),
+                over.get('line'), over.get('probability'), (market_over or {}).get('probability'),
+                model.get('both_score'), odds.get('both_score'), game['id']))
     db.commit()
 
 
@@ -1066,6 +1091,7 @@ def settle_predictions(limit=3, user_id=None):
                          FROM ai_predictions p LEFT JOIN ai_follows f ON f.game_id = p.game_id AND f.user_id = ?
                          WHERE p.status = 'pending' AND p.starts_at < ? AND (p.checked_at IS NULL OR p.checked_at < ?)
                          ORDER BY later, p.starts_at LIMIT ?""", (user_id or 0, ready, recheck, limit)).fetchall()
+    settled = 0
     for row in rows:
         try:
             final = sports_client.final_result(int(row['game_id']))
@@ -1093,7 +1119,9 @@ def settle_predictions(limit=3, user_id=None):
         db.execute("""UPDATE ai_predictions SET status = 'settled', actual_home = ?, actual_away = ?, actual_winner = ?,
                       scorer_hit = ?, scorers = ?, checked_at = ?, settled_at = ? WHERE id = ?""",
                    (home, away, winner, scorer_hit, json.dumps(sorted(set(final['scorers']))), stamp, stamp, row['id']))
+        settled += 1
     db.commit()
+    return settled
 
 
 def _follow_view(row):
@@ -1179,8 +1207,87 @@ def ai_unfollow(game_id):
     return jsonify({'following': False})
 
 
+def _brier(probabilities, outcome):
+    """Erreur quadratique sur 1 / N / 2 : 0 = parfait, 2 = tout faux avec certitude. Un tirage à 1/3 donne 0,667."""
+    return sum((probabilities[key] - (1.0 if key == outcome else 0.0)) ** 2 for key in ('home', 'draw', 'away'))
+
+
+def prediction_quality(rows):
+    """Justesse des pourcentages : calibration, score de Brier modèle / bookmakers, marchés buts."""
+    with_p = [r for r in rows if all(r[c] is not None for c in ('p_home', 'p_draw', 'p_away')) and r['actual_winner']]
+    buckets = []
+    for low, high, label in ((0, 0.5, 'moins de 50 %'), (0.5, 0.6, '50 à 60 %'), (0.6, 0.7, '60 à 70 %'), (0.7, 1.01, '70 % et plus')):
+        subset = [r for r in with_p if low <= max(r['p_home'], r['p_draw'], r['p_away']) < high]
+        if subset:
+            announced = sum(max(r['p_home'], r['p_draw'], r['p_away']) for r in subset) / len(subset)
+            hits = sum(r['winner'] == r['actual_winner'] for r in subset)
+            buckets.append({'label': label, 'total': len(subset), 'announced': round(announced, 3),
+                            'observed': round(hits / len(subset), 3)})
+    both = [r for r in with_p if all(r[c] is not None for c in ('m_home', 'm_draw', 'm_away'))]
+
+    def brier(subset, prefix):
+        if not subset:
+            return None
+        return round(sum(_brier({k: r[f'{prefix}_{k}'] for k in ('home', 'draw', 'away')}, r['actual_winner'])
+                         for r in subset) / len(subset), 3)
+    market_hits = sum(max(('home', 'draw', 'away'), key=lambda k: r[f'm_{k}']) == r['actual_winner'] for r in both)
+    scored = [r for r in rows if r['actual_home'] is not None]
+    over_rows = [r for r in scored if r['p_over'] is not None and r['over_line'] is not None]
+    btts_rows = [r for r in scored if r['p_btts'] is not None]
+    return {
+        'calibration': buckets,
+        'brier': {'model': brier(with_p, 'p'), 'model_same_games': brier(both, 'p'), 'market': brier(both, 'm'),
+                  'games': len(with_p), 'games_with_odds': len(both), 'random': 0.667},
+        'market_winner': _rate(market_hits, len(both)),
+        'model_winner_same_games': _rate(sum(r['winner'] == r['actual_winner'] for r in both), len(both)),
+        'over': _rate(sum((r['p_over'] >= 0.5) == (r['actual_home'] + r['actual_away'] > r['over_line']) for r in over_rows), len(over_rows)),
+        'both_score': _rate(sum((r['p_btts'] >= 0.5) == (r['actual_home'] > 0 and r['actual_away'] > 0) for r in btts_rows), len(btts_rows)),
+        'enough_data': len(with_p) >= 100,
+    }
+
+
 def _rate(hits, total):
     return {'hits': hits, 'total': total, 'rate': round(hits / total, 3) if total else None}
+
+
+SETTLE_INTERVAL_SECONDS = 30 * 60
+_settle_thread_started = False
+_settle_thread_lock = threading.Lock()
+
+
+def _settle_loop():
+    while True:
+        time.sleep(SETTLE_INTERVAL_SECONDS)
+        if not app.config['SPORTS_DATA_ENABLED']:
+            continue
+        try:
+            with app.app_context():
+                settle_predictions(limit=10)
+        except Exception:
+            app.logger.warning('Automatic settlement failed')
+
+
+@app.before_request
+def _start_settle_loop():
+    """Vérifie les pronos terminés toutes les 30 min tant que le serveur tourne (hors tests)."""
+    global _settle_thread_started
+    if _settle_thread_started or app.config.get('TESTING') or os.getenv('AUTO_SETTLE', '1') != '1':
+        return
+    with _settle_thread_lock:
+        if not _settle_thread_started:
+            threading.Thread(target=_settle_loop, name='settle-predictions', daemon=True).start()
+            _settle_thread_started = True
+
+
+@app.post('/api/ai/settle')
+def ai_settle_cron():
+    """Appelé par une tâche planifiée (GitHub Actions) pour réveiller le site et vérifier les pronos."""
+    expected = os.getenv('CRON_TOKEN', '')
+    given = request.headers.get('X-Cron-Token', '')
+    if not expected or len(expected) < 24 or not hmac.compare_digest(expected, given):
+        return jsonify({'error': 'Introuvable.'}), 404
+    settled = settle_predictions(limit=10)
+    return jsonify({'settled': settled})
 
 
 @app.get('/api/ai/track-record')
@@ -1193,9 +1300,10 @@ def ai_track_record():
         except Exception:
             app.logger.warning('AI prediction settlement failed')
     db = get_db()
-    rows = db.execute("""SELECT game_id, sport, competition, home_name, away_name, starts_at, home_goals, away_goals,
+    rows = db.execute(f"""SELECT game_id, sport, competition, home_name, away_name, starts_at, home_goals, away_goals,
                          winner, scorer_name, scorer_hit, model_outcome, model_score, actual_home, actual_away,
-                         actual_winner FROM ai_predictions WHERE status = 'settled' ORDER BY starts_at DESC""").fetchall()
+                         actual_winner, {', '.join(PREDICTION_PROBABILITY_COLUMNS)}
+                         FROM ai_predictions WHERE status = 'settled' ORDER BY starts_at DESC""").fetchall()
     pending = db.execute("SELECT COUNT(*) AS n FROM ai_predictions WHERE status = 'pending'").fetchone()['n']
 
     def actual(r):
@@ -1220,7 +1328,7 @@ def ai_track_record():
                'scorer': _rate(sum(bool(r['scorer_hit']) for r in with_scorer), len(with_scorer))},
         'model': {'winner': _rate(sum(r['model_outcome'] == r['actual_winner'] for r in with_model), len(with_model)),
                   'exact_score': _rate(sum(r['model_score'] == actual(r) for r in model_scored), len(model_scored))},
-        'by_sport': by_sport, 'recent': recent,
+        'by_sport': by_sport, 'recent': recent, 'quality': prediction_quality(rows),
         'notice': 'Pronostics enregistrés avant le coup d’envoi puis comparés au résultat 365Scores. Hockey : temps '
                   'réglementaire. Football avec prolongation : seul le match nul après 90 minutes est compté.'})
     response.headers['Cache-Control'] = 'no-store'

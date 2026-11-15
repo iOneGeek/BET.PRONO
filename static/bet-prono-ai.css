@@ -188,3 +188,15 @@
 .follow-btn:disabled{opacity:.6;cursor:wait}
 .follows-list li{grid-template-columns:auto minmax(0,1fr) auto auto}
 .follow-remove{min-height:36px;padding:4px 10px;font-size:.78rem;border-radius:8px;background:transparent;border:1px solid var(--rule);color:var(--mute);cursor:pointer}
+/* V2.5.0 : match serré, marchés, explication du prono, justesse des pourcentages */
+.forecast-tight{margin:12px 0 0;padding:9px 12px;border-radius:9px;border:1px solid #4a5568;background:#1d2738;color:#e2e8f0;font-size:.88rem}
+.forecast-markets{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px}
+.forecast-markets li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;border:1px solid var(--rule);border-radius:9px;padding:7px 10px;font-size:.86rem}
+.forecast-markets strong{flex:1 1 180px}
+.market-model{font-weight:700;color:var(--orange)}
+.market-odds{color:var(--mute)}
+.pick-explanation{margin-top:12px;border-left:3px solid var(--orange);padding:4px 0 4px 12px}
+.pick-explanation h4{margin:0 0 4px;font-size:.92rem}
+.pick-explanation p{margin:0;line-height:1.45}
+.model-market{margin-top:4px}
+.track-quality{display:grid;gap:6px;padding-top:6px}

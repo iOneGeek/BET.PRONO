@@ -122,6 +122,15 @@
     const p = model.probabilities;
     if (![p.home, p.draw, p.away].every(v => typeof v === 'number' && v >= 0 && v <= 1)) return;
     const hockey = game.sport === 'Hockey sur glace';
+    const inputs = model.inputs || {};
+    const used = [`${Math.max(model.sample.home, model.sample.away)} derniers matchs au plus`];
+    if (inputs.season_strength) used.push('force des deux équipes sur la saison');
+    if (inputs.league_from_table) used.push(`moyenne de la compétition : ${decimal(inputs.league_average)} but par équipe et par match`);
+    if ((inputs.absences || []).length) used.push(`${inputs.absences.length} absent(s) pris en compte`);
+    el('liveModelInputs').textContent = 'Basé sur : ' + used.join(' · ') + '.';
+    const market = data.odds && data.odds.result;
+    el('liveModelMarket').hidden = !market;
+    if (market) el('liveModelMarket').textContent = `Selon les cotes des bookmakers : ${teamName(game.home)} ${percent(market.home)} · Nul ${percent(market.draw)} · ${teamName(game.away)} ${percent(market.away)}`;
     el('liveModelIntro').textContent = `Calcul sur ${model.sample.home} et ${model.sample.away} résultats récents`
       + (hockey ? ', au temps réglementaire (le match nul est possible à 60 minutes).' : '.');
     const parts = [['home', teamName(game.home)], ['draw', 'Nul'], ['away', teamName(game.away)]];
@@ -171,6 +180,45 @@
     el('liveFormPanel').hidden = false;
   }
 
+  function renderQuality(quality) {
+    const body = el('aiTrackQualityBody');
+    if (!quality) { body.replaceChildren(element('p', 'Indisponible.', 'sub')); return; }
+    const parts = [];
+    parts.push(element('p', quality.enough_data
+      ? 'Assez de matchs pour juger le modèle.'
+      : `Encore peu de matchs (${quality.brier.games}) : ces chiffres bougeront beaucoup avant une centaine de pronos vérifiés.`, 'sub'));
+    if (quality.calibration.length) {
+      const table = document.createElement('table');
+      table.className = 'form-table';
+      const head = document.createElement('tr');
+      ['Annoncé', 'Pronos', 'Réussite attendue', 'Réussite réelle'].forEach(label => { const th = element('th', label); th.scope = 'col'; head.append(th); });
+      const thead = document.createElement('thead'); thead.append(head);
+      const tbody = document.createElement('tbody');
+      quality.calibration.forEach(bucket => {
+        const row = document.createElement('tr');
+        row.append(element('th', bucket.label), element('td', String(bucket.total)), element('td', percent(bucket.announced)), element('td', percent(bucket.observed)));
+        row.firstChild.scope = 'row';
+        tbody.append(row);
+      });
+      table.append(thead, tbody);
+      const wrap = document.createElement('div'); wrap.className = 'wrap'; wrap.append(table);
+      parts.push(wrap, element('p', 'Un modèle juste a une réussite réelle proche de la réussite attendue.', 'sub'));
+    }
+    const brier = quality.brier;
+    if (brier.model != null) {
+      let line = `Score de précision (Brier, plus bas = mieux, hasard = 0,667) : modèle ${decimal(brier.model)}`;
+      if (brier.market != null) line += ` · sur les ${brier.games_with_odds} matchs avec cotes : modèle ${decimal(brier.model_same_games)}, bookmakers ${decimal(brier.market)}`;
+      parts.push(element('p', line + '.', 'sub'));
+    }
+    const rates = [];
+    if (quality.market_winner.total) rates.push(`Favori des bookmakers vainqueur : ${percent(quality.market_winner.rate)} (modèle sur les mêmes matchs : ${percent(quality.model_winner_same_games.rate)})`);
+    if (quality.over.total) rates.push(`Plus / moins de buts : ${percent(quality.over.rate)} (${quality.over.hits}/${quality.over.total})`);
+    if (quality.both_score.total) rates.push(`Les deux équipes marquent : ${percent(quality.both_score.rate)} (${quality.both_score.hits}/${quality.both_score.total})`);
+    rates.forEach(text => parts.push(element('p', text, 'sub')));
+    if (!quality.calibration.length) parts.push(element('p', 'Pas encore de prono vérifié avec ses pourcentages.', 'sub'));
+    body.replaceChildren(...parts);
+  }
+
   let trackLoaded = false;
   async function loadTrackRecord() {
     trackLoaded = true;
@@ -203,6 +251,7 @@
         row.append(when, info, tally);
         return row;
       }) : [element('li', 'Aucun pronostic vérifié pour l’instant.')]));
+      renderQuality(data.quality);
       el('aiTrackNotice').textContent = data.notice + (data.pending ? ` ${data.pending} pronostic(s) en attente du résultat.` : '');
       el('aiTrackStatus').textContent = data.settled
         ? `${data.settled} pronostic(s) vérifié(s) après le match.`
@@ -222,6 +271,8 @@
   loadWhenOpen();
 
   function clearSelection() {
+    el('livePickExplanation').hidden = true;
+    el('livePredictionTight').hidden = true;
     setFormView(false);
     el('liveModel').hidden = true;
     el('liveFormPanel').hidden = true;
@@ -359,6 +410,19 @@
     }
     if (typeof prediction.score_probability === 'number') parts.push(`score exact : ${percent(prediction.score_probability)}`);
     el('livePredictionConfidence').textContent = parts.length ? 'Selon le modèle · ' + parts.join(' · ') : '';
+    if (prediction.market && typeof prediction.market[winner] === 'number') {
+      el('livePredictionConfidence').textContent += ` — selon les cotes : ${percent(prediction.market[winner])}`;
+    }
+    el('livePredictionTight').hidden = !prediction.tight;
+    el('livePredictionMarkets').replaceChildren(...(prediction.markets || []).map(market => {
+      const item = document.createElement('li');
+      item.append(element('strong', market.label), element('span', `Modèle ${percent(market.probability)}`, 'market-model'));
+      if (typeof market.market === 'number') item.append(element('span', `Cotes ${percent(market.market)}`, 'market-odds'));
+      return item;
+    }));
+    const notes = prediction.adjustments || [];
+    el('livePredictionAdjustments').textContent = notes.length ? 'Pris en compte : ' + notes.join(' · ') + '.' : '';
+    el('livePredictionAdjustments').hidden = !notes.length;
     el('livePredictionScorer').textContent = 'Non proposé';
     el('livePredictionScorerNote').textContent = (prediction.scorer_options || []).length
       ? 'Aucun joueur assez probable dans l’équipe qui marque selon le score estimé.'
@@ -426,6 +490,12 @@
         const item = document.createElement('li'); item.textContent = text; return item;
       }));
       el('liveAnalysisDate').textContent = 'Synthèse générée par IA le ' + dateLabel(result.generated_at);
+      const why = result.pick_explanation;
+      if (why && typeof why.text === 'string' && Array.isArray(why.evidence) && !el('livePrediction').hidden) {
+        el('livePickExplanationText').textContent = why.text;
+        el('livePickExplanationEvidence').replaceChildren(...why.evidence.map(fact => element('li', fact)));
+        el('livePickExplanation').hidden = false;
+      }
       el('liveAnalysisStatus').textContent = '';
       el('liveAnalysisContent').hidden = false;
     } catch (_) {

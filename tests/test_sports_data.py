@@ -16,6 +16,7 @@ GAME = {'id': 1001, 'sportId': 1, 'competitionDisplayName': 'Test League',
 
 
 H2H_EMPTY = {'game': {'h2hGames': []}}
+ODDS_EMPTY = {'lastUpdateId': 1, 'requestedUpdateId': -1, 'ttl': 30}
 
 
 class FakeResponse:
@@ -191,7 +192,7 @@ class SportsClientTests(unittest.TestCase):
         envelope = {'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}
         for payload in (envelope, {**envelope, 'games': []}):
             with self.subTest(payload=payload), patch('sports_data.requests.get', side_effect=[
-                FakeResponse(payload), FakeResponse({'game': scheduled}), FakeResponse(H2H_EMPTY),
+                FakeResponse(payload), FakeResponse({'game': scheduled}), FakeResponse(H2H_EMPTY), FakeResponse(ODDS_EMPTY),
             ]) as get:
                 client = Scores365Client()
                 result = client.match(1001)
@@ -200,10 +201,11 @@ class SportsClientTests(unittest.TestCase):
                 self.assertEqual(result['statistics'], [])
                 self.assertFalse(result['cached'])
                 self.assertTrue(client.match(1001)['cached'])
-                self.assertEqual(get.call_count, 3)
+                self.assertEqual(get.call_count, 4)
                 self.assertTrue(get.call_args_list[1].args[0].endswith('/game/'))
                 self.assertEqual(get.call_args_list[1].kwargs['params']['gameId'], 1001)
-                self.assertTrue(get.call_args.args[0].endswith('/games/h2h/'))
+                self.assertTrue(get.call_args_list[2].args[0].endswith('/games/h2h/'))
+                self.assertTrue(get.call_args.args[0].endswith('/bets/lines/'))
                 # An empty statistics response must not suspend other searches.
                 get.side_effect = None
                 get.return_value = FakeResponse({'games': [scheduled]})
@@ -245,7 +247,7 @@ class SportsClientTests(unittest.TestCase):
         ]
         samples = [FakeResponse({'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}),
                    FakeResponse({'game': scheduled}), FakeResponse({'games': completed + invalid + [completed[2]]}),
-                   FakeResponse(H2H_EMPTY)]
+                   FakeResponse(H2H_EMPTY), FakeResponse(ODDS_EMPTY)]
         with patch('sports_data.requests.get', side_effect=samples) as get:
             result = self.client.match(1001)
             self.assertEqual(result['statistics'], [])
@@ -253,7 +255,7 @@ class SportsClientTests(unittest.TestCase):
             self.assertEqual([g['id'] for g in result['recent_results']['home']], [2005, 2004, 2003, 2002, 2001, 2000])
             self.assertEqual(len(result['recent_results']['away']), 6)
             self.assertTrue(self.client.match(1001)['cached'])
-            self.assertEqual(get.call_count, 4)
+            self.assertEqual(get.call_count, 5)
             history_call = get.call_args_list[2].kwargs['params']
             self.assertLessEqual(len(history_call['games'].split(',')), 30)
             self.assertEqual(history_call['showOdds'], 'false')
@@ -265,7 +267,7 @@ class SportsClientTests(unittest.TestCase):
         future = {**GAME, 'id': 2000, 'startTime': '2099-10-01T20:00:00+01:00'}
         for history_response in (FakeResponse(status=503), FakeResponse({'games': [future]})):
             samples = [FakeResponse({'lastUpdateId': 0, 'requestedUpdateId': 0, 'ttl': 60}),
-                       FakeResponse({'game': scheduled}), history_response, FakeResponse(H2H_EMPTY)]
+                       FakeResponse({'game': scheduled}), history_response, FakeResponse(H2H_EMPTY), FakeResponse(ODDS_EMPTY)]
             with patch('sports_data.requests.get', side_effect=samples):
                 result = Scores365Client().match(1001)
                 self.assertEqual(result['match']['id'], 1001)
