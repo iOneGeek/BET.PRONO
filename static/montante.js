@@ -7,6 +7,15 @@
   const euro = value => value == null ? '—' : value.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
   const odds = value => Number(value).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   const two = n => String(n).padStart(2, '0');
+  const names = window.betNames || {team: x => x, competition: x => x};
+  const kickoff = value => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const day = new Intl.DateTimeFormat('fr-CA', {timeZone: 'Europe/Paris'}).format(date);
+    const today = new Intl.DateTimeFormat('fr-CA', {timeZone: 'Europe/Paris'}).format(new Date());
+    const time = date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris'});
+    return (day === today ? 'Aujourd’hui ' : date.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris'}) + ' ') + time;
+  };
   // Montant de tableau : sur petit écran, le symbole € passe dans l'en-tête de colonne.
   const amountCell = value => {
     const cell = node('td', value == null ? '—' : value.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}), 'mt-num');
@@ -35,8 +44,9 @@
   function liveLine(live) {
     if (!live) return null;
     if (live.unavailable) return node('span', 'Score momentanément indisponible', 'mt-live-muted');
-    if (live.scheduled) return node('span', `${live.home_name} – ${live.away_name}`, 'mt-live-muted');
-    const text = `${live.in_play ? '● EN DIRECT' + (live.clock ? ' · ' + live.clock : '') : live.finished ? 'Terminé' : ''} ${live.home_name} ${live.home} – ${live.away} ${live.away_name}`;
+    const home = names.team(live.home_name), away = names.team(live.away_name);
+    if (live.scheduled) return node('span', `⏰ ${home} – ${away} · ${kickoff(live.starts_at)}`, 'mt-live-muted');
+    const text = `${live.in_play ? '● EN DIRECT' + (live.clock ? ' · ' + live.clock : '') : live.finished ? 'Terminé' : ''} ${home} ${live.home} – ${live.away} ${away}`;
     return node('span', text.trim(), live.in_play ? 'mt-live' : 'mt-live-muted');
   }
 
@@ -224,9 +234,17 @@
       return;
     }
     const current = view.steps.find(step => step.state === 'current');
-    el('homeMontanteText').textContent = `Palier ${view.current_step} / ${view.total_steps} · mise ${euro(view.current_stake)} · cote ${odds(current.odds)}`
-      + (current.pick ? ` · ${current.pick}` : '');
-    const live = liveLine(current.live);
+    const chips = [['Palier', `${view.current_step} / ${view.total_steps}`], ['Mise', euro(view.current_stake)], ['Cote', odds(current.odds)]]
+      .map(([label, value]) => { const chip = node('span', null, 'hm-chip'); chip.append(node('small', label), node('b', value)); return chip; });
+    const parts = [...chips];
+    if (current.pick) parts.push(node('span', current.pick, 'hm-pick'));
+    el('homeMontanteText').replaceChildren(...parts);
+    const info = current.live;
+    let live = null;
+    if (info && !info.unavailable && info.scheduled) live = node('span', '⏰ ' + kickoff(info.starts_at), 'mt-live-muted');
+    else if (info && !info.unavailable && (info.in_play || info.finished)) {
+      live = node('span', `${info.in_play ? '● ' + (info.clock || 'EN DIRECT') : 'Terminé'} · ${info.home} – ${info.away}`, info.in_play ? 'mt-live' : 'mt-live-muted');
+    }
     el('homeMontanteLive').replaceChildren(...(live ? [live] : []));
     el('homeMontanteBar').style.width = `${Math.round(view.won_steps / view.total_steps * 100)}%`;
     banner.hidden = false;

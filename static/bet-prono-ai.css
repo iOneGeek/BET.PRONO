@@ -310,3 +310,19 @@
 .montante-panel .mt-table th,.montante-panel .mt-table td{border-bottom:0}
 .mobile-nav{grid-template-columns:repeat(7,minmax(0,1fr))}
 @media(max-width:380px){.mobile-nav button{font-size:.6rem;padding:7px 0}}
+/* V2.7.3 : accueil plus propre (blocs qui ne débordent plus, bandeau paliers en pastilles) */
+.fh-list{grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
+.fh-item{overflow:hidden}
+.fh-top{flex-wrap:wrap}
+.fh-comp{flex:1 1 100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fh-match{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center}
+.fh-team{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.2}
+.fh-prono{overflow-wrap:anywhere}
+.home-montante{grid-template-columns:auto minmax(0,1fr) auto;align-items:center}
+.hm-text{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0}
+.hm-chip{display:inline-flex;align-items:baseline;gap:5px;padding:3px 10px;border-radius:999px;background:rgba(255,164,39,.12);border:1px solid rgba(255,164,39,.35);white-space:nowrap}
+.hm-chip small{color:#d8b27a;font-size:.72rem}
+.hm-chip b{color:#fff;font-size:.86rem}
+.hm-pick{color:#e8eefb;font-size:.86rem;overflow-wrap:anywhere;min-width:0}
+.hm-live{white-space:nowrap}
+@media(max-width:560px){.home-montante{grid-template-columns:1fr}.hm-live{white-space:normal}}
