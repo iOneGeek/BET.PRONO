@@ -1302,9 +1302,11 @@ def _start_settle_loop():
 @app.post('/api/ai/settle')
 def ai_settle_cron():
     """Appelé par une tâche planifiée (GitHub Actions) pour réveiller le site et vérifier les pronos."""
-    expected = os.getenv('CRON_TOKEN', '')
-    given = request.headers.get('X-Cron-Token', '')
-    if not expected or len(expected) < 24 or not hmac.compare_digest(expected, given):
+    # strip() retire aussi les espaces invisibles (insécables…) ajoutées au copier-coller dans Render ;
+    # la comparaison se fait sur des octets, car compare_digest refuse le texte non ASCII.
+    expected = os.getenv('CRON_TOKEN', '').strip()
+    given = request.headers.get('X-Cron-Token', '').strip()
+    if not expected or len(expected) < 24 or not hmac.compare_digest(expected.encode('utf-8'), given.encode('utf-8')):
         return jsonify({'error': 'Introuvable.'}), 404
     SETTLE_ERRORS.clear()
     try:

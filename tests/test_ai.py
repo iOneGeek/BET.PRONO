@@ -336,6 +336,12 @@ class AIBetaTests(unittest.TestCase):
                 response = anonymous.post('/api/ai/settle', headers={'X-Cron-Token': 'k' * 32})
             self.assertEqual(response.get_json(), {'settled': 3, 'errors': []})
             settle.assert_called_once_with(limit=10)
+        # A value pasted with an invisible non-breaking space still works, and odd input never crashes.
+        with patch.dict(os.environ, {'CRON_TOKEN': ' ' + 'k' * 32 + ' '}):
+            with patch.object(module, 'settle_predictions', return_value=0):
+                self.assertEqual(anonymous.post('/api/ai/settle', headers={'X-Cron-Token': 'k' * 32}).status_code, 200)
+        with patch.dict(os.environ, {'CRON_TOKEN': 'é' * 32}):
+            self.assertEqual(anonymous.post('/api/ai/settle', headers={'X-Cron-Token': 'k' * 32}).status_code, 404)
 
     def test_analysis_cache_survives_a_new_analyzer(self):
         with self.app.app_context():
