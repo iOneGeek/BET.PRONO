@@ -1096,32 +1096,52 @@ def settle_predictions(limit=3, user_id=None):
         try:
             final = sports_client.final_result(int(row['game_id']))
         except SportsDataError:
-            break
-        stamp = datetime.now(timezone.utc).isoformat()
-        if not final['finished']:
-            too_old = datetime.fromisoformat(row['starts_at']) < now - timedelta(days=2)
-            db.execute("UPDATE ai_predictions SET checked_at = ?, status = ? WHERE id = ?",
-                       (stamp, 'void' if too_old else 'pending', row['id']))
-            continue
-        game = final['match']
-        regulation = game.get('regulation')
-        if regulation:
-            home, away = regulation['home'], regulation['away']
-            winner = _outcome(home, away)
-        elif game.get('decided') in ('extra_time', 'penalties'):
-            # Une prolongation au football signifie un match nul après 90 minutes, score exact inconnu.
-            home = away = None
-            winner = 'draw'
-        else:
-            db.execute("UPDATE ai_predictions SET checked_at = ?, status = 'void' WHERE id = ?", (stamp, row['id']))
-            continue
-        scorer_hit = None if row['scorer_id'] is None else int(int(row['scorer_id']) in final['scorers'])
-        db.execute("""UPDATE ai_predictions SET status = 'settled', actual_home = ?, actual_away = ?, actual_winner = ?,
-                      scorer_hit = ?, scorers = ?, checked_at = ?, settled_at = ? WHERE id = ?""",
-                   (home, away, winner, scorer_hit, json.dumps(sorted(set(final['scorers']))), stamp, stamp, row['id']))
-        settled += 1
-    db.commit()
+            break  # 365Scores indisponible ou limite atteinte : on réessaiera plus tard.
+        try:
+            settled += _settle_one(db, row, final, now)
+            db.commit()
+        except Exception as error:  # Un match qui pose problème ne bloque plus les autres.
+            db.rollback()
+            app.logger.exception('Settlement failed for game %s', row['game_id'])
+            SETTLE_ERRORS.append(f"{row['game_id']}: {type(error).__name__}: {str(error)[:160]}")
+            del SETTLE_ERRORS[:-10]
+            try:
+                db.execute("UPDATE ai_predictions SET checked_at = ? WHERE id = ?",
+                           (datetime.now(timezone.utc).isoformat(), row['id']))
+                db.commit()
+            except Exception:
+                db.rollback()
     return settled
+
+
+SETTLE_ERRORS = []
+
+
+def _settle_one(db, row, final, now):
+    """Vérifie un prono à partir du résultat 365Scores. Retourne 1 s'il est vérifié, 0 sinon."""
+    stamp = datetime.now(timezone.utc).isoformat()
+    if not final['finished']:
+        too_old = datetime.fromisoformat(row['starts_at']) < now - timedelta(days=2)
+        db.execute("UPDATE ai_predictions SET checked_at = ?, status = ? WHERE id = ?",
+                   (stamp, 'void' if too_old else 'pending', row['id']))
+        return 0
+    game = final['match']
+    regulation = game.get('regulation')
+    if regulation:
+        home, away = int(regulation['home']), int(regulation['away'])
+        winner = _outcome(home, away)
+    elif game.get('decided') in ('extra_time', 'penalties'):
+        # Une prolongation au football signifie un match nul après 90 minutes, score exact inconnu.
+        home = away = None
+        winner = 'draw'
+    else:
+        db.execute("UPDATE ai_predictions SET checked_at = ?, status = 'void' WHERE id = ?", (stamp, row['id']))
+        return 0
+    scorer_hit = None if row['scorer_id'] is None else int(int(row['scorer_id']) in final['scorers'])
+    db.execute("""UPDATE ai_predictions SET status = 'settled', actual_home = ?, actual_away = ?, actual_winner = ?,
+                  scorer_hit = ?, scorers = ?, checked_at = ?, settled_at = ? WHERE id = ?""",
+               (home, away, winner, scorer_hit, json.dumps(sorted({int(x) for x in final['scorers']})), stamp, stamp, row['id']))
+    return 1
 
 
 def _follow_view(row):
@@ -1286,8 +1306,13 @@ def ai_settle_cron():
     given = request.headers.get('X-Cron-Token', '')
     if not expected or len(expected) < 24 or not hmac.compare_digest(expected, given):
         return jsonify({'error': 'Introuvable.'}), 404
-    settled = settle_predictions(limit=10)
-    return jsonify({'settled': settled})
+    SETTLE_ERRORS.clear()
+    try:
+        settled = settle_predictions(limit=10)
+    except Exception as error:  # Message lisible dans la tâche GitHub (accès protégé par le jeton).
+        app.logger.exception('Scheduled settlement failed')
+        return jsonify({'error': f'{type(error).__name__}: {str(error)[:300]}'}), 500
+    return jsonify({'settled': settled, 'errors': list(SETTLE_ERRORS)})
 
 
 @app.get('/api/ai/track-record')

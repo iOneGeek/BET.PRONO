@@ -334,7 +334,7 @@ class AIBetaTests(unittest.TestCase):
             self.assertEqual(anonymous.post('/api/ai/settle', headers={'X-Cron-Token': 'wrong'}).status_code, 404)
             with patch.object(module, 'settle_predictions', return_value=3) as settle:
                 response = anonymous.post('/api/ai/settle', headers={'X-Cron-Token': 'k' * 32})
-            self.assertEqual(response.get_json(), {'settled': 3})
+            self.assertEqual(response.get_json(), {'settled': 3, 'errors': []})
             settle.assert_called_once_with(limit=10)
 
     def test_analysis_cache_survives_a_new_analyzer(self):
