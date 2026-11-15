@@ -343,6 +343,42 @@ class AIBetaTests(unittest.TestCase):
         with patch.dict(os.environ, {'CRON_TOKEN': 'é' * 32}):
             self.assertEqual(anonymous.post('/api/ai/settle', headers={'X-Cron-Token': 'k' * 32}).status_code, 404)
 
+    def test_dashboard_lists_live_upcoming_and_recent_follows(self):
+        from datetime import datetime, timedelta, timezone
+        module = self.module
+        now = datetime.now(timezone.utc)
+        with self.app.app_context():
+            db = module.get_db()
+            for table in ('ai_follows', 'ai_predictions'):
+                db.execute(f'DELETE FROM {table}')
+            user_id = db.execute("SELECT id FROM users WHERE username = 'beta_user'").fetchone()['id']
+            rows = ((901, now + timedelta(hours=5), 'pending', None), (902, now - timedelta(minutes=50), 'pending', None),
+                    (903, now - timedelta(hours=10), 'settled', (2, 1)), (904, now - timedelta(days=3), 'settled', (0, 0)),
+                    (905, now + timedelta(days=40), 'pending', None))
+            for game_id, start, status, actual in rows:
+                db.execute("""INSERT INTO ai_predictions (game_id, sport, competition, home_name, away_name, starts_at, home_goals,
+                              away_goals, winner, status, actual_home, actual_away, actual_winner, created_at, updated_at)
+                              VALUES (?, 'Football', 'Ligue 1', 'A', 'B', ?, 2, 1, 'home', ?, ?, ?, ?, 'x', 'x')""",
+                           (game_id, start.isoformat(), status, actual and actual[0], actual and actual[1],
+                            actual and ('home' if actual[0] > actual[1] else 'draw')))
+                db.execute("""INSERT INTO ai_follows (user_id, game_id, home_goals, away_goals, winner, created_at)
+                              VALUES (?, ?, 2, 1, 'home', 'x')""", (user_id, game_id))
+            db.commit()
+        live = {'match': {'home': {'score': 1}, 'away': {'score': 0}, 'live': True, 'status': '2nd Half'},
+                'clock': "67'", 'finished': False, 'periods': []}
+        with patch.object(module.sports_client, 'tracker', return_value=live) as tracker:
+            data = self.client.get('/api/ai/follows/dashboard').get_json()
+        tracker.assert_called_once_with(902)
+        self.assertEqual([(i['game_id'], i['phase']) for i in data['items']], [(902, 'live'), (901, 'upcoming'), (903, 'finished')])
+        self.assertTrue(data['has_live'])
+        self.assertEqual((data['items'][0]['live']['home'], data['items'][0]['live']['clock']), (1, "67'"))
+        self.assertTrue(data['items'][2]['winner_hit'])
+        # 365Scores down: the card still shows the match, marked unavailable.
+        with patch.object(module.sports_client, 'tracker', side_effect=module.SportsDataError('down', 503)):
+            item = self.client.get('/api/ai/follows/dashboard').get_json()['items'][0]
+        self.assertEqual(item['live'], {'unavailable': True})
+        self.assertEqual(self.app.test_client().get('/api/ai/follows/dashboard').status_code, 401)
+
     def test_analysis_cache_survives_a_new_analyzer(self):
         with self.app.app_context():
             store = self.module.AnalysisStore()

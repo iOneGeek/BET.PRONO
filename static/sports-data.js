@@ -363,6 +363,7 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Action impossible pour le moment.');
       if (on) followed.add(gameId); else followed.delete(gameId);
+      window.dispatchEvent(new Event('bet-prono-follows-changed'));
       if (currentPick && currentPick.id === gameId) {
         setFollowButton(on);
         el('followStatus').textContent = on ? 'Ajouté à « Mes pronos suivis ». Le résultat s’affichera après le match.' : 'Prono retiré de ta liste.';

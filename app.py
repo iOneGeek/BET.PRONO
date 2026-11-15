@@ -1190,6 +1190,64 @@ def ai_follows_list():
     return response
 
 
+LIVE_WINDOW_HOURS = 4      # Un match commencé depuis moins de 4 h peut encore être en cours.
+LIVE_FETCH_LIMIT = 4       # Scores en direct demandés à 365Scores par actualisation (cache 60 s par match).
+
+
+@app.get('/api/ai/follows/dashboard')
+@login_required
+def ai_follows_dashboard():
+    """Pronos suivis pour le tableau de bord : en direct d'abord, puis à venir (30 jours), puis terminés depuis 24 h."""
+    now = datetime.now(timezone.utc)
+    rows = get_db().execute("""SELECT f.game_id, f.home_goals, f.away_goals, f.winner, f.scorer_id, f.scorer_name,
+                                      f.confidence, f.created_at, p.sport, p.competition, p.home_name, p.away_name,
+                                      p.starts_at, p.status, p.actual_home, p.actual_away, p.actual_winner, p.scorers
+                               FROM ai_follows f JOIN ai_predictions p ON p.game_id = f.game_id
+                               WHERE f.user_id = ? AND p.starts_at >= ? AND p.starts_at <= ?
+                               ORDER BY p.starts_at LIMIT 30""",
+                            (g.user['id'], (now - timedelta(hours=24)).isoformat(),
+                             (now + timedelta(days=30)).isoformat())).fetchall()
+    items = []
+    fetched = 0
+    for row in rows:
+        item = _follow_view(row)
+        start = datetime.fromisoformat(row['starts_at'])
+        item['live'] = None
+        started = start <= now
+        if (started and item['status'] == 'pending' and now - start < timedelta(hours=LIVE_WINDOW_HOURS)
+                and fetched < LIVE_FETCH_LIMIT and app.config['SPORTS_DATA_ENABLED']):
+            fetched += 1
+            try:
+                tracked = sports_client.tracker(int(row['game_id']))
+                game = tracked['match']
+                item['live'] = {'home': game['home']['score'], 'away': game['away']['score'],
+                                'in_play': bool(game.get('live')), 'finished': bool(tracked.get('finished')),
+                                'clock': tracked.get('clock') or '', 'status': game.get('status') or '',
+                                'periods': tracked.get('periods', [])[-4:]}
+            except SportsDataError:
+                item['live'] = {'unavailable': True}
+        if item['status'] != 'pending':
+            item['phase'] = 'finished'
+        elif item['live'] and item['live'].get('finished'):
+            item['phase'] = 'finished'
+        elif started and now - start < timedelta(hours=LIVE_WINDOW_HOURS):
+            item['phase'] = 'live'
+        elif started:
+            item['phase'] = 'finished'
+        else:
+            item['phase'] = 'upcoming'
+        items.append(item)
+    order = {'live': 0, 'upcoming': 1, 'finished': 2}
+    items.sort(key=lambda item: (order[item['phase']], item['starts_at'] if item['phase'] != 'finished' else ''))
+    finished = [item for item in items if item['phase'] == 'finished']
+    finished.sort(key=lambda item: item['starts_at'], reverse=True)
+    items = [item for item in items if item['phase'] != 'finished'] + finished
+    response = jsonify({'items': items[:8], 'has_live': any(item['phase'] == 'live' for item in items),
+                        'server_time': now.isoformat()})
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 @app.post('/api/ai/follows/<int:game_id>')
 @login_required
 def ai_follow(game_id):
