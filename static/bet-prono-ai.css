@@ -326,3 +326,13 @@
 .hm-pick{color:#e8eefb;font-size:.86rem;overflow-wrap:anywhere;min-width:0}
 .hm-live{white-space:nowrap}
 @media(max-width:560px){.home-montante{grid-template-columns:1fr}.hm-live{white-space:normal}}
+
+/* V2.8.5 : historique des pronos suivis, replié */
+.follows-history{margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px}
+.follows-history>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:40px;font-weight:700;color:#e8eefb}
+.follows-history>summary::-webkit-details-marker{display:none}
+.follows-history>summary::before{content:'▸';color:var(--accent,#ffa427);transition:transform .15s}
+.follows-history[open]>summary::before{transform:rotate(90deg)}
+.follows-history .fh-count{color:#9fb0cc;font-weight:500}
+.follow-more{display:block;margin:10px auto 0;min-height:38px;padding:6px 16px;border-radius:999px;background:transparent;border:1px solid rgba(255,164,39,.5);color:#ffa427;font-weight:600;cursor:pointer}
+.follow-more:hover{background:rgba(255,164,39,.1)}
