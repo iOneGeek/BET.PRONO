@@ -317,7 +317,8 @@
       if (item.exact_hit) detail += ' · Score exact ✓';
       if (item.scorer_hit != null) detail += item.scorer_hit ? ' · Buteur ✓' : ' · Buteur ✗';
     }
-    info.append(element('strong', `${item.home} — ${item.away}`), element('small', `${item.competition} · ${detail}`));
+    const fr = window.betNames || {team: name => name, competition: name => name};
+    info.append(element('strong', `${fr.team(item.home)} — ${fr.team(item.away)}`), element('small', `${fr.competition(item.competition)} · ${detail}`));
     const label = item.status === 'pending' ? '…' : item.status === 'void' ? '—' : item.winner_hit ? '✓' : '✗';
     const tally = element('abbr', label, 'result-score');
     tally.dataset.outcome = item.status === 'settled' ? (item.winner_hit ? 'Victoire' : 'Défaite') : 'Nul';
@@ -331,6 +332,25 @@
     return row;
   }
 
+  const HISTORY_PAGE = 5;
+  let historyItems = [];
+  let historyShown = HISTORY_PAGE;
+
+  function renderHistory() {
+    el('aiFollowsHistoryList').replaceChildren(...historyItems.slice(0, historyShown).map(followRow));
+    const more = el('aiFollowsMore');
+    const left = historyItems.length - historyShown;
+    // « Voir plus » tant qu'il en reste, puis « Réduire » pour revenir aux 5 derniers.
+    more.hidden = historyItems.length <= HISTORY_PAGE;
+    more.textContent = left > 0 ? `Voir plus (encore ${left})` : 'Réduire';
+  }
+
+  el('aiFollowsMore')?.addEventListener('click', () => {
+    historyShown = historyShown < historyItems.length ? historyShown + HISTORY_PAGE : HISTORY_PAGE;
+    renderHistory();
+    if (historyShown === HISTORY_PAGE) el('aiFollowsHistory').scrollIntoView({block: 'nearest'});
+  });
+
   async function loadFollows() {
     try {
       const response = await fetch('/api/ai/follows', {credentials: 'same-origin'});
@@ -340,7 +360,13 @@
       followed.clear();
       data.items.forEach(item => followed.add(item.game_id));
       if (currentPick) setFollowButton(followed.has(currentPick.id));
-      el('aiFollowsList').replaceChildren(...data.items.map(followRow));
+      // En attente en haut ; les matchs vérifiés vont dans « Historique » (replié, 5 par 5).
+      const waiting = data.items.filter(item => item.status === 'pending');
+      historyItems = data.items.filter(item => item.status !== 'pending');
+      el('aiFollowsList').replaceChildren(...waiting.map(followRow));
+      el('aiFollowsHistory').hidden = !historyItems.length;
+      el('aiFollowsHistoryCount').textContent = `(${historyItems.length})`;
+      renderHistory();
       const s = data.summary;
       el('aiFollowsStatus').textContent = data.items.length
         ? `${s.followed} prono(s) suivi(s) · ${s.pending} en attente` + (s.settled ? ` · ${s.winner.hits} bon(s) vainqueur(s) sur ${s.settled}` : '') + '.'
