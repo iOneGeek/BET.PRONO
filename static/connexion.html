@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Œil du Trader — Connexion</title>
+<link rel="stylesheet" href="/static/oeil.css">
+</head>
+<body class="login">
+  <main class="login-box">
+    <div class="logo">👁</div>
+    <h1>Œil du Trader</h1>
+    <p class="muted">Tes bots, partout. Lecture seule : aucun ordre ne part d'ici.</p>
+    <a class="btn" id="btnGoogle" href="/auth/google" hidden>Se connecter avec Google</a>
+    <form id="dev" hidden>
+      <p class="muted small">Mode essai local (sans Google)</p>
+      <input id="devEmail" type="email" placeholder="ton e-mail" required>
+      <button class="btn" type="submit">Entrer</button>
+    </form>
+    <p class="err" id="err"></p>
+  </main>
+<script>
+const msgs = {etat: "Session expirée, recommence.", code: "Connexion annulée.", google: "Google ne répond pas, réessaie.",
+  jeton: "Vérification Google impossible, réessaie.", email: "E-mail Google non vérifié.",
+  refuse: "Cet e-mail n'est pas autorisé sur ce site. Demande à l'administrateur de l'ajouter."};
+const e = new URLSearchParams(location.search).get("erreur");
+if (e) document.getElementById("err").textContent = msgs[e] || "Erreur de connexion.";
+fetch("/auth/info").then(r => r.json()).then(i => {
+  document.getElementById("btnGoogle").hidden = !i.google;
+  document.getElementById("dev").hidden = !i.dev;
+});
+document.getElementById("dev").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const r = await fetch("/auth/dev", {method: "POST", headers: {"Content-Type": "application/json", "X-Oeil": "1"},
+    body: JSON.stringify({email: document.getElementById("devEmail").value})});
+  if (r.ok) location.href = "/"; else document.getElementById("err").textContent = "Refusé.";
+});
+</script>
+</body>
+</html>

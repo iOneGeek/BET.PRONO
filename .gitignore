@@ -1,8 +1,13 @@
+# secrets et fichiers locaux : JAMAIS sur GitHub
+local.env
+*.env
+!.env.example
 instance/
+._test/
+.abacusai/
+.claude/
 __pycache__/
 *.pyc
-server.log
+*.log
 tmp/
-local.env
-.abacusai/
-_test/
+*.db
