@@ -26,6 +26,12 @@ SCHEMA = [
     """CREATE TABLE IF NOT EXISTS oeil_equite (
         compte_id INTEGER NOT NULL, source TEXT NOT NULL, t DOUBLE PRECISION NOT NULL, equite DOUBLE PRECISION, solde DOUBLE PRECISION,
         PRIMARY KEY (compte_id, source, t))""",
+    """CREATE TABLE IF NOT EXISTS oeil_trades (
+        compte_id INTEGER NOT NULL, source TEXT NOT NULL, ticket BIGINT NOT NULL, compte_mt5 BIGINT, symbole TEXT, sens TEXT,
+        volume DOUBLE PRECISION, ouverture_t DOUBLE PRECISION, fermeture_t DOUBLE PRECISION, prix_ouv DOUBLE PRECISION,
+        prix_ferm DOUBLE PRECISION, net DOUBLE PRECISION, devise TEXT, commentaire TEXT,
+        PRIMARY KEY (compte_id, source, ticket))""",
+    """CREATE INDEX IF NOT EXISTS oeil_trades_t ON oeil_trades (compte_id, fermeture_t)""",
     """CREATE TABLE IF NOT EXISTS oeil_bilans (
         compte_id INTEGER NOT NULL, source TEXT NOT NULL, jour TEXT NOT NULL, donnees TEXT NOT NULL, maj DOUBLE PRECISION,
         PRIMARY KEY (compte_id, source, jour))""",
@@ -92,3 +98,15 @@ def upsert(table: str, cles: tuple, valeurs: dict):
     sql = (f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))}) "
            f"ON CONFLICT ({', '.join(cles)}) DO UPDATE SET " + ", ".join(f"{c} = excluded.{c}" for c in maj))
     run(sql, tuple(valeurs[c] for c in cols))
+
+
+def upsert_many(table: str, cles: tuple, lignes: list[dict]):
+    """Insère ou met à jour plusieurs lignes en UNE requête (beaucoup plus rapide vers Neon)."""
+    if not lignes:
+        return
+    cols = list(lignes[0])
+    maj = [c for c in cols if c not in cles]
+    une = "(" + ", ".join(["%s"] * len(cols)) + ")"
+    sql = (f"INSERT INTO {table} ({', '.join(cols)}) VALUES " + ", ".join([une] * len(lignes)) +
+           f" ON CONFLICT ({', '.join(cles)}) DO UPDATE SET " + ", ".join(f"{c} = excluded.{c}" for c in maj))
+    run(sql, tuple(l[c] for l in lignes for c in cols))

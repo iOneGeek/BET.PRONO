@@ -283,6 +283,28 @@ def recevoir_etat():
     return jsonify({"ok": True, "sources": n})
 
 
+@app.post("/api/connecteur/trades")
+def recevoir_trades():
+    """22/11 : trades fermés lus dans MT5 par le connecteur (par lots), gardés pour l'historique et le bilan du soir."""
+    entete = request.headers.get("Authorization", "")
+    k = db.run("SELECT id, compte_id FROM oeil_cles WHERE empreinte = %s AND revoquee = 0",
+               (empreinte(entete[7:].strip()),), one=True) if entete.startswith("Bearer oeil_") else None
+    if not k:
+        return jsonify({"erreur": "clé inconnue"}), 401
+    L = []
+    for t in (request.get_json(silent=True) or {}).get("trades") or []:
+        if t.get("source") not in SOURCES or not isinstance(t.get("ticket"), int):
+            continue
+        L.append({"compte_id": k["compte_id"], "source": t["source"], "ticket": t["ticket"], "compte_mt5": t.get("compte"),
+                  "symbole": str(t.get("symbole") or "")[:20], "sens": str(t.get("sens") or "")[:4], "volume": t.get("volume"),
+                  "ouverture_t": t.get("ouverture_t"), "fermeture_t": t.get("fermeture_t"), "prix_ouv": t.get("prix_ouv"),
+                  "prix_ferm": t.get("prix_ferm"), "net": t.get("net"), "devise": str(t.get("devise") or "")[:4],
+                  "commentaire": str(t.get("commentaire") or "")[:40]})
+    for i in range(0, len(L), 400):
+        db.upsert_many("oeil_trades", ("compte_id", "source", "ticket"), L[i:i + 400])
+    return jsonify({"ok": True, "trades": len(L)})
+
+
 # ------------------------------------------------------------------ tableau de bord
 @app.get("/api/etats")
 @connecte
@@ -307,6 +329,34 @@ def courbe_equite():
     if rows and pts[-1] is not rows[-1]:
         pts.append(rows[-1])
     return jsonify({"source": source, "points": [[r["t"], r["equite"], r["solde"]] for r in pts]})
+
+
+def debut_jour_paris(t=None) -> float:
+    from zoneinfo import ZoneInfo
+    d = datetime.fromtimestamp(t or time.time(), ZoneInfo("Europe/Paris"))
+    return d.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+
+@app.get("/api/trades")
+@connecte
+def liste_trades():
+    """Trades fermés (exacts, lus dans MT5) : totaux par bot (aujourd'hui, 7 j, 30 j, tout) + liste filtrée."""
+    cid = compte_courant()["id"]
+    source = request.args.get("source", "")
+    jours = min(max(float(request.args.get("jours", 7) or 7), 1), 3650)
+    j0 = debut_jour_paris()
+    stats = {}
+    for nom, t in (("jour", j0), ("semaine", j0 - 6 * 86400), ("mois", j0 - 29 * 86400), ("tout", 0)):
+        for r in db.run("SELECT source, COUNT(*) AS n, SUM(net) AS net, SUM(CASE WHEN net > 0 THEN 1 ELSE 0 END) AS g, MAX(devise) AS devise "
+                        "FROM oeil_trades WHERE compte_id = %s AND fermeture_t >= %s GROUP BY source", (cid, t), all=True) or []:
+            stats.setdefault(r["source"], {})[nom] = {"n": int(r["n"]), "net": round(float(r["net"] or 0), 2), "gagnants": int(r["g"] or 0),
+                                                      "devise": r["devise"]}
+    sql, par = "SELECT * FROM oeil_trades WHERE compte_id = %s AND fermeture_t >= %s", [cid, time.time() - jours * 86400]
+    if source in SOURCES:
+        sql += " AND source = %s"; par.append(source)
+    rows = db.run(sql + " ORDER BY fermeture_t DESC LIMIT 500", tuple(par), all=True) or []
+    return jsonify({"stats": stats, "trades": [{k2: r[k2] for k2 in ("source", "ticket", "symbole", "sens", "volume", "ouverture_t", "fermeture_t",
+                                                                     "prix_ouv", "prix_ferm", "net", "devise")} for r in rows]})
 
 
 @app.get("/api/historique")

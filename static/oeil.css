@@ -97,6 +97,11 @@ nav button svg.pic { width: 22px; height: 22px; stroke: none !important; }
 .hcard { cursor: pointer; }
 .hcard.big { cursor: default; } .hcard.big:hover { transform: none; }
 
+/* ---------- mini graphique des positions, filtres de l'historique ---------- */
+.as-chart { display: block; width: 100%; height: 90px; margin-top: 8px; border-radius: 8px; background: rgba(0,0,0,.25); }
+.hsel { background: rgba(0,0,0,.35); color: var(--text); border: 1px solid rgba(231,184,74,.25); border-radius: 8px; padding: 5px 8px;
+        font: 600 12.5px "Segoe UI", system-ui, sans-serif; margin-left: 6px; }
+
 /* ---------- courbe d'équité ---------- */
 .eq-per { display: flex; gap: 4px; }
 .eq-per button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 8px; font: 700 12px "Segoe UI", system-ui, sans-serif;

@@ -97,8 +97,16 @@
 
       <section class="page" id="page-histo">
         <div class="card">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Bilans par jour</div>
-          <div class="tscroll"><table class="ptable"><thead><tr><th>Jour</th><th>Bot</th><th>Trades</th><th>Gagnants</th><th>Net</th></tr></thead><tbody id="histo"></tbody></table></div>
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>Bilan par bot <small class="muted" style="font-weight:600">· trades fermés, lus dans MT5</small></div>
+          <div class="tscroll"><table class="ptable"><thead><tr><th>Bot</th><th>Aujourd'hui</th><th>7 jours</th><th>30 jours</th><th>Depuis le début</th></tr></thead><tbody id="hStats"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Trades fermés
+            <span style="flex:1"></span>
+            <select id="hBot" class="hsel"><option value="">Tous les bots</option><option value="apex">APEX</option><option value="principal">Sonic</option><option value="allstar">ALL STAR</option><option value="manuel">Bot manuel</option></select>
+            <select id="hJours" class="hsel"><option value="1">24 h</option><option value="7" selected>7 jours</option><option value="30">30 jours</option><option value="3650">Tout</option></select></div>
+          <div class="tscroll"><table class="ptable"><thead><tr><th>Fermé le</th><th>Bot</th><th>Marché</th><th>Sens</th><th>Lot</th><th>Entrée</th><th>Sortie</th><th>Durée</th><th>Résultat</th></tr></thead><tbody id="hTrades"></tbody></table></div>
+          <div class="note" id="hNote" style="padding:8px 16px"></div>
         </div>
       </section>
 
@@ -163,12 +171,42 @@ function voyant(s, now) {
   if (s.marche_ferme) return ["closed", "MARCHÉ FERMÉ", s.marche_ferme];
   return ["idle", "EN ATTENTE", "en marche"];
 }
+/* mini graphique d'une position (comme le panneau) : bougies, entrée, SL, prix actuel */
+function miniChart(p, W = 300, H = 90) {
+  const b = (p.bougies || []).filter(x => x && x.length === 5).slice(-7);
+  if (b.length < 3) return "";
+  const core = b.flatMap(x => [x[2], x[3]]);
+  let lo = Math.min(...core), hi = Math.max(...core);
+  const span0 = hi - lo || Math.abs(hi) * 1e-4 || 1;
+  for (const v of [+p.prix, p.ouverture ? +p.ouverture : null, p.sl ? +p.sl : null]) {
+    if (v == null || !isFinite(v)) continue;
+    if (v < lo && lo - v <= 1.5 * span0) lo = v;
+    if (v > hi && v - hi <= 1.5 * span0) hi = v;
+  }
+  const pad = (hi - lo) * 0.1 || span0 * 0.1; lo -= pad; hi += pad;
+  const R = 34, cw = (W - R) / b.length, y = v => H - (v - lo) / (hi - lo) * H;
+  let g = b.map((x, i) => {
+    const c = x[4] >= x[1] ? "#6cb8ff" : "#ffab5c", cx = i * cw + cw / 2, yo = y(x[1]), yc = y(x[4]);
+    return `<line x1="${cx}" x2="${cx}" y1="${y(x[2])}" y2="${y(x[3])}" stroke="${c}" stroke-width="1"/>` +
+           `<rect x="${cx - cw * 0.32}" y="${Math.min(yo, yc)}" width="${cw * 0.64}" height="${Math.max(1, Math.abs(yc - yo))}" fill="${c}" rx="0.6"/>`;
+  }).join("");
+  const ligne = (v, col, dash, lbl) => {
+    const out = v > hi ? "↑" : v < lo ? "↓" : "", yy = Math.max(1, Math.min(H - 1, y(v)));
+    return `<line x1="0" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="${col}" stroke-width="1.2" ${dash ? `stroke-dasharray="${dash}"` : ""}${out ? ' opacity=".55"' : ""}/>` +
+      `<text x="${W - R + 3}" y="${Math.max(9, Math.min(H - 2, yy + 3))}" fill="${col}" font-size="9" font-weight="700">${lbl}${out ? " " + out : ""}</text>`;
+  };
+  if (p.ouverture) g += ligne(+p.ouverture, "#e7b84a", "4 3", "entrée");
+  if (p.sl) g += ligne(+p.sl, "#ff5c5c", "2 2", "SL");
+  const yp = Math.max(4, Math.min(H - 4, y(+p.prix))), xp = (b.length - 0.5) * cw;
+  g += `<circle cx="${xp}" cy="${yp}" r="3.2" fill="#fff" stroke="${p.profit >= 0 ? "#6cb8ff" : "#ffab5c"}" stroke-width="2"/>`;
+  return `<svg class="as-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Graphique ${esc(p.symbole)}">${g}</svg>`;
+}
 function trades(s) {
   const P = s.positions || [];
   if (!P.length) return `<div class="hc-trade wait">${s.marche_ferme ? esc(s.marche_ferme) : "Aucune position ouverte : le bot attend un signal."}</div>`;
   return P.slice(0, 4).map(p => `<div class="hc-trade"><span class="side ${p.sens || ""}">${p.sens || "—"}</span> <b>${esc(p.symbole || "")}</b>
     ${p.volume ? `<span class="muted"> · ${p.volume} lot</span>` : ""}<span class="pnl ${cls(p.profit)}">${eur(p.profit, s.devise)}</span>
-    <div class="note">prix ${p.prix ?? "—"}${p.sl ? " · SL " + p.sl : ""}${p.tp ? " · TP " + p.tp : ""}</div></div>`).join("")
+    <div class="note">prix ${p.prix ?? "—"}${p.ouverture ? " · entrée " + p.ouverture : ""}${p.sl ? " · SL " + p.sl : ""}${p.tp ? " · TP " + p.tp : ""}</div>${miniChart(p)}</div>`).join("")
     + (P.length > 4 ? `<div class="note">+ ${P.length - 4} autre(s) dans Positions</div>` : "");
 }
 function carte(k, s, now) {
@@ -281,11 +319,21 @@ async function rafraichir() {
   } catch (e) { $("sub").textContent = "Connexion au site perdue, nouvel essai…"; }
 }
 async function histo() {
-  const L = await (await fetch("/api/historique")).json();
-  $("histo").innerHTML = L.map(b => `<tr><td>${esc(b.jour)}</td><td><svg class="pic"><use href="#${BOTS[b.source]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[b.source]?.nom || b.source)}</td>
-    <td>${b.trades ?? "—"}</td><td>${b.gagnants ?? "—"}</td><td class="${cls(b.net)}">${eur(b.net)}</td></tr>`).join("")
-    || `<tr><td colspan="5" class="vide">Pas encore d'historique : il se remplit chaque jour.</td></tr>`;
+  const d = await (await fetch(`/api/trades?source=${$("hBot").value}&jours=${$("hJours").value}`)).json();
+  const cell = x => x ? `<b class="${cls(x.net)}">${eur(x.net, x.devise)}</b><div class="note">${x.n} trades · ${x.n ? Math.round(x.gagnants / x.n * 100) : 0} % gagnants</div>` : `<span class="muted">—</span>`;
+  $("hStats").innerHTML = ORDRE.filter(k => d.stats[k]).map(k => `<tr><td><svg class="pic"><use href="#${BOTS[k].pic}"/></svg> ${esc(BOTS[k].nom)}</td>
+    <td>${cell(d.stats[k].jour)}</td><td>${cell(d.stats[k].semaine)}</td><td>${cell(d.stats[k].mois)}</td><td>${cell(d.stats[k].tout)}</td></tr>`).join("")
+    || `<tr><td colspan="5" class="vide">Pas encore de trades reçus : le connecteur les envoie dans la minute qui suit son démarrage.</td></tr>`;
+  const dur = s => s < 3600 ? Math.round(s / 60) + " min" : s < 86400 ? (s / 3600).toFixed(1).replace(".", ",") + " h" : (s / 86400).toFixed(1).replace(".", ",") + " j";
+  $("hTrades").innerHTML = d.trades.map(t => `<tr><td>${new Date(t.fermeture_t * 1000).toLocaleString("fr-FR", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"})}</td>
+    <td><svg class="pic"><use href="#${BOTS[t.source]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[t.source]?.nom || t.source)}</td><td>${esc(t.symbole)}</td>
+    <td><span class="mini ${t.sens === "SELL" ? "sell" : ""}">${esc(t.sens)}</span></td><td>${t.volume}</td><td>${+Number(t.prix_ouv).toFixed(5)}</td><td>${+Number(t.prix_ferm).toFixed(5)}</td>
+    <td>${dur(t.fermeture_t - t.ouverture_t)}</td><td class="${cls(t.net)}">${eur(t.net, t.devise)}</td></tr>`).join("")
+    || `<tr><td colspan="9" class="vide">Aucun trade fermé sur cette période.</td></tr>`;
+  const tot = d.trades.reduce((a, t) => a + (t.net || 0), 0);
+  $("hNote").textContent = d.trades.length ? `${d.trades.length}${d.trades.length >= 500 ? " (les 500 derniers)" : ""} trades · total ${eur(tot)}` : "";
 }
+$("hBot").onchange = histo; $("hJours").onchange = histo;
 async function moi() {
   const m = await (await fetch("/api/moi")).json();
   $("qui").textContent = m.email;

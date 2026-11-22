@@ -153,6 +153,47 @@ def verifier_hors_ligne():
             db.upsert("oeil_alertes", ("compte_id",), {"compte_id": cid, "hors_ligne": int(hors), "maj": now})
 
 
+HEURE_BILAN = 23   # heure de Paris
+
+
+def texte_bilan(cid: int, debut: float) -> tuple[str, str] | None:
+    """Bilan des trades fermés depuis `debut` (minuit, heure de Paris), par bot. None s'il n'y a rien à dire."""
+    rows = db.run("SELECT source, COUNT(*) AS n, SUM(net) AS net, SUM(CASE WHEN net > 0 THEN 1 ELSE 0 END) AS g, MAX(devise) AS devise "
+                  "FROM oeil_trades WHERE compte_id = %s AND fermeture_t >= %s GROUP BY source", (cid, debut), all=True) or []
+    if not rows:
+        return "📊 Bilan du jour", "Aucun trade fermé aujourd'hui."
+    ordre = ["apex", "allstar", "principal", "manuel"]
+    rows.sort(key=lambda r: ordre.index(r["source"]) if r["source"] in ordre else 9)
+    parts, tot, n = [], 0.0, 0
+    for r in rows:
+        net = float(r["net"] or 0)
+        parts.append(f"{NOMS.get(r['source'], r['source'])} {eur(net, r['devise'] or 'EUR')} ({int(r['n'])})")
+        if (r["devise"] or "EUR") == "EUR":
+            tot += net
+        n += int(r["n"])
+    return f"📊 Bilan du jour : {eur(tot)}", " · ".join(parts) + f" — {n} trades"
+
+
+def verifier_bilan_soir():
+    """Une fois par jour, à 23 h (Paris) : bilan des trades fermés du jour à chaque compte qui a un téléphone abonné."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    maintenant = datetime.now(ZoneInfo("Europe/Paris"))
+    if maintenant.hour < HEURE_BILAN:
+        return
+    jour = maintenant.strftime("%Y-%m-%d")
+    debut = maintenant.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    for r in db.run("SELECT DISTINCT compte_id FROM oeil_abonnements", all=True) or []:
+        cid, cle = r["compte_id"], f"bilan_{r['compte_id']}"
+        deja = db.run("SELECT valeur FROM oeil_reglages WHERE cle = %s", (cle,), one=True)
+        if deja and deja["valeur"] == jour:
+            continue
+        db.upsert("oeil_reglages", ("cle",), {"cle": cle, "valeur": jour})
+        b = texte_bilan(cid, debut)
+        if b:
+            envoyer(cid, b[0], b[1], "bilan")
+
+
 _garde = {"lance": False}
 
 
@@ -163,9 +204,10 @@ def lancer_surveillance():
 
     def boucle():
         while True:
-            try:
-                verifier_hors_ligne()
-            except Exception:  # noqa: BLE001
-                pass
+            for f in (verifier_hors_ligne, verifier_bilan_soir):
+                try:
+                    f()
+                except Exception:  # noqa: BLE001
+                    pass
             time.sleep(60)
     threading.Thread(target=boucle, daemon=True).start()
