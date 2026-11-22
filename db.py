@@ -59,8 +59,14 @@ def _pg_pool():
             if _pool is None:
                 from psycopg_pool import ConnectionPool
                 from psycopg.rows import dict_row
-                _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=8, kwargs={"row_factory": dict_row, "autocommit": True},
-                                       open=True, timeout=15)
+                # 23/11 : le site s'était figé : une connexion inactive coupée en silence entre Render et Neon faisait attendre
+                # une requête pour toujours. Désormais : connexion vérifiée avant usage, recyclée souvent, TCP keepalive,
+                # (le pooler de Neon refuse le paramètre « options » : pas de statement_timeout ici).
+                _pool = ConnectionPool(
+                    DATABASE_URL, min_size=1, max_size=10, open=True, timeout=10,
+                    check=ConnectionPool.check_connection, max_idle=60, max_lifetime=900,
+                    kwargs={"row_factory": dict_row, "autocommit": True, "connect_timeout": 10,
+                            "keepalives": 1, "keepalives_idle": 30, "keepalives_interval": 10, "keepalives_count": 3})
     return _pool
 
 
