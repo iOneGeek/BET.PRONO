@@ -23,6 +23,9 @@ SCHEMA = [
     """CREATE TABLE IF NOT EXISTS oeil_etats (
         compte_id INTEGER NOT NULL, source TEXT NOT NULL, donnees TEXT NOT NULL, maj DOUBLE PRECISION,
         PRIMARY KEY (compte_id, source))""",
+    """CREATE TABLE IF NOT EXISTS oeil_equite (
+        compte_id INTEGER NOT NULL, source TEXT NOT NULL, t DOUBLE PRECISION NOT NULL, equite DOUBLE PRECISION, solde DOUBLE PRECISION,
+        PRIMARY KEY (compte_id, source, t))""",
     """CREATE TABLE IF NOT EXISTS oeil_bilans (
         compte_id INTEGER NOT NULL, source TEXT NOT NULL, jour TEXT NOT NULL, donnees TEXT NOT NULL, maj DOUBLE PRECISION,
         PRIMARY KEY (compte_id, source, jour))""",

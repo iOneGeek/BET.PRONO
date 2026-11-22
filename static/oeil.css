@@ -97,6 +97,26 @@ nav button svg.pic { width: 22px; height: 22px; stroke: none !important; }
 .hcard { cursor: pointer; }
 .hcard.big { cursor: default; } .hcard.big:hover { transform: none; }
 
+/* ---------- courbe d'équité ---------- */
+.eq-per { display: flex; gap: 4px; }
+.eq-per button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 8px; font: 700 12px "Segoe UI", system-ui, sans-serif;
+                 color: #d8d2c4; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); }
+.eq-per button.on { color: #1a1408; background: var(--gold-grad); border-color: transparent; }
+.eq-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 14px; margin-bottom: 6px; }
+.eq-leg { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.eq-leg i { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--gold); margin-left: 6px; }
+.eq-leg i.l-so { border-top: 2px dashed #59a8ff; }
+.eq-wrap { position: relative; }
+.eq-svg { width: 100%; height: 220px; display: block; touch-action: pan-y; }
+.eq-grid { stroke: rgba(255,255,255,.07); stroke-width: 1; }
+.eq-ax { fill: var(--muted); font: 11px "Segoe UI", system-ui, sans-serif; }
+.eq-eq { fill: none; stroke: #e7b84a; stroke-width: 2; stroke-linejoin: round; }
+.eq-so { fill: none; stroke: #59a8ff; stroke-width: 1.5; stroke-dasharray: 5 4; opacity: .85; }
+.eq-x { stroke: rgba(255,255,255,.3); stroke-width: 1; }
+.eq-dot { fill: #e7b84a; stroke: #07080a; stroke-width: 2; }
+.eq-tip { position: absolute; top: 4px; width: 150px; padding: 7px 9px; border-radius: 9px; font-size: 12px; pointer-events: none;
+          background: rgba(10,11,14,.95); border: 1px solid rgba(231,184,74,.4); box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+
 /* ---------- cartes ---------- */
 .card { background: linear-gradient(180deg, rgba(20,21,26,.94), rgba(12,13,16,.94)); border: 1px solid var(--line); border-radius: 14px; }
 .card + .card { margin-top: 14px; }

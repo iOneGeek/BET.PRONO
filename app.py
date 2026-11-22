@@ -265,6 +265,13 @@ def recevoir_etat():
             pass
         db.upsert("oeil_etats", ("compte_id", "source"),
                   {"compte_id": k["compte_id"], "source": source, "donnees": json.dumps(donnees, ensure_ascii=False), "maj": maintenant})
+        # 23/11 : point de la courbe d'équité, au plus un toutes les 5 min par bot
+        if isinstance(donnees.get("equite"), (int, float)):
+            dern = db.run("SELECT MAX(t) AS t FROM oeil_equite WHERE compte_id = %s AND source = %s", (k["compte_id"], source), one=True)
+            if not dern or not dern["t"] or maintenant - dern["t"] >= 300:
+                db.run("INSERT INTO oeil_equite (compte_id, source, t, equite, solde) VALUES (%s, %s, %s, %s, %s)",
+                       (k["compte_id"], source, maintenant, float(donnees["equite"]),
+                        float(donnees["solde"]) if isinstance(donnees.get("solde"), (int, float)) else None))
         bilan = donnees.get("bilan_jour")
         if isinstance(bilan, dict):
             jour = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -283,6 +290,23 @@ def etats():
     c = compte_courant()
     rows = db.run("SELECT source, donnees, maj FROM oeil_etats WHERE compte_id = %s", (c["id"],), all=True)
     return jsonify({"t": time.time(), "sources": {r["source"]: {"maj": r["maj"], **json.loads(r["donnees"])} for r in rows}})
+
+
+@app.get("/api/equite")
+@connecte
+def courbe_equite():
+    """Courbe d'équité d'un bot : au plus 600 points sur la période demandée (heures)."""
+    source = request.args.get("source", "")
+    if source not in SOURCES:
+        return jsonify({"erreur": "bot inconnu"}), 400
+    heures = min(max(float(request.args.get("heures", 168) or 168), 1), 24 * 3650)
+    rows = db.run("SELECT t, equite, solde FROM oeil_equite WHERE compte_id = %s AND source = %s AND t >= %s ORDER BY t",
+                  (compte_courant()["id"], source, time.time() - heures * 3600), all=True) or []
+    pas = max(1, len(rows) // 600)
+    pts = rows[::pas]
+    if rows and pts[-1] is not rows[-1]:
+        pts.append(rows[-1])
+    return jsonify({"source": source, "points": [[r["t"], r["equite"], r["solde"]] for r in pts]})
 
 
 @app.get("/api/historique")

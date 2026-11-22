@@ -72,6 +72,16 @@
 
       <section class="page" id="page-bot">
         <div id="botCard"></div>
+        <div class="card" style="margin-top:14px" id="eqCard">
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>
+            Courbe d'équité<span style="flex:1"></span>
+            <span class="eq-per" id="eqPer"><button data-h="24">24 h</button><button data-h="168" class="on">7 j</button><button data-h="720">30 j</button><button data-h="87600">Tout</button></span></div>
+          <div class="card-body">
+            <div class="eq-head"><span id="eqVar"></span><span class="eq-leg"><i class="l-eq"></i>Équité <i class="l-so"></i>Solde</span></div>
+            <div class="eq-wrap"><svg id="eqSvg" class="eq-svg" preserveAspectRatio="none"></svg><div class="eq-tip" id="eqTip" hidden></div></div>
+            <p class="note" id="eqNote"></p>
+          </div>
+        </div>
         <div class="card" style="margin-top:14px">
           <div class="card-title" id="botPosTitle">Positions ouvertes</div>
           <div class="tscroll" id="botPos"></div>
@@ -140,6 +150,7 @@ function aller(page, bot) {
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-" + page));
   botCourant = bot || null;
   if (page === "histo") histo(); if (page === "pc") moi(); if (page === "bot" && dernier) pageBot(dernier);
+  if (page === "bot") { eqData = null; courbe(true); }
   document.querySelector("main").scrollTop = 0;
 }
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => aller(b.dataset.page, b.dataset.bot));
@@ -240,6 +251,7 @@ function pageBot(d) {
   if (!s) { $("botCard").innerHTML = `<div class="card"><div class="vide">Ce bot n'envoie pas de données.</div></div>`; $("botPos").innerHTML = ""; return; }
   $("botCard").innerHTML = carte(botCourant, s, d.t).replace('class="card hcard', 'class="card hcard big');
   $("botPosTitle").textContent = "Positions ouvertes · " + (BOTS[botCourant]?.nom || botCourant);
+  $("eqCard").hidden = s.equite == null;
   const L = (s.positions || []).map(p => ({k: botCourant, dev: s.devise, ...p}));
   $("botPos").innerHTML = lignesPos(L) || `<div class="vide">Aucune position ouverte : ${esc(BOTS[botCourant]?.nom || "")} attend un signal.</div>`;
 }
@@ -259,7 +271,7 @@ async function rafraichir() {
     dernier = d;
     $("aucun").hidden = ks.length > 0;
     $("cartes").innerHTML = ks.map(k => carte(k, d.sources[k], now)).join("");
-    tablePositions(d); gauche(d); pageBot(d);
+    tablePositions(d); gauche(d); pageBot(d); courbe(false);
     const vieux = ks.length ? Math.max(...ks.map(k => now - (d.sources[k].maj || 0))) : 1e9;
     const enLigne = ks.length && vieux < 60;
     $("navDot").className = "nav-dot " + (enLigne ? "on" : "off");
@@ -289,6 +301,59 @@ async function nouvelleCle() {
   moi();
 }
 async function suppr(id) { if (confirm("Supprimer cette clé ? Le PC qui l'utilise ne pourra plus envoyer.")) { await fetch("/api/cles/" + id, {method: "DELETE", headers: H}); moi(); } }
+/* ---------- courbe d'équité (page de chaque bot) ---------- */
+let eqH = 168, eqData = null, eqT = 0;
+document.querySelectorAll("#eqPer button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#eqPer button").forEach(x => x.classList.toggle("on", x === b));
+  eqH = +b.dataset.h; courbe(true);
+});
+async function courbe(force) {
+  if (!botCourant || ($("page-bot").classList.contains("active") === false)) return;
+  if (!force && Date.now() - eqT < 60000 && eqData && eqData.source === botCourant) return dessiner();
+  eqT = Date.now();
+  try { eqData = await (await fetch(`/api/equite?source=${botCourant}&heures=${eqH}`)).json(); } catch (e) { return; }
+  dessiner();
+}
+function dessiner() {
+  const svg = $("eqSvg"), P = (eqData && eqData.points) || [], s = dernier && dernier.sources[botCourant], dev = s?.devise === "USD" ? " $" : " €";
+  if (P.length < 2) {
+    svg.innerHTML = ""; $("eqVar").textContent = "";
+    $("eqNote").textContent = "La courbe se remplit toute seule : un point toutes les 5 minutes depuis le 22/11. Reviens dans quelques heures.";
+    return;
+  }
+  $("eqNote").textContent = "";
+  const W = svg.clientWidth || 600, Hh = svg.clientHeight || 220, ml = 56, mr = 10, mt = 10, mb = 24;
+  svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`);
+  const t0 = P[0][0], t1 = P[P.length - 1][0], vals = P.flatMap(p => [p[1], p[2]]).filter(v => v != null);
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = Math.max((hi - lo) * .08, 0.5); lo -= pad; hi += pad;
+  const X = t => ml + (t - t0) / Math.max(1, t1 - t0) * (W - ml - mr), Y = v => mt + (hi - v) / (hi - lo) * (Hh - mt - mb);
+  const ligne = i => P.filter(p => p[i] != null).map((p, k) => `${k ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(p[i]).toFixed(1)}`).join("");
+  let g = "";
+  for (let k = 0; k <= 3; k++) { const v = lo + (hi - lo) * k / 3, y = Y(v);
+    g += `<line x1="${ml}" x2="${W - mr}" y1="${y}" y2="${y}" class="eq-grid"/><text x="${ml - 6}" y="${y + 4}" text-anchor="end" class="eq-ax">${num(v, 0)}</text>`; }
+  const fmtT = t => new Date(t * 1000).toLocaleString("fr-FR", eqH <= 24 ? {hour: "2-digit", minute: "2-digit"} : {day: "2-digit", month: "2-digit"});
+  g += `<text x="${ml}" y="${Hh - 6}" class="eq-ax">${fmtT(t0)}</text><text x="${W - mr}" y="${Hh - 6}" text-anchor="end" class="eq-ax">${fmtT(t1)}</text>`;
+  const aire = `M${X(P[0][0])},${Hh - mb}` + ligne(1).replace(/^M/, "L") + `L${X(t1)},${Hh - mb}Z`;
+  svg.innerHTML = `<defs><linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e7b84a" stop-opacity=".28"/><stop offset="1" stop-color="#e7b84a" stop-opacity="0"/></linearGradient></defs>
+    ${g}<path d="${aire}" fill="url(#eqFill)"/><path d="${ligne(2)}" class="eq-so"/><path d="${ligne(1)}" class="eq-eq"/>
+    <line id="eqX" class="eq-x" y1="${mt}" y2="${Hh - mb}" visibility="hidden"/><circle id="eqDot" r="4" class="eq-dot" visibility="hidden"/>`;
+  const d = P[P.length - 1][1] - P[0][1];
+  $("eqVar").innerHTML = `${num(P[P.length - 1][1])}${dev} · <b class="${cls(d)}">${(d >= 0 ? "+" : "−") + num(Math.abs(d))}${dev}</b> sur la période`;
+  svg.onpointermove = ev => {
+    const r = svg.getBoundingClientRect(), x = (ev.clientX - r.left) * W / r.width;
+    let i = 0, best = 1e18; P.forEach((p, k) => { const dx = Math.abs(X(p[0]) - x); if (dx < best) { best = dx; i = k; } });
+    const p = P[i], cx = X(p[0]), cy = Y(p[1]);
+    $("eqX").setAttribute("x1", cx); $("eqX").setAttribute("x2", cx); $("eqX").setAttribute("visibility", "visible");
+    $("eqDot").setAttribute("cx", cx); $("eqDot").setAttribute("cy", cy); $("eqDot").setAttribute("visibility", "visible");
+    const tip = $("eqTip"); tip.hidden = false;
+    tip.innerHTML = `<div class="muted">${new Date(p[0] * 1000).toLocaleString("fr-FR", {weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"})}</div>
+      <div>Équité <b>${num(p[1])}${dev}</b></div>${p[2] != null ? `<div>Solde <b>${num(p[2])}${dev}</b></div>` : ""}`;
+    tip.style.left = Math.min(r.width - 150, Math.max(0, cx * r.width / W - 75)) + "px";
+  };
+  svg.onpointerleave = () => { $("eqTip").hidden = true; $("eqX").setAttribute("visibility", "hidden"); $("eqDot").setAttribute("visibility", "hidden"); };
+}
+addEventListener("resize", () => eqData && dessiner());
+
 /* ---------- notifications (Web Push) ---------- */
 const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
 const appli = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
