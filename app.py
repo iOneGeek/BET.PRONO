@@ -177,6 +177,17 @@ def accueil():
     return send_from_directory(ICI / "static", "index.html")
 
 
+@app.get("/favicon.ico")
+def favicon():
+    return send_from_directory(ICI / "static", "favicon.ico", max_age=86400)
+
+
+@app.get("/apple-touch-icon.png")
+@app.get("/apple-touch-icon-precomposed.png")
+def icone_iphone():
+    return send_from_directory(ICI / "static", "apple-touch-icon.png", mimetype="image/png", max_age=86400)
+
+
 @app.get("/sante")
 def sante():
     try:
