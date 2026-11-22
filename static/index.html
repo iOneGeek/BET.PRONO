@@ -243,7 +243,7 @@ function carte(k, s, now) {
       ${s.solde != null ? ` · solde <b>${num(s.solde)}${s.devise === "USD" ? " $" : " €"}</b>` : ""}
       ${s.bilan_total ? ` · depuis le début <b class="${cls(s.bilan_total.net)}">${eur(s.bilan_total.net, s.devise)}</b>` : ""}</div>
     <div class="hc-kpis">
-      <div class="hc-kpi"><span>Aujourd'hui</span><b class="${cls(bj.net)}">${bj.net != null ? eur(bj.net, s.devise) : "—"}</b></div>
+      <div class="hc-kpi" title="${bj.trades != null ? `${bj.trades} trade(s) fermé(s) aujourd'hui · ${bj.gagnants ?? 0} gagnant(s)` : ""}"><span>Aujourd'hui${bj.trades != null ? ` · ${bj.trades} trade${bj.trades > 1 ? "s" : ""}` : ""}</span><b class="${cls(bj.net)}">${bj.net != null ? eur(bj.net, s.devise) : "—"}</b></div>
       <div class="hc-kpi"><span>${s.equite != null ? "Équité" : "Trades du jour"}</span><b>${s.equite != null ? num(s.equite) + (s.devise === "USD" ? " $" : " €") : (bj.trades ?? "—")}</b></div>
       <div class="hc-kpi"><span>En cours</span><b class="${P.length ? cls(latent) : ""}">${P.length ? eur(latent, s.devise) : "—"}</b></div>
     </div>${trades(s)}`;
