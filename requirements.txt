@@ -5,3 +5,5 @@ requests==2.31.0
 google-auth==2.27.0
 psycopg[binary,pool]>=3.2.10
 psycopg-pool>=3.2
+pywebpush>=1.14
+cryptography>=42

@@ -94,6 +94,18 @@
 
       <section class="page" id="page-pc">
         <div class="card">
+          <div class="card-title"><span style="font-size:20px">🔔</span>Notifications sur ce téléphone</div>
+          <div class="card-body">
+            <p class="note">Tu reçois une notification à chaque <b>trade ouvert</b> ou <b>fermé</b> (avec le résultat), et si ton <b>PC passe hors ligne</b> plus de 2 minutes.</p>
+            <p class="note" id="notifEtat">…</p>
+            <div class="addpc">
+              <button class="btn" id="bNotifOn" onclick="notifActiver()">🔔 Activer les notifications</button>
+              <button class="btn sec" id="bNotifTest" onclick="notifEssai()" hidden>Envoyer un essai</button>
+              <button class="btn sec" id="bNotifOff" onclick="notifDesactiver()" hidden>Désactiver sur cet appareil</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Mes PC connectés</div>
           <div class="card-body">
             <p class="note">Chaque PC où tournent tes bots envoie son état au site avec une clé personnelle. La clé ne s'affiche qu'une fois :
@@ -277,6 +289,45 @@ async function nouvelleCle() {
   moi();
 }
 async function suppr(id) { if (confirm("Supprimer cette clé ? Le PC qui l'utilise ne pourra plus envoyer.")) { await fetch("/api/cles/" + id, {method: "DELETE", headers: H}); moi(); } }
+/* ---------- notifications (Web Push) ---------- */
+const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const appli = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let swReg = null;
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", {scope: "/"}).then(r => { swReg = r; notifEtat(); }).catch(() => notifEtat());
+const b64u = s => { const p = "=".repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...b].map(c => c.charCodeAt(0))); };
+async function notifEtat() {
+  const e = $("notifEtat"), on = $("bNotifOn"), t = $("bNotifTest"), off = $("bNotifOff");
+  if (iOS && !appli) { e.innerHTML = "📲 Sur iPhone, ouvre d'abord le site depuis son <b>icône sur l'écran d'accueil</b> (Partager → Sur l'écran d'accueil), puis reviens ici."; on.hidden = true; return; }
+  if (!("PushManager" in window) || !swReg) { e.textContent = "Ce navigateur ne gère pas les notifications web (iPhone : iOS 16.4 ou plus récent)."; on.hidden = true; return; }
+  const sub = await swReg.pushManager.getSubscription();
+  const info = await (await fetch("/api/notif")).json();
+  if (Notification.permission === "denied") e.textContent = "Notifications refusées : réactive-les dans Réglages → Notifications → Œil du Trader.";
+  else e.textContent = sub ? `✅ Activées sur cet appareil (${info.appareils} appareil(s) au total).` : `Pas encore activées sur cet appareil${info.appareils ? ` (${info.appareils} autre(s) appareil(s) déjà actif(s))` : ""}.`;
+  on.hidden = !!sub; t.hidden = off.hidden = !sub;
+}
+async function notifActiver() {
+  try {
+    if (await Notification.requestPermission() !== "granted") return notifEtat();
+    const info = await (await fetch("/api/notif")).json();
+    if (!info.cle) return alert("Le site n'a pas encore ses clés de notification, réessaie dans une minute.");
+    const sub = await swReg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: b64u(info.cle)});
+    const appareil = iOS ? "iPhone" : (navigator.userAgentData?.platform || "ordinateur");
+    const r = await fetch("/api/notif/abonner", {method: "POST", headers: H, body: JSON.stringify({abonnement: sub.toJSON(), appareil})});
+    if (!r.ok) alert("Activation refusée par le site.");
+    await notifEssai(true);
+  } catch (err) { alert("Impossible d'activer : " + err.message); }
+  notifEtat();
+}
+async function notifEssai(silencieux) {
+  const d = await (await fetch("/api/notif/essai", {method: "POST", headers: H})).json();
+  if (!silencieux && !d.ok) alert("Aucune notification envoyée : désactive puis réactive les notifications.");
+}
+async function notifDesactiver() {
+  const sub = swReg && await swReg.pushManager.getSubscription();
+  if (sub) { await fetch("/api/notif/desabonner", {method: "POST", headers: H, body: JSON.stringify({endpoint: sub.endpoint})}); await sub.unsubscribe(); }
+  notifEtat();
+}
+
 moi(); rafraichir(); setInterval(rafraichir, 3000);
 </script>
 </body>

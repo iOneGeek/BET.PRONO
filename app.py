@@ -28,6 +28,7 @@ import requests
 from flask import Flask, abort, jsonify, redirect, request, send_from_directory, session
 
 import db
+import notif
 
 ICI = Path(__file__).parent
 SUR_RENDER = bool(os.getenv("RENDER"))
@@ -53,6 +54,12 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config.update(SECRET_KEY=SECRET_KEY, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   SESSION_COOKIE_SECURE=SUR_RENDER, PERMANENT_SESSION_LIFETIME=30 * 86400, MAX_CONTENT_LENGTH=TAILLE_MAX)
 db.init()
+notif.init()
+
+
+@app.before_request
+def _surveillance():
+    notif.lancer_surveillance()   # alerte « PC hors ligne » (une seule fois par processus)
 
 
 # ------------------------------------------------------------------ comptes
@@ -250,6 +257,12 @@ def recevoir_etat():
     for source, donnees in (corps.get("sources") or {}).items():
         if source not in SOURCES or not isinstance(donnees, dict):
             continue
+        ancien = db.run("SELECT donnees FROM oeil_etats WHERE compte_id = %s AND source = %s", (k["compte_id"], source), one=True)
+        try:
+            for titre, texte, tag in notif.evenements(source, json.loads(ancien["donnees"]) if ancien else None, donnees):
+                notif.envoyer_fond(k["compte_id"], titre, texte, tag)
+        except Exception:  # noqa: BLE001
+            pass
         db.upsert("oeil_etats", ("compte_id", "source"),
                   {"compte_id": k["compte_id"], "source": source, "donnees": json.dumps(donnees, ensure_ascii=False), "maj": maintenant})
         bilan = donnees.get("bilan_jour")
@@ -279,6 +292,53 @@ def historique():
     rows = db.run("SELECT source, jour, donnees FROM oeil_bilans WHERE compte_id = %s ORDER BY jour DESC LIMIT 400",
                   (c["id"],), all=True)
     return jsonify([{"source": r["source"], "jour": r["jour"], **json.loads(r["donnees"])} for r in rows])
+
+
+# ------------------------------------------------------------------ notifications sur le téléphone
+@app.get("/sw.js")
+def service_worker():
+    r = send_from_directory(ICI / "static", "sw.js", mimetype="application/javascript")
+    r.headers["Service-Worker-Allowed"] = "/"
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
+@app.get("/api/notif")
+@connecte
+def notif_info():
+    try:
+        pub = notif.cles()[1]
+    except Exception:  # noqa: BLE001
+        pub = None
+    return jsonify({"cle": pub, "appareils": notif.nb_abonnements(compte_courant()["id"])})
+
+
+@app.post("/api/notif/abonner")
+@connecte
+def notif_abonner():
+    anti_csrf()
+    d = request.get_json(silent=True) or {}
+    try:
+        notif.abonner(compte_courant()["id"], d.get("abonnement") or {}, d.get("appareil") or "")
+    except ValueError as e:
+        return jsonify({"erreur": str(e)}), 400
+    return jsonify({"ok": True, "appareils": notif.nb_abonnements(compte_courant()["id"])})
+
+
+@app.post("/api/notif/desabonner")
+@connecte
+def notif_desabonner():
+    anti_csrf()
+    notif.desabonner(compte_courant()["id"], (request.get_json(silent=True) or {}).get("endpoint") or "")
+    return jsonify({"ok": True})
+
+
+@app.post("/api/notif/essai")
+@connecte
+def notif_essai():
+    anti_csrf()
+    n = notif.envoyer(compte_courant()["id"], "👁 Œil du Trader", "Les notifications marchent ! Tu seras prévenu à chaque trade et si ton PC passe hors ligne.", "essai")
+    return jsonify({"ok": n > 0, "envois": n})
 
 
 @app.after_request
