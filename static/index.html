@@ -155,6 +155,7 @@ function carte(k, s, now) {
     <div class="hc-top"><span class="hc-name"><svg class="pic"><use href="#${b.pic}"/></svg>${esc(b.nom)}</span>
       <i class="sdot ${v}" title="${esc(info)}"></i><span class="hc-state">${etat}</span></div>
     <div class="hc-sub">${s.compte ? `Compte ${esc(s.compte)} · ${s.reel ? "réel" : "démo"} · ` : ""}${esc(s.strategie || (k === "allstar" ? "mode " + (s.mode || "—") + (s.risque_eur ? " · " + s.risque_eur + " € de risque" : "") : ""))}
+      ${s.solde != null ? ` · solde <b>${num(s.solde)}${s.devise === "USD" ? " $" : " €"}</b>` : ""}
       ${s.bilan_total ? ` · depuis le début <b class="${cls(s.bilan_total.net)}">${eur(s.bilan_total.net, s.devise)}</b>` : ""}</div>
     <div class="hc-kpis">
       <div class="hc-kpi"><span>Aujourd'hui</span><b class="${cls(bj.net)}">${bj.net != null ? eur(bj.net, s.devise) : "—"}</b></div>
