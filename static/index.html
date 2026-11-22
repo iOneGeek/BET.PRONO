@@ -34,16 +34,33 @@
     <nav>
       <button class="active" data-page="home">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
-        <span>Tableau de bord</span><i class="nav-dot" id="navDot"></i></button>
+        <span><span class="long">Tableau de bord</span><span class="court" style="display:none">Accueil</span></span><i class="nav-dot" id="navDot"></i></button>
+      <button data-page="bot" data-bot="apex" class="reel-on" hidden>
+        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><use href="#pic-apex"/></svg>
+        <span>APEX<b class="reel-tag">€ RÉEL</b></span><i class="nav-dot" data-dot="apex"></i></button>
+      <button data-page="bot" data-bot="principal" hidden>
+        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><use href="#pic-sonic"/></svg>
+        <span>Sonic</span><i class="nav-dot" data-dot="principal"></i></button>
+      <button data-page="bot" data-bot="allstar" hidden>
+        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><use href="#pic-star"/></svg>
+        <span>ALL STAR</span><i class="nav-dot" data-dot="allstar"></i></button>
+      <button data-page="bot" data-bot="manuel" hidden>
+        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><use href="#pic-man"/></svg>
+        <span>Manuel</span><i class="nav-dot" data-dot="manuel"></i></button>
       <button data-page="positions">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>
         <span>Positions</span></button>
       <button data-page="histo">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
-        <span>Historique</span></button>
+        <span><span class="long">Historique</span><span class="court" style="display:none">Histo.</span></span></button>
       <button data-page="pc">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
         <span>Mes PC</span></button>
+      <div id="navSums"></div>
+      <div class="nav-news" id="navNews" hidden>
+        <div class="ns-title"><span class="nn-ic">📅</span>Agenda</div>
+        <div id="newsBody"></div>
+      </div>
       <svg class="ghost" viewBox="0 0 220 130"><use href="#logo"/></svg>
     </nav>
 
@@ -51,6 +68,14 @@
       <section class="page active" id="page-home">
         <div class="home-grid" id="cartes"></div>
         <div class="card" id="aucun" hidden><div class="vide">Aucune donnée reçue pour l'instant : va dans <b>Mes PC</b>, crée une clé et lance le connecteur sur ton PC.</div></div>
+      </section>
+
+      <section class="page" id="page-bot">
+        <div id="botCard"></div>
+        <div class="card" style="margin-top:14px">
+          <div class="card-title" id="botPosTitle">Positions ouvertes</div>
+          <div class="tscroll" id="botPos"></div>
+        </div>
       </section>
 
       <section class="page" id="page-positions">
@@ -97,11 +122,15 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&
 const cls = x => (x || 0) >= 0 ? "pos" : "neg";
 let dernier = null;
 
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("nav button").forEach(o => o.classList.toggle("active", o === b));
-  document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-" + b.dataset.page));
-  if (b.dataset.page === "histo") histo(); if (b.dataset.page === "pc") moi();
-});
+let botCourant = null;
+function aller(page, bot) {
+  document.querySelectorAll("nav button").forEach(o => o.classList.toggle("active", o.dataset.page === page && (o.dataset.bot || null) === (bot || null)));
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-" + page));
+  botCourant = bot || null;
+  if (page === "histo") histo(); if (page === "pc") moi(); if (page === "bot" && dernier) pageBot(dernier);
+  document.querySelector("main").scrollTop = 0;
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => aller(b.dataset.page, b.dataset.bot));
 async function sortir() { await fetch("/auth/sortie", {method: "POST", headers: H}); location.href = "/connexion"; }
 
 function voyant(s, now) {
@@ -122,10 +151,10 @@ function trades(s) {
 function carte(k, s, now) {
   const b = BOTS[k] || {pic: "pic-sonic", nom: s.nom || k}, [v, etat, info] = voyant(s, now), bj = s.bilan_jour || {};
   const P = s.positions || [], latent = P.reduce((a, p) => a + (p.profit || 0), 0);
-  let h = `<div class="card hcard${s.reel ? " reel" : ""}">
+  let h = `<div class="card hcard${s.reel ? " reel" : ""}" onclick="aller('bot','${k}')" title="Ouvrir la page du bot">
     <div class="hc-top"><span class="hc-name"><svg class="pic"><use href="#${b.pic}"/></svg>${esc(b.nom)}</span>
       <i class="sdot ${v}" title="${esc(info)}"></i><span class="hc-state">${etat}</span></div>
-    <div class="hc-sub">${esc(s.strategie || (k === "allstar" ? "ALL STAR · mode " + (s.mode || "—") + (s.risque_eur ? " · " + s.risque_eur + " € de risque" : "") : s.reel ? "Compte réel" : "Compte démo"))}
+    <div class="hc-sub">${s.compte ? `Compte ${esc(s.compte)} · ${s.reel ? "réel" : "démo"} · ` : ""}${esc(s.strategie || (k === "allstar" ? "mode " + (s.mode || "—") + (s.risque_eur ? " · " + s.risque_eur + " € de risque" : "") : ""))}
       ${s.bilan_total ? ` · depuis le début <b class="${cls(s.bilan_total.net)}">${eur(s.bilan_total.net, s.devise)}</b>` : ""}</div>
     <div class="hc-kpis">
       <div class="hc-kpi"><span>Aujourd'hui</span><b class="${cls(bj.net)}">${bj.net != null ? eur(bj.net, s.devise) : "—"}</b></div>
@@ -148,6 +177,59 @@ function carte(k, s, now) {
     `<div><span>${esc(d.t)} · ${esc(d.symbole)}</span><b class="${cls(d.net)}">${eur(d.net, s.devise)}</b></div>`).join("") + `</div>`;
   return h + `</div>`;
 }
+/* barre de gauche : voyants du menu, résumés APEX / Sonic, agenda (comme le panneau PC) */
+const DOT = {idle: "on", busy: "on", closed: "closed", off: "off"};
+function gauche(d) {
+  const now = d.t;
+  for (const k of ORDRE) {
+    const s = d.sources[k], b = document.querySelector(`nav button[data-bot="${k}"]`);
+    if (b) b.hidden = !s;
+    const dot = document.querySelector(`[data-dot="${k}"]`);
+    if (dot && s) dot.className = "nav-dot " + DOT[voyant(s, now)[0]];
+  }
+  const sums = ["apex", "principal"].filter(k => d.sources[k]).map(k => {
+    const s = d.sources[k], bj = s.bilan_jour || {}, dev = s.devise === "USD" ? " USD" : " EUR", [v] = voyant(s, now);
+    const n = (s.positions || []).length;
+    const ligne = (lbl, val) => val == null ? "" : `<div class="ns-row"><span>${lbl}</span><b>${val}</b></div>`;
+    return `<div class="nav-sum${s.reel ? " reel" : ""}" onclick="aller('bot','${k}')" title="Ouvrir la page du bot">
+      <div class="ns-title"><svg class="pic"><use href="#${BOTS[k].pic}"/></svg>${esc(BOTS[k].nom)}${s.reel ? `<b class="reel-tag">€ RÉEL</b>` : `<small class="ns-tag">bot</small>`}<i class="sdot ${v}"></i></div>
+      <div class="ns-day"><span>Aujourd'hui</span><b class="${cls(bj.net)}">${bj.net != null ? (bj.net >= 0 ? "+" : "−") + num(Math.abs(bj.net)) + dev : "—"}</b></div>
+      ${ligne("Solde", s.solde != null ? num(s.solde) + dev : null)}${ligne("Équité", s.equite != null ? num(s.equite) + dev : null)}
+      ${ligne("Positions", `${n}${s.max_positions ? " / " + s.max_positions : ""}`)}</div>`;
+  }).join("");
+  if ($("navSums")._h !== sums) { $("navSums").innerHTML = sums; $("navSums")._h = sums; }
+  // agenda des annonces (envoyé par le bot principal)
+  const p = d.sources.principal, box = $("navNews");
+  box.hidden = !(p && "agenda" in p);
+  if (!box.hidden) {
+    box.classList.toggle("live", !!p.annonce);
+    const m = p.annonce && p.annonce.match(/: (.+) à (\d\d:\d\d) \(pas de trade de (\d\d:\d\d) à (\d\d:\d\d)\)/);
+    const etat = p.annonce ? `<div class="nn-state live">⏸ Pas de trade${m ? `<br>${esc(m[1])} à ${m[2]}<br>reprise à ${m[4]}` : `<br>${esc(p.annonce)}`}</div>`
+                           : `<div class="nn-state calm">✅ Rien d'important dans l'immédiat</div>`;
+    const groupes = [];
+    for (const e of p.agenda || []) { const g = groupes.find(x => x.quand === e.quand); if (g) g.items.push(e); else groupes.push({quand: e.quand, info: e.info, en_cours: e.en_cours, items: [e]}); }
+    const f = v => esc(String(v || "—").replace(".", ","));
+    const html = etat + (groupes.map(g => `<div class="nn-ev${g.en_cours ? " now" : ""}"><div class="nn-when">${esc(g.quand)}</div>
+      ${g.items.map(e => `<div class="nn-name">${esc(e.titre)}</div><div class="nn-num">Prévu ${f(e.prevision)} · Précédent ${f(e.precedent)}</div>`).join("")}
+      <div class="nn-info">${esc(g.info)}</div></div>`).join("") || `<div class="nn-info">Plus d'annonce importante cette semaine.</div>`);
+    if (box._h !== html) { $("newsBody").innerHTML = html; box._h = html; }
+  }
+}
+function lignesPos(L) {
+  return L.length ? `<table class="ptable"><thead><tr><th>Bot</th><th>Marché</th><th>Sens</th><th>Lot</th><th>Prix</th><th>SL</th><th>TP</th><th>Résultat</th></tr></thead><tbody>` +
+    L.map(p => `<tr><td><svg class="pic"><use href="#${BOTS[p.k]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[p.k]?.nom || p.k)}</td><td>${esc(p.symbole)}</td>
+      <td>${p.sens ? `<span class="mini ${p.sens === "SELL" ? "sell" : ""}">${p.sens}</span>` : "—"}</td><td>${p.volume ?? "—"}</td><td>${p.prix ?? "—"}</td>
+      <td>${p.sl || "—"}</td><td>${p.tp || "—"}</td><td class="${cls(p.profit)}">${eur(p.profit, p.dev)}</td></tr>`).join("") + `</tbody></table>` : "";
+}
+function pageBot(d) {
+  if (!botCourant) return;
+  const s = d.sources[botCourant];
+  if (!s) { $("botCard").innerHTML = `<div class="card"><div class="vide">Ce bot n'envoie pas de données.</div></div>`; $("botPos").innerHTML = ""; return; }
+  $("botCard").innerHTML = carte(botCourant, s, d.t).replace('class="card hcard', 'class="card hcard big');
+  $("botPosTitle").textContent = "Positions ouvertes · " + (BOTS[botCourant]?.nom || botCourant);
+  const L = (s.positions || []).map(p => ({k: botCourant, dev: s.devise, ...p}));
+  $("botPos").innerHTML = lignesPos(L) || `<div class="vide">Aucune position ouverte : ${esc(BOTS[botCourant]?.nom || "")} attend un signal.</div>`;
+}
 function tablePositions(d) {
   const L = [];
   for (const k of ORDRE) for (const p of (d.sources[k]?.positions || [])) L.push({k, dev: d.sources[k].devise, ...p});
@@ -164,7 +246,7 @@ async function rafraichir() {
     dernier = d;
     $("aucun").hidden = ks.length > 0;
     $("cartes").innerHTML = ks.map(k => carte(k, d.sources[k], now)).join("");
-    tablePositions(d);
+    tablePositions(d); gauche(d); pageBot(d);
     const vieux = ks.length ? Math.max(...ks.map(k => now - (d.sources[k].maj || 0))) : 1e9;
     const enLigne = ks.length && vieux < 60;
     $("navDot").className = "nav-dot " + (enLigne ? "on" : "off");
