@@ -2,99 +2,176 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Œil du Trader</title>
 <link rel="stylesheet" href="/static/oeil.css">
 </head>
 <body>
-<header class="top">
-  <span style="font-size:22px">👁</span><h1>Œil du Trader</h1>
-  <span class="sp"></span>
-  <span class="muted small" id="qui"></span>
-  <button class="btn sec mini" onclick="sortir()">Déconnexion</button>
-</header>
-<nav class="tabs">
-  <button class="on" data-t="bots">Mes bots</button>
-  <button data-t="histo">Historique</button>
-  <button data-t="pc">Mes PC</button>
-</nav>
-<main class="wrap">
-  <section id="t-bots"><div class="grid" id="cartes"></div>
-    <p class="note" id="aucun" hidden>Aucune donnée reçue pour l'instant. Va dans « Mes PC », crée une clé et lance le connecteur sur ton PC.</p>
-  </section>
-  <section id="t-histo" hidden><div class="card"><h2>Bilans par jour</h2><div class="body"><table class="t"><thead><tr><th>Jour</th><th>Bot</th><th>Trades</th><th>Gagnants</th><th>Net</th></tr></thead><tbody id="histo"></tbody></table></div></div></section>
-  <section id="t-pc" hidden>
-    <div class="card"><h2>Mes PC connectés</h2><div class="body">
-      <p class="note">Chaque PC où tournent tes bots envoie son état au site avec une clé personnelle. La clé ne s'affiche qu'une fois :
-        copie-la dans <code>config.env</code> de ton PC (<code>EN_LIGNE_CLE=…</code>). Ne la partage avec personne.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><input id="nomPc" placeholder="Nom du PC (ex. PC bureau)" maxlength="40"><button class="btn" onclick="nouvelleCle()">Créer une clé</button></div>
-      <div id="nouvelle"></div>
-      <table class="t"><thead><tr><th>PC</th><th>Clé</th><th>Créée</th><th>Dernier envoi</th><th></th></tr></thead><tbody id="cles"></tbody></table>
-    </div></div>
-  </section>
-</main>
+<script src="/static/oeil.js"></script>
+<div class="app">
+  <header>
+    <svg class="logo" viewBox="0 0 220 130"><use href="#logo"/></svg>
+    <div class="sep"></div>
+    <div class="titles">
+      <h1>Œil du Trader</h1>
+      <div class="sub" id="sub">Connexion…</div>
+    </div>
+    <div class="hright">
+      <span class="chip" id="qui"></span>
+      <button class="btn sec mini" onclick="sortir()" title="Déconnexion">⏻ <span>Sortir</span></button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav>
+      <button class="active" data-page="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+        <span>Tableau de bord</span><i class="nav-dot" id="navDot"></i></button>
+      <button data-page="positions">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>
+        <span>Positions</span></button>
+      <button data-page="histo">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+        <span>Historique</span></button>
+      <button data-page="pc">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+        <span>Mes PC</span></button>
+      <svg class="ghost" viewBox="0 0 220 130"><use href="#logo"/></svg>
+    </nav>
+
+    <main>
+      <section class="page active" id="page-home">
+        <div class="home-grid" id="cartes"></div>
+        <div class="card" id="aucun" hidden><div class="vide">Aucune donnée reçue pour l'instant : va dans <b>Mes PC</b>, crée une clé et lance le connecteur sur ton PC.</div></div>
+      </section>
+
+      <section class="page" id="page-positions">
+        <div class="card">
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>Positions ouvertes · tous les bots</div>
+          <div class="tscroll" id="posTable"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-histo">
+        <div class="card">
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Bilans par jour</div>
+          <div class="tscroll"><table class="ptable"><thead><tr><th>Jour</th><th>Bot</th><th>Trades</th><th>Gagnants</th><th>Net</th></tr></thead><tbody id="histo"></tbody></table></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-pc">
+        <div class="card">
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Mes PC connectés</div>
+          <div class="card-body">
+            <p class="note">Chaque PC où tournent tes bots envoie son état au site avec une clé personnelle. La clé ne s'affiche qu'une fois :
+              colle-la dans <code>config.env</code> de ton PC (<code>EN_LIGNE_CLE=…</code>). Ne la partage avec personne.</p>
+            <div class="addpc"><input id="nomPc" placeholder="Nom du PC (ex. PC maison)" maxlength="40"><button class="btn" onclick="nouvelleCle()">+ Créer une clé</button></div>
+            <div id="nouvelle"></div>
+          </div>
+          <div class="tscroll"><table class="ptable"><thead><tr><th>PC</th><th>Clé</th><th>Créée</th><th>Dernier envoi</th><th></th></tr></thead><tbody id="cles"></tbody></table></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 const H = {"Content-Type": "application/json", "X-Oeil": "1"};
+const BOTS = {
+  apex: {pic: "pic-apex", nom: "APEX"}, allstar: {pic: "pic-star", nom: "ALL STAR"},
+  principal: {pic: "pic-sonic", nom: "Sonic"}, manuel: {pic: "pic-man", nom: "Bot manuel"}};
 const ORDRE = ["apex", "allstar", "principal", "manuel"];
 const eur = (x, dev) => x == null ? "—" : (x >= 0 ? "+" : "−") + Math.abs(x).toLocaleString("fr-FR", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + (dev === "USD" ? " $" : " €");
 const num = (x, d = 2) => x == null ? "—" : Number(x).toLocaleString("fr-FR", {minimumFractionDigits: d, maximumFractionDigits: d});
 const quand = t => t ? new Date(t * 1000).toLocaleString("fr-FR", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"}) : "jamais";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
-let decal = 0;
+const cls = x => (x || 0) >= 0 ? "pos" : "neg";
+let dernier = null;
 
-document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("nav.tabs button").forEach(x => x.classList.toggle("on", x === b));
-  ["bots", "histo", "pc"].forEach(t => $("t-" + t).hidden = t !== b.dataset.t);
-  if (b.dataset.t === "histo") histo(); if (b.dataset.t === "pc") moi();
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(o => o.classList.toggle("active", o === b));
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-" + b.dataset.page));
+  if (b.dataset.page === "histo") histo(); if (b.dataset.page === "pc") moi();
 });
 async function sortir() { await fetch("/auth/sortie", {method: "POST", headers: H}); location.href = "/connexion"; }
 
-function point(s, now) {
-  const age = now - (s.maj || 0);
-  if (age > 60) return ["off", "PC hors ligne depuis " + quand(s.maj)];
-  if (s.marche_ferme) return ["warn", s.marche_ferme];
-  if (s.etat && s.etat !== "auto") return ["warn", "bot : " + s.etat];
-  return ["ok", "en marche"];
+function voyant(s, now) {
+  if (now - (s.maj || 0) > 60) return ["off", "HORS LIGNE", "PC hors ligne depuis " + quand(s.maj)];
+  if (s.etat && s.etat !== "auto") return ["closed", "ARRÊTÉ", "bot : " + s.etat];
+  if ((s.positions || []).length) return ["busy", "EN TRADE", "position en cours"];
+  if (s.marche_ferme) return ["closed", "MARCHÉ FERMÉ", s.marche_ferme];
+  return ["idle", "EN ATTENTE", "en marche"];
 }
-function tabPos(P, dev) {
-  if (!P || !P.length) return `<div class="vide">Aucune position ouverte.</div>`;
-  return `<table class="t"><thead><tr><th>Marché</th><th>Sens</th><th>Lot</th><th>Prix</th><th>SL</th><th>Profit</th></tr></thead><tbody>` +
-    P.map(p => `<tr><td>${esc(p.symbole)}</td><td>${p.sens === "BUY" ? "▲ BUY" : p.sens === "SELL" ? "▼ SELL" : "—"}</td><td>${p.volume ?? "—"}</td>
-      <td>${p.prix ?? "—"}</td><td>${p.sl || "—"}</td><td class="${p.profit >= 0 ? "pos" : "neg"}">${eur(p.profit, dev)}</td></tr>`).join("") + `</tbody></table>`;
+function trades(s) {
+  const P = s.positions || [];
+  if (!P.length) return `<div class="hc-trade wait">${s.marche_ferme ? esc(s.marche_ferme) : "Aucune position ouverte : le bot attend un signal."}</div>`;
+  return P.slice(0, 4).map(p => `<div class="hc-trade"><span class="side ${p.sens || ""}">${p.sens || "—"}</span> <b>${esc(p.symbole || "")}</b>
+    ${p.volume ? `<span class="muted"> · ${p.volume} lot</span>` : ""}<span class="pnl ${cls(p.profit)}">${eur(p.profit, s.devise)}</span>
+    <div class="note">prix ${p.prix ?? "—"}${p.sl ? " · SL " + p.sl : ""}${p.tp ? " · TP " + p.tp : ""}</div></div>`).join("")
+    + (P.length > 4 ? `<div class="note">+ ${P.length - 4} autre(s) dans Positions</div>` : "");
 }
 function carte(k, s, now) {
-  const [cl, txt] = point(s, now), dev = s.devise, bj = s.bilan_jour || {};
-  const latent = (s.positions || []).reduce((a, p) => a + (p.profit || 0), 0);
-  let html = `<div class="card"><h2><span class="dot ${cl}" title="${esc(txt)}"></span>${esc(s.nom || k)}
-    <span class="tag ${s.reel ? "reel" : ""}">${s.reel ? "€ RÉEL" : "DÉMO"}</span><span class="muted small" style="margin-left:auto">${esc(txt)}</span></h2><div class="body">`;
-  html += `<div class="kpis"><div class="kpi"><span>Aujourd'hui</span><b class="${(bj.net || 0) >= 0 ? "pos" : "neg"}">${eur(bj.net, dev)}</b></div>
-    <div class="kpi"><span>${s.equite != null ? "Équité" : "Trades du jour"}</span><b>${s.equite != null ? num(s.equite) : (bj.trades ?? "—")}</b></div>
-    <div class="kpi"><span>En cours</span><b class="${latent >= 0 ? "pos" : "neg"}">${(s.positions || []).length ? eur(latent, dev) : "—"}</b></div></div>`;
-  if (s.strategie) html += `<div class="ligne"><span>Stratégie</span><b>${esc(s.strategie)}</b></div>`;
-  if (s.radar && s.radar.score != null) html += `<div class="ligne"><span>Radar ${esc(s.radar.heure || "")}</span><b>${s.radar.score}/100 · ${esc(s.radar.sens || "")} · ${esc(s.radar.decision || "")}</b></div>`;
-  if (s.bilan_total) html += `<div class="ligne"><span>Depuis le début</span><b class="${s.bilan_total.net >= 0 ? "pos" : "neg"}">${eur(s.bilan_total.net, dev)} · ${s.bilan_total.trades} trades</b></div>`;
-  if (s.positions) html += tabPos(s.positions, dev);
-  if (s.top && s.top.length) {
-    html += `<div class="note" style="margin-top:10px">Classement (seuil ${s.score_min ?? "—"}) :</div>` + s.top.slice(0, 5).map(t =>
-      `<div class="ligne"><span style="min-width:80px">${esc(t.symbole)}</span><div class="bar"><i style="width:${t.score}%"></i></div><b>${t.score} ${t.sens === "BUY" ? "▲" : "▼"}${t.spread_ok === false ? " ⛔" : ""}</b></div>`).join("");
+  const b = BOTS[k] || {pic: "pic-sonic", nom: s.nom || k}, [v, etat, info] = voyant(s, now), bj = s.bilan_jour || {};
+  const P = s.positions || [], latent = P.reduce((a, p) => a + (p.profit || 0), 0);
+  let h = `<div class="card hcard${s.reel ? " reel" : ""}">
+    <div class="hc-top"><span class="hc-name"><svg class="pic"><use href="#${b.pic}"/></svg>${esc(b.nom)}</span>
+      <i class="sdot ${v}" title="${esc(info)}"></i><span class="hc-state">${etat}</span></div>
+    <div class="hc-sub">${esc(s.strategie || (k === "allstar" ? "ALL STAR · mode " + (s.mode || "—") + (s.risque_eur ? " · " + s.risque_eur + " € de risque" : "") : s.reel ? "Compte réel" : "Compte démo"))}
+      ${s.bilan_total ? ` · depuis le début <b class="${cls(s.bilan_total.net)}">${eur(s.bilan_total.net, s.devise)}</b>` : ""}</div>
+    <div class="hc-kpis">
+      <div class="hc-kpi"><span>Aujourd'hui</span><b class="${cls(bj.net)}">${bj.net != null ? eur(bj.net, s.devise) : "—"}</b></div>
+      <div class="hc-kpi"><span>${s.equite != null ? "Équité" : "Trades du jour"}</span><b>${s.equite != null ? num(s.equite) + (s.devise === "USD" ? " $" : " €") : (bj.trades ?? "—")}</b></div>
+      <div class="hc-kpi"><span>En cours</span><b class="${P.length ? cls(latent) : ""}">${P.length ? eur(latent, s.devise) : "—"}</b></div>
+    </div>${trades(s)}`;
+  if (s.radar && s.radar.score != null) {
+    const ok = s.radar.score >= (s.radar.seuil || 70);
+    h += `<div class="hc-radar"><span class="muted">Radar ${esc(s.radar.heure || "")}</span><span class="side ${s.radar.sens}">${esc(s.radar.sens || "")}</span>
+      <span class="g"><i class="${ok ? "ok" : ""}" style="width:${s.radar.score}%"></i></span><b>${s.radar.score}</b><span class="verdict">${esc(s.radar.decision || "")}</span></div>`;
   }
-  if (s.derniers && s.derniers.length) html += `<div class="note" style="margin-top:10px">Derniers trades :</div>` + s.derniers.slice(0, 5).map(d =>
-    `<div class="ligne"><span>${esc(d.t)} ${esc(d.symbole)}</span><b class="${d.net >= 0 ? "pos" : "neg"}">${eur(d.net, dev)}</b></div>`).join("");
-  return html + `</div></div>`;
+  if (s.top && s.top.length) {
+    const seuil = s.score_min || 90;
+    h += `<div class="as-top"><div class="as-top-h">🎯 Classement <small>(seul le n° 1 · seuil ${seuil})</small></div>` + s.top.slice(0, 5).map(t =>
+      `<div class="as-top-r"><b>${esc(t.symbole)}</b><span class="as-sd ${t.sens}">${t.sens === "BUY" ? "▲" : "▼"}</span>
+       <span class="as-bar"><i class="${t.score >= seuil && t.spread_ok !== false ? "ok" : ""}" style="width:${t.score}%"></i><u style="left:${seuil}%"></u></span>
+       <span class="as-sc">${t.score}</span><span title="${esc(t.contre || "")}">${t.spread_ok === false ? "⛔" : ""}</span></div>`).join("") + `</div>`;
+  }
+  if (s.derniers && s.derniers.length) h += `<div class="hc-ev">` + s.derniers.slice(0, 5).map(d =>
+    `<div><span>${esc(d.t)} · ${esc(d.symbole)}</span><b class="${cls(d.net)}">${eur(d.net, s.devise)}</b></div>`).join("") + `</div>`;
+  return h + `</div>`;
+}
+function tablePositions(d) {
+  const L = [];
+  for (const k of ORDRE) for (const p of (d.sources[k]?.positions || [])) L.push({k, dev: d.sources[k].devise, ...p});
+  $("posTable").innerHTML = L.length ? `<table class="ptable"><thead><tr><th>Bot</th><th>Marché</th><th>Sens</th><th>Lot</th><th>Prix</th><th>SL</th><th>TP</th><th>Résultat</th></tr></thead><tbody>` +
+    L.map(p => `<tr><td><svg class="pic"><use href="#${BOTS[p.k]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[p.k]?.nom || p.k)}</td><td>${esc(p.symbole)}</td>
+      <td>${p.sens ? `<span class="mini ${p.sens === "SELL" ? "sell" : ""}">${p.sens}</span>` : "—"}</td><td>${p.volume ?? "—"}</td><td>${p.prix ?? "—"}</td>
+      <td>${p.sl || "—"}</td><td>${p.tp || "—"}</td><td class="${cls(p.profit)}">${eur(p.profit, p.dev)}</td></tr>`).join("") + `</tbody></table>`
+    : `<div class="vide">Aucune position ouverte sur tes bots.</div>`;
 }
 async function rafraichir() {
   try {
     const r = await fetch("/api/etats"); if (r.status === 401) return location.href = "/connexion";
     const d = await r.json(), now = d.t, ks = Object.keys(d.sources).sort((a, b) => ORDRE.indexOf(a) - ORDRE.indexOf(b));
+    dernier = d;
     $("aucun").hidden = ks.length > 0;
     $("cartes").innerHTML = ks.map(k => carte(k, d.sources[k], now)).join("");
-  } catch (e) {}
+    tablePositions(d);
+    const vieux = ks.length ? Math.max(...ks.map(k => now - (d.sources[k].maj || 0))) : 1e9;
+    const enLigne = ks.length && vieux < 60;
+    $("navDot").className = "nav-dot " + (enLigne ? "on" : "off");
+    const nPos = ks.reduce((a, k) => a + (d.sources[k].positions || []).length, 0);
+    $("sub").textContent = enLigne ? `PC en ligne · ${ks.length} bots · ${nPos} position(s) ouverte(s) · mis à jour ${new Date().toLocaleTimeString("fr-FR")}`
+                                   : ks.length ? "PC hors ligne : dernières données reçues " + quand(Math.max(...ks.map(k => d.sources[k].maj || 0))) : "En attente de ton PC…";
+  } catch (e) { $("sub").textContent = "Connexion au site perdue, nouvel essai…"; }
 }
 async function histo() {
   const L = await (await fetch("/api/historique")).json();
-  $("histo").innerHTML = L.map(b => `<tr><td>${esc(b.jour)}</td><td>${esc(b.source)}</td><td>${b.trades ?? "—"}</td><td>${b.gagnants ?? "—"}</td>
-    <td class="${(b.net || 0) >= 0 ? "pos" : "neg"}">${eur(b.net)}</td></tr>`).join("") || `<tr><td colspan="5" class="vide">Pas encore d'historique.</td></tr>`;
+  $("histo").innerHTML = L.map(b => `<tr><td>${esc(b.jour)}</td><td><svg class="pic"><use href="#${BOTS[b.source]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[b.source]?.nom || b.source)}</td>
+    <td>${b.trades ?? "—"}</td><td>${b.gagnants ?? "—"}</td><td class="${cls(b.net)}">${eur(b.net)}</td></tr>`).join("")
+    || `<tr><td colspan="5" class="vide">Pas encore d'historique : il se remplit chaque jour.</td></tr>`;
 }
 async function moi() {
   const m = await (await fetch("/api/moi")).json();
@@ -106,7 +183,7 @@ async function nouvelleCle() {
   const r = await fetch("/api/cles", {method: "POST", headers: H, body: JSON.stringify({nom: $("nomPc").value || "Mon PC"})});
   const d = await r.json();
   if (!r.ok) return alert(d.erreur || "Erreur");
-  $("nouvelle").innerHTML = `<p class="note">Clé pour <b>${esc(d.nom)}</b> — copie-la maintenant, elle ne sera plus jamais affichée :</p>
+  $("nouvelle").innerHTML = `<p class="note">Clé pour <b>${esc(d.nom)}</b> : copie-la maintenant, elle ne sera plus jamais affichée.</p>
     <div class="cle">${esc(d.cle)}</div><p class="note">Dans <code>config.env</code> de ce PC :<br><code>EN_LIGNE_URL=${esc(location.origin)}</code><br><code>EN_LIGNE_CLE=</code>(la clé ci-dessus)</p>`;
   moi();
 }
