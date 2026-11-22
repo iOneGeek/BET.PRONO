@@ -32,6 +32,9 @@ SCHEMA = [
         prix_ferm DOUBLE PRECISION, net DOUBLE PRECISION, devise TEXT, commentaire TEXT,
         PRIMARY KEY (compte_id, source, ticket))""",
     """CREATE INDEX IF NOT EXISTS oeil_trades_t ON oeil_trades (compte_id, fermeture_t)""",
+    """CREATE TABLE IF NOT EXISTS oeil_mouvements (
+        compte_id INTEGER NOT NULL, compte_mt5 BIGINT NOT NULL, ticket BIGINT NOT NULL, t DOUBLE PRECISION, montant DOUBLE PRECISION,
+        PRIMARY KEY (compte_id, compte_mt5, ticket))""",
     """CREATE TABLE IF NOT EXISTS oeil_bilans (
         compte_id INTEGER NOT NULL, source TEXT NOT NULL, jour TEXT NOT NULL, donnees TEXT NOT NULL, maj DOUBLE PRECISION,
         PRIMARY KEY (compte_id, source, jour))""",
@@ -95,6 +98,12 @@ def init():
     pk = "SERIAL PRIMARY KEY" if USE_PG else "INTEGER PRIMARY KEY AUTOINCREMENT"
     for s in SCHEMA:
         run(s.format(pk=pk))
+    # 23/11 : détail des frais des trades (colonnes ajoutées à une table existante)
+    for col in ("brut", "commission", "swap"):
+        try:
+            run(f"ALTER TABLE oeil_trades ADD COLUMN {'IF NOT EXISTS ' if USE_PG else ''}{col} DOUBLE PRECISION")
+        except Exception:  # noqa: BLE001  (SQLite : la colonne existe déjà)
+            pass
 
 
 def upsert(table: str, cles: tuple, valeurs: dict):

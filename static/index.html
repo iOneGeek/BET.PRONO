@@ -30,6 +30,11 @@
     </div>
   </header>
 
+  <div class="stale" id="stale" hidden></div>
+  <div class="plus-menu" id="plusMenu" hidden onclick="if(event.target===this)plusMenu()"><div class="plus-box">
+    <button onclick="aller('histo');plusMenu()">📄 Historique</button><button onclick="aller('agenda');plusMenu()">📅 Agenda</button>
+    <button onclick="aller('comparer');plusMenu()">📊 Comparer</button><button onclick="aller('pc');plusMenu()">💻 Mes PC & alertes</button>
+    <button onclick="aller('bot','manuel');plusMenu()">✋ Bot manuel</button></div></div>
   <div class="layout">
     <nav>
       <button class="active" data-page="home">
@@ -53,9 +58,18 @@
       <button data-page="histo">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
         <span><span class="long">Historique</span><span class="court" style="display:none">Histo.</span></span></button>
+      <button data-page="agenda">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        <span>Agenda</span></button>
+      <button data-page="comparer">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        <span>Comparer</span></button>
       <button data-page="pc">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
         <span>Mes PC</span></button>
+      <button class="plus-btn" onclick="plusMenu()" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+        <span>Plus</span></button>
       <div id="navSums"></div>
       <div class="nav-news" id="navNews" hidden>
         <div class="ns-title"><span class="nn-ic">📅</span>Agenda</div>
@@ -72,12 +86,22 @@
 
       <section class="page" id="page-bot">
         <div id="botCard"></div>
+        <div class="card" style="margin-top:14px" id="diagCard" hidden>
+          <div class="card-title"><span style="font-size:20px">🩺</span>Pourquoi ALL STAR ne trade pas ?<span style="flex:1"></span><small class="muted" id="diagSync" style="font-weight:600"></small></div>
+          <div class="card-body"><div id="diagMain"></div><div class="st-h" style="margin-top:14px">Blocages depuis le dernier démarrage d'ALL STAR</div><div id="diagBloc"></div></div>
+        </div>
+        <div class="card" style="margin-top:14px" id="perfCard">
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Performance
+            <span style="flex:1"></span><select id="perfJours" class="hsel"><option value="1">Aujourd'hui</option><option value="7">7 jours</option><option value="30">30 jours</option><option value="3650" selected>Depuis le début</option></select></div>
+          <div class="card-body"><div class="st-kpis" id="perfKpis"></div><div class="perf-bfn" id="perfBfn"></div></div>
+        </div>
         <div class="card" style="margin-top:14px" id="eqCard">
           <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>
             Courbe d'équité<span style="flex:1"></span>
             <span class="eq-per" id="eqPer"><button data-h="24">24 h</button><button data-h="168" class="on">7 j</button><button data-h="720">30 j</button><button data-h="87600">Tout</button></span></div>
           <div class="card-body">
-            <div class="eq-head"><span id="eqVar"></span><span class="eq-leg"><i class="l-eq"></i>Équité <i class="l-so"></i>Solde</span></div>
+            <div class="eq-head"><span id="eqVar"></span><span class="eq-leg"><i class="l-eq"></i>Équité <i class="l-so"></i>Solde <i class="l-dd"></i>Drawdown <i class="l-tr"></i>Trades
+              <button class="btn sec mini" id="eqReset" onclick="eqToutVoir()" hidden>↺ Tout voir</button></span></div>
             <div class="eq-wrap"><svg id="eqSvg" class="eq-svg" preserveAspectRatio="none"></svg><div class="eq-tip" id="eqTip" hidden></div></div>
             <p class="note" id="eqNote"></p>
           </div>
@@ -104,9 +128,11 @@
           <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Trades fermés
             <span style="flex:1"></span>
             <select id="hBot" class="hsel"><option value="">Tous les bots</option><option value="apex">APEX</option><option value="principal">Sonic</option><option value="allstar">ALL STAR</option><option value="manuel">Bot manuel</option></select>
+            <input id="hSym" class="hsel" placeholder="Symbole" style="width:96px">
+            <select id="hRes" class="hsel"><option value="">Tous</option><option value="g">Gagnants</option><option value="p">Perdants</option></select>
             <select id="hJours" class="hsel"><option value="1">24 h</option><option value="7" selected>7 jours</option><option value="30">30 jours</option><option value="3650">Tout</option></select></div>
           <div class="addpc" style="padding:0 16px;margin:10px 0 0"><button class="btn sec mini" onclick="exporterCsv()">⬇ Exporter en CSV (Excel)</button></div>
-          <div class="tscroll"><table class="ptable"><thead><tr><th>Fermé le</th><th>Bot</th><th>Marché</th><th>Sens</th><th>Lot</th><th>Entrée</th><th>Sortie</th><th>Durée</th><th>Résultat</th></tr></thead><tbody id="hTrades"></tbody></table></div>
+          <div class="tscroll"><table class="ptable"><thead><tr><th>Fermé le</th><th>Bot</th><th>Marché</th><th>Sens</th><th>Lot</th><th>Entrée</th><th>Sortie</th><th>Durée</th><th>Brut</th><th>Commission</th><th>Swap</th><th>Net</th></tr></thead><tbody id="hTrades"></tbody></table></div>
           <div class="note" id="hNote" style="padding:8px 16px"></div>
         </div>
         <div class="card">
@@ -119,10 +145,33 @@
             </div>
           </div>
         </div>
+        <div class="card"><div class="card-body note">📅 Le calendrier des gains est maintenant dans <a href="#" onclick="aller('agenda');return false">Agenda</a> (vue par mois et par année).</div></div>
+      </section>
+
+      <section class="page" id="page-agenda">
         <div class="card">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendrier des gains
-            <span style="flex:1"></span><button class="btn sec mini" onclick="calMois(-1)">◀</button><b id="calTitre" style="min-width:130px;text-align:center"></b><button class="btn sec mini" onclick="calMois(1)">▶</button></div>
-          <div class="card-body"><div class="cal" id="cal"></div><div class="note" id="calNote" style="margin-top:8px"></div></div>
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda des gains <small class="muted" id="agTitre" style="font-weight:600"></small>
+            <span style="flex:1"></span>
+            <select id="agBot" class="hsel"><option value="apex" selected>APEX (réel)</option><option value="principal">Sonic (démo)</option><option value="allstar">ALL STAR (démo)</option><option value="manuel">Bot manuel (démo)</option></select>
+          </div>
+          <div class="card-body">
+            <div class="ag-bar">
+              <span class="seg" id="agMode"><button data-m="net" class="on">Profit</button><button data-m="pct">Profit %</button><button data-m="rr">R:R</button></span>
+              <span class="seg" id="agVue"><button data-v="mois" class="on">📅 Mensuel</button><button data-v="annee">🗓 Annuel</button></span>
+              <span id="agNav"><button class="btn sec mini" onclick="agDecal(-1)">◀</button><b id="agPer"></b><button class="btn sec mini" onclick="agDecal(1)">▶</button></span>
+            </div>
+            <div id="agGrille"></div>
+            <p class="note" id="agNote"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-comparer">
+        <div class="card">
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Comparer les bots <span style="flex:1"></span>
+            <select id="cmpJours" class="hsel"><option value="1">Aujourd'hui</option><option value="7">7 jours</option><option value="30" selected>30 jours</option><option value="90">90 jours</option><option value="3650">Tout</option></select></div>
+          <div class="card-body"><p class="note">Même période pour tous. <b>APEX tourne sur un compte réel</b>, les autres sur des comptes démo : leurs historiques ne sont jamais additionnés.</p></div>
+          <div class="tscroll"><table class="ptable cmp-t"><thead id="cmpHead"></thead><tbody id="cmpBody"></tbody></table></div>
         </div>
       </section>
 
@@ -182,10 +231,13 @@ function aller(page, bot) {
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-" + page));
   botCourant = bot || null;
   if (page === "histo") histo(); if (page === "pc") { moi(); alertesLire(); } if (page === "bot" && dernier) pageBot(dernier);
-  if (page === "bot") { eqData = null; courbe(true); }
+  if (page === "bot") { eqData = null; eqZoom = null; courbe(true); perf(); }
+  if (page === "agenda") agenda(); if (page === "comparer") comparer();
+  document.querySelector(".plus-btn")?.classList.toggle("active", ["histo", "agenda", "comparer", "pc"].includes(page) || bot === "manuel");
   document.querySelector("main").scrollTop = 0;
 }
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => aller(b.dataset.page, b.dataset.bot));
+document.querySelectorAll("nav button[data-page]").forEach(b => b.onclick = () => aller(b.dataset.page, b.dataset.bot));
+function plusMenu() { $("plusMenu").hidden = !$("plusMenu").hidden; }
 async function sortir() { await fetch("/auth/sortie", {method: "POST", headers: H}); location.href = "/connexion"; }
 
 function voyant(s, now) {
@@ -238,7 +290,7 @@ function carte(k, s, now) {
   const P = s.positions || [], latent = P.reduce((a, p) => a + (p.profit || 0), 0);
   let h = `<div class="card hcard${s.reel ? " reel" : ""}" onclick="aller('bot','${k}')" title="Ouvrir la page du bot">
     <div class="hc-top"><span class="hc-name"><svg class="pic"><use href="#${b.pic}"/></svg>${esc(b.nom)}</span>
-      <i class="sdot ${v}" title="${esc(info)}"></i><span class="hc-state">${etat}</span></div>
+      <i class="sdot ${v}" title="${esc(info)}"></i><span class="hc-sync" title="Dernière synchronisation de ce bot">⟳ ${s.maj ? new Date(s.maj * 1000).toLocaleTimeString("fr-FR") : "—"}</span><span class="hc-state">${etat}</span></div>
     <div class="hc-sub">${s.compte ? `Compte ${esc(s.compte)} · ${s.reel ? "réel" : "démo"} · ` : ""}${esc(s.strategie || (k === "allstar" ? "mode " + (s.mode || "—") + (s.risque_eur ? " · " + s.risque_eur + " € de risque" : "") : ""))}
       ${s.solde != null ? ` · solde <b>${num(s.solde)}${s.devise === "USD" ? " $" : " €"}</b>` : ""}
       ${s.bilan_total ? ` · depuis le début <b class="${cls(s.bilan_total.net)}">${eur(s.bilan_total.net, s.devise)}</b>` : ""}</div>
@@ -253,15 +305,50 @@ function carte(k, s, now) {
       <span class="g"><i class="${ok ? "ok" : ""}" style="width:${s.radar.score}%"></i></span><b>${s.radar.score}</b><span class="verdict">${esc(s.radar.decision || "")}</span></div>`;
   }
   if (s.top && s.top.length) {
-    const seuil = s.score_min || 90;
-    h += `<div class="as-top"><div class="as-top-h">🎯 Classement <small>(seul le n° 1 · seuil ${seuil})</small></div>` + s.top.slice(0, 5).map(t =>
-      `<div class="as-top-r"><b>${esc(t.symbole)}</b><span class="as-sd ${t.sens}">${t.sens === "BUY" ? "▲" : "▼"}</span>
-       <span class="as-bar"><i class="${t.score >= seuil && t.spread_ok !== false ? "ok" : ""}" style="width:${t.score}%"></i><u style="left:${seuil}%"></u></span>
-       <span class="as-sc">${t.score}</span><span title="${esc(t.contre || "")}">${t.spread_ok === false ? "⛔" : ""}</span></div>`).join("") + `</div>`;
+    const seuil = s.score_min || 90, big = k === botCourant;
+    h += `<div class="as-top"><div class="as-top-h">🎯 Classement <small>(seul le n° 1 peut entrer · seuil ${seuil} · les autres restent en surveillance)</small></div>` +
+      s.top.slice(0, big ? 8 : 5).map(t => { const st = statutAS(t, seuil); return `<div class="as-row ${st.c}">
+       <span class="as-rk">${t.rang ? "#" + t.rang : "—"}</span><b>${esc(t.symbole)}</b><span class="side ${t.sens}">${t.sens}</span>
+       <span class="as-bar"><i class="${st.c === "ok" ? "ok" : ""}" style="width:${t.score}%"></i><u style="left:${seuil}%"></u></span>
+       <span class="as-sc">${t.score}<small>/100</small></span><span class="as-st ${st.c}">${st.l}</span>
+       ${big || st.m ? `<span class="as-motif">${esc(st.m)}</span>` : ""}</div>`; }).join("") + `</div>`;
   }
   if (s.derniers && s.derniers.length) h += `<div class="hc-ev">` + s.derniers.slice(0, 5).map(d =>
     `<div><span>${esc(d.t)} · ${esc(d.symbole)}</span><b class="${cls(d.net)}">${eur(d.net, s.devise)}</b></div>`).join("") + `</div>`;
   return h + `</div>`;
+}
+/* statut d'un marché du classement ALL STAR, d'après les données du bot (rien d'inventé) */
+function statutAS(t, seuil) {
+  const c = t.contre || "";
+  if (!t.rang || /retiré du classement/.test(c)) return {c: "ko", l: "Refusé", m: c ? "Coûts trop lourds pour son SL (spread + commission)" : "Hors classement"};
+  if (t.rang === 1 && t.score >= seuil && !c) return {c: "ok", l: "Éligible", m: ""};
+  if (t.rang === 1 && c) return {c: "ko", l: "Refusé", m: /FLASH/.test(c) ? "Impulsion FLASH non confirmée" : /coûts/.test(c) ? "Coûts trop lourds" : /ticks/.test(c) ? "Pas de ticks récents" : c};
+  if (t.score < seuil) return {c: "att", l: "En attente", m: `Score insuffisant (${t.score} < ${seuil})`};
+  return {c: "att", l: "En attente", m: "Pas n° 1 : en surveillance"};
+}
+/* « Pourquoi ALL STAR ne trade pas ? » : uniquement ce que le bot transmet */
+function diagnostic(s, now) {
+  const seuil = s.score_min || 90, t1 = (s.top || []).find(t => t.rang === 1), L = [];
+  if (now - (s.maj || 0) > 60) L.push(["off", "Données périmées", "Le PC n'envoie plus rien depuis " + quand(s.maj) + " : l'état réel est inconnu."]);
+  else if ((s.positions || []).length) L.push(["info", "Position déjà ouverte", "ALL STAR ne garde qu'une position à la fois : il attend sa fermeture."]);
+  else if (!t1 && (s.exclus_cher || []).length) L.push(["ko", "Spread / commission trop élevés", `${s.exclus_cher.length} marché(s) actifs retirés du classement : leurs coûts dépassent le plafond du SL (souvent la nuit et le week-end).`]);
+  else if (!t1) L.push(["att", "Aucun marché classé", "Aucun marché actif avec des EMA alignées pour l'instant (marchés fermés ou sans tendance)."]);
+  else if (t1.score < seuil) L.push(["att", "Score EMA insuffisant", `Le n° 1 (${t1.symbole}) est à ${t1.score}/100, le seuil est ${seuil}.`]);
+  else if (/FLASH/.test(t1.contre || "")) L.push(["att", "Impulsion FLASH non confirmée", `${t1.symbole} a le score (${t1.score}) mais les ticks des dernières secondes ne confirment pas.`]);
+  else if (/coûts/.test(t1.contre || "")) L.push(["ko", "Coûts trop lourds", `${t1.symbole} : ${t1.contre}`]);
+  else if (/ticks/.test(t1.contre || "")) L.push(["att", "Pas de ticks récents", `${t1.symbole} ne cote plus.`]);
+  else L.push(["ok", "Signal possible", `${t1.symbole} remplit les conditions : ALL STAR peut entrer au prochain contrôle (lot, marge et limite de risque vérifiés à l'envoi).`]);
+  const info = [s.flash === false ? "FLASH désactivé" : s.flash === true ? "FLASH actif" : "FLASH : information indisponible",
+                s.risque_eur ? `risque ${s.risque_eur} € par trade` : "", `seuil ${seuil}`].filter(Boolean).join(" · ");
+  $("diagMain").innerHTML = L.map(([c, t, m]) => `<div class="diag ${c}"><b>${esc(t)}</b><span>${esc(m)}</span></div>`).join("") + `<div class="note" style="margin-top:6px">${esc(info)}</div>`;
+  const B = s.blocages || {}, NOMS_B = {sous_seuil: "Score EMA insuffisant", flash: "Impulsion FLASH non confirmée", couts: "Coûts trop lourds (n° 1)",
+    marches_trop_chers_exclus: "Marchés retirés (coûts)", position_ouverte: "Position déjà ouverte", doublon: "Même signal < 60 s",
+    lot_trop_gros: "Lot minimum > risque autorisé", pas_de_ticks: "Pas de ticks"};
+  const E = Object.entries(B).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]), mx = Math.max(1, ...E.map(e => e[1]));
+  $("diagBloc").innerHTML = E.length ? E.map(([k2, v]) => `<div class="bl-r"><span>${esc(NOMS_B[k2] || k2)}</span><span class="as-bar"><i style="width:${v / mx * 100}%"></i></span><b>${v.toLocaleString("fr-FR")}</b></div>`).join("")
+    + `<div class="note" style="margin-top:6px">Un contrôle toutes les 5 s · ${(s.stats?.scans || 0).toLocaleString("fr-FR")} contrôles · ${(s.stats?.trades || 0)} trade(s) ouvert(s) depuis le démarrage.</div>`
+    : `<div class="note">Information indisponible.</div>`;
+  $("diagSync").textContent = "mis à jour " + new Date((s.maj || 0) * 1000).toLocaleTimeString("fr-FR");
 }
 /* barre de gauche : voyants du menu, résumés APEX / Sonic, agenda (comme le panneau PC) */
 const DOT = {idle: "on", busy: "on", closed: "closed", off: "off"};
@@ -314,6 +401,8 @@ function pageBot(d) {
   $("botCard").innerHTML = carte(botCourant, s, d.t).replace('class="card hcard', 'class="card hcard big');
   $("botPosTitle").textContent = "Positions ouvertes · " + (BOTS[botCourant]?.nom || botCourant);
   $("eqCard").hidden = s.equite == null;
+  $("diagCard").hidden = botCourant !== "allstar";
+  if (botCourant === "allstar") diagnostic(s, d.t);
   const L = (s.positions || []).map(p => ({k: botCourant, dev: s.devise, ...p}));
   $("botPos").innerHTML = lignesPos(L) || `<div class="vide">Aucune position ouverte : ${esc(BOTS[botCourant]?.nom || "")} attend un signal.</div>`;
 }
@@ -337,13 +426,15 @@ async function rafraichir() {
     const vieux = ks.length ? Math.max(...ks.map(k => now - (d.sources[k].maj || 0))) : 1e9;
     const enLigne = ks.length && vieux < 60;
     $("navDot").className = "nav-dot " + (enLigne ? "on" : "off");
+    $("stale").hidden = !ks.length || enLigne;
+    $("stale").textContent = `⚠ Données périmées : ton PC n'envoie plus rien depuis ${quand(Math.max(...ks.map(k => d.sources[k].maj || 0)))}. Les chiffres affichés ne sont plus à jour.`;
     const nPos = ks.reduce((a, k) => a + (d.sources[k].positions || []).length, 0);
     $("sub").textContent = enLigne ? `PC en ligne · ${ks.length} bots · ${nPos} position(s) ouverte(s) · mis à jour ${new Date().toLocaleTimeString("fr-FR")}`
                                    : ks.length ? "PC hors ligne : dernières données reçues " + quand(Math.max(...ks.map(k => d.sources[k].maj || 0))) : "En attente de ton PC…";
   } catch (e) { $("sub").textContent = "Connexion au site perdue, nouvel essai…"; }
 }
 async function histo() {
-  const d = await (await fetch(`/api/trades?source=${$("hBot").value}&jours=${$("hJours").value}`)).json();
+  const d = await (await fetch(`/api/trades?source=${$("hBot").value}&jours=${$("hJours").value}&symbole=${encodeURIComponent($("hSym").value.trim())}&res=${$("hRes").value}`)).json();
   const cell = x => x ? `<b class="${cls(x.net)}">${eur(x.net, x.devise)}</b><div class="note">${x.n} trades · ${x.n ? Math.round(x.gagnants / x.n * 100) : 0} % gagnants</div>` : `<span class="muted">—</span>`;
   $("hStats").innerHTML = ORDRE.filter(k => d.stats[k]).map(k => `<tr><td><svg class="pic"><use href="#${BOTS[k].pic}"/></svg> ${esc(BOTS[k].nom)}</td>
     <td>${cell(d.stats[k].jour)}</td><td>${cell(d.stats[k].semaine)}</td><td>${cell(d.stats[k].mois)}</td><td>${cell(d.stats[k].tout)}</td></tr>`).join("")
@@ -352,21 +443,21 @@ async function histo() {
   $("hTrades").innerHTML = d.trades.map(t => `<tr><td>${new Date(t.fermeture_t * 1000).toLocaleString("fr-FR", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"})}</td>
     <td><svg class="pic"><use href="#${BOTS[t.source]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[t.source]?.nom || t.source)}</td><td>${esc(t.symbole)}</td>
     <td><span class="mini ${t.sens === "SELL" ? "sell" : ""}">${esc(t.sens)}</span></td><td>${t.volume}</td><td>${+Number(t.prix_ouv).toFixed(5)}</td><td>${+Number(t.prix_ferm).toFixed(5)}</td>
-    <td>${dur(t.fermeture_t - t.ouverture_t)}</td><td class="${cls(t.net)}">${eur(t.net, t.devise)}</td></tr>`).join("")
-    || `<tr><td colspan="9" class="vide">Aucun trade fermé sur cette période.</td></tr>`;
+    <td>${dur(t.fermeture_t - t.ouverture_t)}</td><td>${t.brut == null ? "—" : eur(t.brut, t.devise)}</td><td class="muted">${t.commission == null ? "—" : eur(t.commission, t.devise)}</td>
+    <td class="muted">${t.swap == null ? "—" : eur(t.swap, t.devise)}</td><td class="${cls(t.net)}"><b>${eur(t.net, t.devise)}</b></td></tr>`).join("")
+    || `<tr><td colspan="12" class="vide">Aucun trade fermé avec ces filtres.</td></tr>`;
   const tot = d.trades.reduce((a, t) => a + (t.net || 0), 0);
   $("hNote").textContent = d.trades.length ? `${d.trades.length}${d.trades.length >= 500 ? " (les 500 derniers)" : ""} trades · total ${eur(tot)}` : "";
   stats();
 }
-$("hBot").onchange = histo; $("hJours").onchange = histo;
-function exporterCsv() { location.href = `/api/trades.csv?source=${$("hBot").value}&jours=${$("hJours").value}`; }
+$("hBot").onchange = histo; $("hJours").onchange = histo; $("hRes").onchange = histo;
+let tSym = 0; $("hSym").oninput = () => { clearTimeout(tSym); tSym = setTimeout(histo, 400); };
+function exporterCsv() { location.href = `/api/trades.csv?source=${$("hBot").value}&jours=${$("hJours").value}&symbole=${encodeURIComponent($("hSym").value.trim())}&res=${$("hRes").value}`; }
 
 /* ---------- statistiques + calendrier (page Historique, mêmes filtres) ---------- */
-let calDecal = 0, calJours = {};
 async function stats() {
   const src = $("hBot").value, j = $("hJours").value;
-  const [d, c] = await Promise.all([fetch(`/api/stats?source=${src}&jours=${j}`).then(r => r.json()), fetch(`/api/stats?source=${src}&jours=400`).then(r => r.json())]);
-  calJours = c.jours || {};
+  const d = await fetch(`/api/stats?source=${src}&jours=${j}`).then(r => r.json());
   $("stTitre").textContent = `· ${src ? BOTS[src]?.nom : "tous les bots"} · ${$("hJours").selectedOptions[0].text}`;
   const k = (lbl, v, c2) => `<div class="hc-kpi"><span>${lbl}</span><b class="${c2 || ""}">${v}</b></div>`;
   $("stKpis").innerHTML = !d.n ? `<div class="vide">Aucun trade fermé sur cette période.</div>` :
@@ -385,32 +476,7 @@ async function stats() {
   }).join("");
   const best = H.filter(h => h.n).sort((a, b) => b.net - a.net);
   $("stHeuresNote").textContent = best.length ? `Meilleure heure : ${best[0].h} h (${eur(best[0].net)}) · pire : ${best[best.length - 1].h} h (${eur(best[best.length - 1].net)})` : "";
-  calendrier();
 }
-function calMois(d) { calDecal = Math.min(0, calDecal + d); calendrier(); }
-function calendrier() {
-  const now = new Date(), m = new Date(now.getFullYear(), now.getMonth() + calDecal, 1);
-  $("calTitre").textContent = m.toLocaleDateString("fr-FR", {month: "long", year: "numeric"});
-  const jours = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."];
-  let h = jours.map(j => `<div class="cal-h">${j}</div>`).join("");
-  const decal = (m.getDay() + 6) % 7, nb = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
-  const valeurs = [];
-  for (let i = 1; i <= nb; i++) { const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`; if (calJours[k]) valeurs.push(Math.abs(calJours[k].net)); }
-  const mx = Math.max(1e-9, ...valeurs);
-  h += "<div></div>".repeat(decal);
-  let tot = 0, n = 0, pos = 0, neg = 0;
-  for (let i = 1; i <= nb; i++) {
-    const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`, v = calJours[k];
-    const aujourd = i === now.getDate() && calDecal === 0;
-    if (v) { tot += v.net; n += v.n; v.net >= 0 ? pos++ : neg++; }
-    const a = v ? (.18 + .62 * Math.min(1, Math.abs(v.net) / mx)).toFixed(2) : 0;
-    const fond = v ? (v.net >= 0 ? `rgba(76,141,255,${a})` : `rgba(255,154,60,${a})`) : "rgba(255,255,255,.03)";
-    h += `<div class="cal-j${aujourd ? " auj" : ""}" style="background:${fond}" title="${v ? v.n + " trades" : "aucun trade"}"><span>${i}</span>${v ? `<b>${(v.net >= 0 ? "+" : "−") + num(Math.abs(v.net), Math.abs(v.net) >= 100 ? 0 : 2)}</b>` : ""}</div>`;
-  }
-  $("cal").innerHTML = h;
-  $("calNote").innerHTML = n ? `Mois : <b class="${cls(tot)}">${eur(tot)}</b> · ${n} trades · ${pos} jour(s) gagnant(s), ${neg} perdant(s)` : "Aucun trade ce mois-ci.";
-}
-
 /* ---------- alertes de risque (page Mes PC) ---------- */
 async function alertesLire() {
   const a = await (await fetch("/api/alertes")).json();
@@ -441,28 +507,134 @@ async function nouvelleCle() {
   moi();
 }
 async function suppr(id) { if (confirm("Supprimer cette clé ? Le PC qui l'utilise ne pourra plus envoyer.")) { await fetch("/api/cles/" + id, {method: "DELETE", headers: H}); moi(); } }
-/* ---------- courbe d'équité (page de chaque bot) ---------- */
-let eqH = 168, eqData = null, eqT = 0;
+
+/* ---------- performance d'un bot (page du bot) : net, brut, frais, ratios ---------- */
+async function perf() {
+  if (!botCourant) return;
+  const d = await (await fetch(`/api/stats?source=${botCourant}&jours=${$("perfJours").value}`)).json();
+  const s = dernier?.sources?.[botCourant], dev = s?.devise;
+  const k = (lbl, v, c2, t) => `<div class="hc-kpi"${t ? ` title="${esc(t)}"` : ""}><span>${lbl}</span><b class="${c2 || ""}">${v}</b></div>`;
+  $("perfKpis").innerHTML = !d.n ? `<div class="vide">Aucun trade fermé sur cette période.</div>` :
+    k("Résultat net", eur(d.net, dev), cls(d.net)) + k("Trades", `${d.n} <small class="muted">(✔ ${d.gagnants} · ✖ ${d.perdants})</small>`) +
+    k("Taux de réussite", d.taux + " %") + k("Profit factor", d.profit_factor == null ? "—" : num(d.profit_factor), d.profit_factor >= 1 ? "pos" : "neg", "gains ÷ pertes : au-dessus de 1, le bot gagne") +
+    k("Par trade", eur(d.esperance, dev), cls(d.esperance)) + k("Gain moyen", eur(d.gain_moyen, dev), "pos") + k("Perte moyenne", eur(d.perte_moyenne, dev), "neg") +
+    k("Drawdown max", "−" + num(d.creux) + (dev === "USD" ? " $" : " €"), "neg", "plus forte baisse depuis un sommet, sur les trades fermés") +
+    k("Pire série", d.pire_serie + " pertes") + k("Meilleur / pire", `${eur(d.meilleur, dev)} / ${eur(d.pire, dev)}`);
+  $("perfBfn").innerHTML = !d.n ? "" : d.brut == null ? `<p class="note">Détail brut / frais : information indisponible pour ces trades (envoyés avant le 23/11).</p>` :
+    `<div class="bfn"><div><span>Bénéfice brut</span><b class="${cls(d.brut)}">${eur(d.brut, dev)}</b></div><i>−</i>
+     <div><span>Frais (commission + swap)</span><b class="neg">${eur(d.frais, dev).replace("+", "−").replace("−−", "+")}</b></div><i>=</i>
+     <div><span>Bénéfice net (MT5)</span><b class="${cls(d.net)}">${eur(d.net, dev)}</b></div></div>
+     <p class="note">Le net vient directement de MT5 (profit + commission + swap) : les frais ne sont jamais retirés deux fois.${d.detail_frais < d.n ? ` Détail disponible pour ${d.detail_frais} trade(s) sur ${d.n}.` : ""}</p>`;
+}
+$("perfJours").onchange = perf;
+
+/* ---------- Agenda des gains (vue mensuelle : jours · vue annuelle : mois) ---------- */
+let agVue = "mois", agMode = "net", agDec = 0, agData = null;
+document.querySelectorAll("#agMode button").forEach(b => b.onclick = () => { agMode = b.dataset.m; document.querySelectorAll("#agMode button").forEach(x => x.classList.toggle("on", x === b)); agDessin(); });
+document.querySelectorAll("#agVue button").forEach(b => b.onclick = () => { agVue = b.dataset.v; agDec = 0; document.querySelectorAll("#agVue button").forEach(x => x.classList.toggle("on", x === b)); agenda(); });
+$("agBot").onchange = agenda;
+function agDecal(n) { agDec = Math.min(0, agDec + n); agenda(); }
+function agMoisCourant() { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + agDec); return d; }
+let agReq = 0;
+async function agenda() {
+  const m = agMoisCourant(), mois = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`, n = ++agReq, vue = agVue;
+  $("agNav").hidden = vue !== "mois";
+  $("agPer").textContent = m.toLocaleDateString("fr-FR", {month: "long", year: "numeric"});
+  const d = await (await fetch(`/api/agenda?source=${$("agBot").value}&vue=${vue}&mois=${mois}`)).json();
+  if (n !== agReq) return;   // une réponse plus récente est déjà demandée (changement de vue rapide)
+  agData = d; agData.mois = m; agDessin();
+}
+function agVal(c) {
+  if (!c) return null;
+  if (agMode === "pct") return c.pct;
+  if (agMode === "rr") return c.rr;
+  return c.net;
+}
+function agCase(c, titre) {
+  if (!c) return `<div class="ag-c vide2">${titre ? `<span>${titre}</span>` : ""}<em>pas de trade</em></div>`;
+  const v = agVal(c), ton = c.net > 0.005 ? (Math.abs(c.net) < 1 ? "neutre" : "gain") : c.net < -0.005 ? (Math.abs(c.net) < 1 ? "neutre" : "perte") : "neutre";
+  const pct = c.pct == null ? "" : `<div class="ag-p">${c.pct >= 0 ? "▲" : "▼"} ${num(Math.abs(c.pct))} %</div>`;
+  const rr = c.rr == null ? "" : `<div class="ag-rr">${num(c.rr)} R:R</div>`;
+  const prin = agMode === "pct" ? (v == null ? "—" : (v >= 0 ? "+" : "−") + num(Math.abs(v)) + " %") : agMode === "rr" ? (v == null ? "—" : num(v) + " R:R") : eur(c.net);
+  return `<div class="ag-c ${ton}" title="${c.n} trade(s) · ${c.gagnants} gagnant(s)">${titre ? `<span>${titre}</span>` : ""}<b>${prin}</b>
+    ${agMode === "net" ? pct + rr : agMode === "pct" ? `<div class="ag-p">${eur(c.net)}</div>` + rr : `<div class="ag-p">${eur(c.net)}</div>` + pct}<small>${c.n} trade${c.n > 1 ? "s" : ""}</small></div>`;
+}
+function agDessin() {
+  if (!agData) return;
+  const C = agData.cases || {}, src = $("agBot").value;
+  $("agTitre").textContent = src ? "· " + (BOTS[src]?.nom || src) : "· tous les bots";
+  let note = agMode === "pct" && !agData.pct_dispo ? "Profit % : choisis un seul bot (un seul compte MT5) pour le calculer sur son solde. " : "";
+  if (agMode === "rr") note += "R:R = gain moyen ÷ perte moyenne des trades de la case (le risque prévu de chaque trade n'est pas transmis). ";
+  if (agVue === "mois") {
+    const m = agData.mois, nb = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate(), dec = (new Date(m.getFullYear(), m.getMonth(), 1).getDay() + 6) % 7;
+    let h = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."].map(j => `<div class="ag-h">${j}</div>`).join("") + "<div></div>".repeat(dec);
+    let tot = 0, n = 0, jg = 0, jp = 0;
+    for (let i = 1; i <= nb; i++) {
+      const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`, c = C[k];
+      if (c) { tot += c.net; n += c.n; c.net >= 0 ? jg++ : jp++; }
+      h += agCase(c, String(i)).replace('class="ag-c', `class="ag-c${agDec === 0 && i === new Date().getDate() ? " auj" : ""}`);
+    }
+    $("agGrille").innerHTML = `<div class="ag-mois">${h}</div>`;
+    note = (n ? `Mois : <b class="${cls(tot)}">${eur(tot)}</b> · ${n} trades · ${jg} jour(s) gagnant(s), ${jp} perdant(s). ` : "Aucun trade ce mois-ci. ") + note;
+  } else {
+    const ans = [...new Set(Object.keys(C).map(k => k.slice(0, 4)))].sort().reverse();
+    const M = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+    let h = `<div class="ag-an"><div class="ag-h">Année</div>${M.map(x => `<div class="ag-h">${x}</div>`).join("")}<div class="ag-h">Total</div>`;
+    for (const a of ans) {
+      const cs = M.map((_, i) => C[`${a}-${String(i + 1).padStart(2, "0")}`]);
+      const tot = cs.filter(Boolean).reduce((x, c) => ({net: x.net + c.net, n: x.n + c.n, gagnants: x.gagnants + c.gagnants, pct: null, rr: null}), {net: 0, n: 0, gagnants: 0});
+      h += `<div class="ag-y">${a}</div>` + cs.map(c => agCase(c, "")).join("") + agCase(tot.n ? tot : null, "");
+    }
+    $("agGrille").innerHTML = ans.length ? h + `</div>` : `<div class="vide">Aucun trade.</div>`;
+  }
+  $("agNote").innerHTML = note;
+}
+
+/* ---------- Comparateur des bots (même période) ---------- */
+$("cmpJours").onchange = comparer;
+async function comparer() {
+  const j = $("cmpJours").value, ks = ORDRE.filter(k => dernier?.sources?.[k] || true);
+  const R = await Promise.all(ks.map(k => fetch(`/api/stats?source=${k}&jours=${j}`).then(r => r.json())));
+  const col = ks.map((k, i) => ({k, d: R[i], reel: k === "apex"})).filter(c => c.d.n);
+  $("cmpHead").innerHTML = `<tr><th>Statistique</th>${col.map(c => `<th><svg class="pic"><use href="#${BOTS[c.k].pic}"/></svg> ${esc(BOTS[c.k].nom)}<div class="note">${c.reel ? "€ compte réel" : "compte démo"}</div></th>`).join("")}</tr>`;
+  const lig = (lbl, f) => `<tr><td class="muted">${lbl}</td>${col.map(c => `<td>${f(c.d)}</td>`).join("")}</tr>`;
+  $("cmpBody").innerHTML = !col.length ? `<tr><td class="vide">Aucun trade sur cette période.</td></tr>` :
+    lig("Résultat net", d => `<b class="${cls(d.net)}">${eur(d.net)}</b>`) + lig("Bénéfice brut", d => d.brut == null ? "—" : eur(d.brut)) +
+    lig("Frais", d => d.frais == null ? "—" : eur(d.frais)) + lig("Trades", d => d.n) + lig("Taux de réussite", d => d.taux + " %") +
+    lig("Profit factor", d => d.profit_factor == null ? "—" : `<b class="${d.profit_factor >= 1 ? "pos" : "neg"}">${num(d.profit_factor)}</b>`) +
+    lig("Par trade", d => `<span class="${cls(d.esperance)}">${eur(d.esperance)}</span>`) + lig("Gain moyen", d => eur(d.gain_moyen)) +
+    lig("Perte moyenne", d => eur(d.perte_moyenne)) + lig("Drawdown max", d => `<span class="neg">−${num(d.creux)} €</span>`) + lig("Pire série", d => d.pire_serie + " pertes");
+}
+
+/* ---------- courbe d'équité (page de chaque bot) : périodes, zoom, repères des trades, drawdown ---------- */
+let eqH = 168, eqData = null, eqT = 0, eqTrades = [], eqZoom = null, eqDrag = null;
 document.querySelectorAll("#eqPer button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#eqPer button").forEach(x => x.classList.toggle("on", x === b));
-  eqH = +b.dataset.h; courbe(true);
+  eqH = +b.dataset.h; eqZoom = null; courbe(true);
 });
 async function courbe(force) {
   if (!botCourant || ($("page-bot").classList.contains("active") === false)) return;
   if (!force && Date.now() - eqT < 60000 && eqData && eqData.source === botCourant) return dessiner();
   eqT = Date.now();
-  try { eqData = await (await fetch(`/api/equite?source=${botCourant}&heures=${eqH}`)).json(); } catch (e) { return; }
+  try {
+    const [e, t] = await Promise.all([fetch(`/api/equite?source=${botCourant}&heures=${eqH}`).then(r => r.json()),
+                                      fetch(`/api/trades?source=${botCourant}&jours=${Math.max(1, eqH / 24)}`).then(r => r.json())]);
+    eqData = e; eqTrades = t.trades || [];
+  } catch (e) { return; }
   dessiner();
 }
 function dessiner() {
-  const svg = $("eqSvg"), P = (eqData && eqData.points) || [], s = dernier && dernier.sources[botCourant], dev = s?.devise === "USD" ? " $" : " €";
+  const svg = $("eqSvg"), s = dernier && dernier.sources[botCourant], dev = s?.devise === "USD" ? " $" : " €";
+  let P = (eqData && eqData.points) || [];
+  if (eqZoom) P = P.filter(p => p[0] >= eqZoom[0] && p[0] <= eqZoom[1]);
+  $("eqReset").hidden = !eqZoom;
   if (P.length < 2) {
     svg.innerHTML = ""; $("eqVar").textContent = "";
-    $("eqNote").textContent = "La courbe se remplit toute seule : un point toutes les 5 minutes depuis le 22/11. Reviens dans quelques heures.";
+    $("eqNote").textContent = eqZoom ? "Zone trop petite : clique sur « Tout voir »." : "La courbe se remplit toute seule : un point toutes les 5 minutes depuis le 22/11. Reviens dans quelques heures.";
     return;
   }
-  $("eqNote").textContent = "";
-  const W = svg.clientWidth || 600, Hh = svg.clientHeight || 220, ml = 56, mr = 10, mt = 10, mb = 24;
+  $("eqNote").textContent = "Astuce : fais glisser la souris (ou le doigt) sur la courbe pour zoomer sur une période.";
+  const W = svg.clientWidth || 600, Hh = svg.clientHeight || 240, ml = 56, mr = 10, mt = 10, mb = 24;
   svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`);
   const t0 = P[0][0], t1 = P[P.length - 1][0], vals = P.flatMap(p => [p[1], p[2]]).filter(v => v != null);
   let lo = Math.min(...vals), hi = Math.max(...vals); const pad = Math.max((hi - lo) * .08, 0.5); lo -= pad; hi += pad;
@@ -471,27 +643,46 @@ function dessiner() {
   let g = "";
   for (let k = 0; k <= 3; k++) { const v = lo + (hi - lo) * k / 3, y = Y(v);
     g += `<line x1="${ml}" x2="${W - mr}" y1="${y}" y2="${y}" class="eq-grid"/><text x="${ml - 6}" y="${y + 4}" text-anchor="end" class="eq-ax">${num(v, 0)}</text>`; }
-  const fmtT = t => new Date(t * 1000).toLocaleString("fr-FR", eqH <= 24 ? {hour: "2-digit", minute: "2-digit"} : {day: "2-digit", month: "2-digit"});
+  const dureeH = (t1 - t0) / 3600;
+  const fmtT = t => new Date(t * 1000).toLocaleString("fr-FR", dureeH <= 30 ? {hour: "2-digit", minute: "2-digit"} : {day: "2-digit", month: "2-digit"});
   g += `<text x="${ml}" y="${Hh - 6}" class="eq-ax">${fmtT(t0)}</text><text x="${W - mr}" y="${Hh - 6}" text-anchor="end" class="eq-ax">${fmtT(t1)}</text>`;
+  // drawdown : zone entre le plus haut atteint et l'équité
+  let pic = -1e18, dd = 0, haut = "", bas = "";
+  const pk = P.map(p => { pic = Math.max(pic, p[1]); dd = Math.max(dd, pic - p[1]); return pic; });
+  haut = P.map((p, k) => `${k ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(pk[k]).toFixed(1)}`).join("");
+  bas = P.slice().reverse().map(p => `L${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("");
   const aire = `M${X(P[0][0])},${Hh - mb}` + ligne(1).replace(/^M/, "L") + `L${X(t1)},${Hh - mb}Z`;
+  // repères des trades fermés dans la fenêtre
+  const marques = eqTrades.filter(t => t.fermeture_t >= t0 && t.fermeture_t <= t1).slice(0, 300).map(t =>
+    `<line x1="${X(t.fermeture_t).toFixed(1)}" x2="${X(t.fermeture_t).toFixed(1)}" y1="${Hh - mb}" y2="${Hh - mb - 7}" class="eq-tr ${t.net >= 0 ? "g" : "p"}"><title>${esc(t.symbole)} ${t.sens} · ${eur(t.net)}</title></line>`).join("");
   svg.innerHTML = `<defs><linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e7b84a" stop-opacity=".28"/><stop offset="1" stop-color="#e7b84a" stop-opacity="0"/></linearGradient></defs>
-    ${g}<path d="${aire}" fill="url(#eqFill)"/><path d="${ligne(2)}" class="eq-so"/><path d="${ligne(1)}" class="eq-eq"/>
+    ${g}<path d="${aire}" fill="url(#eqFill)"/><path d="${haut}${bas}Z" class="eq-dd"/><path d="${ligne(2)}" class="eq-so"/><path d="${ligne(1)}" class="eq-eq"/>${marques}
+    <rect id="eqSel" class="eq-sel" y="${mt}" height="${Hh - mt - mb}" width="0" visibility="hidden"/>
     <line id="eqX" class="eq-x" y1="${mt}" y2="${Hh - mb}" visibility="hidden"/><circle id="eqDot" r="4" class="eq-dot" visibility="hidden"/>`;
   const d = P[P.length - 1][1] - P[0][1];
-  $("eqVar").innerHTML = `${num(P[P.length - 1][1])}${dev} · <b class="${cls(d)}">${(d >= 0 ? "+" : "−") + num(Math.abs(d))}${dev}</b> sur la période`;
+  $("eqVar").innerHTML = `${num(P[P.length - 1][1])}${dev} · <b class="${cls(d)}">${(d >= 0 ? "+" : "−") + num(Math.abs(d))}${dev}</b> sur la période · <span class="neg">drawdown max −${num(dd)}${dev}</span>`;
+  const xDe = ev => { const r = svg.getBoundingClientRect(); return (ev.clientX - r.left) * W / r.width; };
+  const tDe = x => t0 + (Math.min(W - mr, Math.max(ml, x)) - ml) / (W - ml - mr) * (t1 - t0);
+  svg.onpointerdown = ev => { eqDrag = xDe(ev); svg.setPointerCapture(ev.pointerId); };
+  svg.onpointerup = ev => {
+    if (eqDrag != null) { const x = xDe(ev); if (Math.abs(x - eqDrag) > 12) { const a = tDe(Math.min(x, eqDrag)), b = tDe(Math.max(x, eqDrag)); eqZoom = [a, b]; eqDrag = null; return dessiner(); } }
+    eqDrag = null; $("eqSel").setAttribute("visibility", "hidden");
+  };
   svg.onpointermove = ev => {
-    const r = svg.getBoundingClientRect(), x = (ev.clientX - r.left) * W / r.width;
+    const r = svg.getBoundingClientRect(), x = xDe(ev);
+    if (eqDrag != null) { const a = Math.min(x, eqDrag), b = Math.max(x, eqDrag); const e = $("eqSel"); e.setAttribute("x", a); e.setAttribute("width", b - a); e.setAttribute("visibility", "visible"); }
     let i = 0, best = 1e18; P.forEach((p, k) => { const dx = Math.abs(X(p[0]) - x); if (dx < best) { best = dx; i = k; } });
     const p = P[i], cx = X(p[0]), cy = Y(p[1]);
     $("eqX").setAttribute("x1", cx); $("eqX").setAttribute("x2", cx); $("eqX").setAttribute("visibility", "visible");
     $("eqDot").setAttribute("cx", cx); $("eqDot").setAttribute("cy", cy); $("eqDot").setAttribute("visibility", "visible");
     const tip = $("eqTip"); tip.hidden = false;
     tip.innerHTML = `<div class="muted">${new Date(p[0] * 1000).toLocaleString("fr-FR", {weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"})}</div>
-      <div>Équité <b>${num(p[1])}${dev}</b></div>${p[2] != null ? `<div>Solde <b>${num(p[2])}${dev}</b></div>` : ""}`;
-    tip.style.left = Math.min(r.width - 150, Math.max(0, cx * r.width / W - 75)) + "px";
+      <div>Équité <b>${num(p[1])}${dev}</b></div>${p[2] != null ? `<div>Solde <b>${num(p[2])}${dev}</b></div>` : ""}<div class="neg">sous le plus haut : −${num(pk[i] - p[1])}${dev}</div>`;
+    tip.style.left = Math.min(r.width - 160, Math.max(0, cx * r.width / W - 80)) + "px";
   };
   svg.onpointerleave = () => { $("eqTip").hidden = true; $("eqX").setAttribute("visibility", "hidden"); $("eqDot").setAttribute("visibility", "hidden"); };
 }
+function eqToutVoir() { eqZoom = null; dessiner(); }
 addEventListener("resize", () => eqData && dessiner());
 
 /* ---------- notifications (Web Push) ---------- */

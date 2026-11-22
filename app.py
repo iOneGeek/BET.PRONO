@@ -303,9 +303,15 @@ def recevoir_trades():
                   "symbole": str(t.get("symbole") or "")[:20], "sens": str(t.get("sens") or "")[:4], "volume": t.get("volume"),
                   "ouverture_t": t.get("ouverture_t"), "fermeture_t": t.get("fermeture_t"), "prix_ouv": t.get("prix_ouv"),
                   "prix_ferm": t.get("prix_ferm"), "net": t.get("net"), "devise": str(t.get("devise") or "")[:4],
-                  "commentaire": str(t.get("commentaire") or "")[:40]})
+                  "commentaire": str(t.get("commentaire") or "")[:40],
+                  "brut": t.get("brut"), "commission": t.get("commission"), "swap": t.get("swap")})
     for i in range(0, len(L), 400):
         db.upsert_many("oeil_trades", ("compte_id", "source", "ticket"), L[i:i + 400])
+    M = [{"compte_id": k["compte_id"], "compte_mt5": m["compte"], "ticket": m["ticket"], "t": m.get("t"), "montant": m.get("montant")}
+         for m in (request.get_json(silent=True) or {}).get("mouvements") or []
+         if isinstance(m.get("compte"), int) and isinstance(m.get("ticket"), int)]
+    for i in range(0, len(M), 400):
+        db.upsert_many("oeil_mouvements", ("compte_id", "compte_mt5", "ticket"), M[i:i + 400])
     try:
         notif.verifier_risque(k["compte_id"], sources_trades={t["source"] for t in L})
     except Exception:  # noqa: BLE001
@@ -359,12 +365,9 @@ def liste_trades():
                         "FROM oeil_trades WHERE compte_id = %s AND fermeture_t >= %s GROUP BY source", (cid, t), all=True) or []:
             stats.setdefault(r["source"], {})[nom] = {"n": int(r["n"]), "net": round(float(r["net"] or 0), 2), "gagnants": int(r["g"] or 0),
                                                       "devise": r["devise"]}
-    sql, par = "SELECT * FROM oeil_trades WHERE compte_id = %s AND fermeture_t >= %s", [cid, time.time() - jours * 86400]
-    if source in SOURCES:
-        sql += " AND source = %s"; par.append(source)
-    rows = db.run(sql + " ORDER BY fermeture_t DESC LIMIT 500", tuple(par), all=True) or []
+    rows = _trades_filtre(cid, source, jours, request.args.get("symbole", "").strip(), request.args.get("res", ""))[::-1][:500]
     return jsonify({"stats": stats, "trades": [{k2: r[k2] for k2 in ("source", "ticket", "symbole", "sens", "volume", "ouverture_t", "fermeture_t",
-                                                                     "prix_ouv", "prix_ferm", "net", "devise")} for r in rows]})
+                                                                     "prix_ouv", "prix_ferm", "net", "devise", "brut", "commission", "swap")} for r in rows]})
 
 
 @app.get("/api/alertes")
@@ -380,10 +383,16 @@ def alertes_ecrire():
     return jsonify(notif.enregistrer_alertes(compte_courant()["id"], request.get_json(silent=True) or {}))
 
 
-def _trades_filtre(cid, source, jours):
+def _trades_filtre(cid, source, jours, symbole="", res=""):
     sql, par = "SELECT * FROM oeil_trades WHERE compte_id = %s AND fermeture_t >= %s", [cid, time.time() - jours * 86400]
     if source in SOURCES:
         sql += " AND source = %s"; par.append(source)
+    if symbole:
+        sql += " AND UPPER(symbole) LIKE %s"; par.append("%" + symbole.upper()[:20] + "%")
+    if res == "g":
+        sql += " AND net > 0"
+    elif res == "p":
+        sql += " AND net < 0"
     return db.run(sql + " ORDER BY fermeture_t", tuple(par), all=True) or []
 
 
@@ -411,14 +420,69 @@ def statistiques():
         j = datetime.fromtimestamp(t["fermeture_t"], tz).strftime("%Y-%m-%d")
         jn = jours_net.setdefault(j, [0, 0.0]); jn[0] += 1; jn[1] += float(t["net"] or 0)
     r2 = lambda v: round(v, 2)   # noqa: E731
+    brut = sum(float(t["brut"]) for t in T if t.get("brut") is not None)
+    frais = sum(float(t["commission"] or 0) + float(t["swap"] or 0) for t in T if t.get("brut") is not None)
+    detail = sum(1 for t in T if t.get("brut") is not None)
     return jsonify({
         "n": len(T), "net": r2(sum(nets)), "gagnants": len(gains), "taux": round(len(gains) / len(T) * 100, 1) if T else 0,
         "profit_factor": round(sum(gains) / -sum(pertes), 2) if pertes else None, "gain_moyen": r2(sum(gains) / len(gains)) if gains else 0,
         "perte_moyenne": r2(sum(pertes) / len(pertes)) if pertes else 0, "esperance": r2(sum(nets) / len(nets)) if nets else 0,
+        "brut": r2(brut) if detail else None, "frais": r2(frais) if detail else None, "detail_frais": detail,
+        "perdants": len(pertes),
         "meilleur": r2(max(nets)) if nets else 0, "pire": r2(min(nets)) if nets else 0, "creux": r2(creux), "pire_serie": pire_serie,
         "marches": sorted(({"symbole": k2, "n": v[0], "net": r2(v[1]), "taux": round(v[2] / v[0] * 100)} for k2, v in marches.items()), key=lambda x: -x["net"]),
         "heures": [{"h": h, "n": v[0], "net": r2(v[1])} for h, v in heures.items()],
         "jours": {k2: {"n": v[0], "net": r2(v[1])} for k2, v in jours_net.items()}})
+
+
+@app.get("/api/agenda")
+@connecte
+def agenda():
+    """23/11 : Agenda des gains. vue=annee : une case par mois ; vue=mois (mois=AAAA-MM) : une case par jour.
+    Profit = somme des résultats nets ; % = profit / solde du compte au début de la case (un seul bot choisi : solde reconstitué
+    à partir du solde actuel, des trades et des dépôts/retraits) ; R:R = gain moyen / perte moyenne de la case."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Europe/Paris")
+    cid, source, vue = compte_courant()["id"], request.args.get("source", ""), request.args.get("vue", "annee")
+    mois = request.args.get("mois", "")
+    T = _trades_filtre(cid, source, 3650)
+    fmt = "%Y-%m" if vue == "annee" else "%Y-%m-%d"
+    cases = {}
+    for t in T:
+        k = datetime.fromtimestamp(t["fermeture_t"], tz).strftime(fmt)
+        if vue != "annee" and not k.startswith(mois):
+            continue
+        c = cases.setdefault(k, {"net": 0.0, "n": 0, "g": [], "p": [], "t0": t["fermeture_t"]})
+        c["t0"] = min(c["t0"], t["fermeture_t"])
+        net = float(t["net"] or 0)
+        c["net"] += net; c["n"] += 1
+        (c["g"] if net > 0 else c["p"]).append(net)
+    solde_a = None
+    if source in SOURCES and T:
+        comptes = {t["compte_mt5"] for t in T if t["compte_mt5"]}
+        etat = db.run("SELECT donnees FROM oeil_etats WHERE compte_id = %s AND source = %s", (cid, source), one=True)
+        solde_now = json.loads(etat["donnees"]).get("solde") if etat else None
+        if len(comptes) == 1 and isinstance(solde_now, (int, float)):
+            cpt = comptes.pop()
+            tous = db.run("SELECT fermeture_t AS t, net AS v FROM oeil_trades WHERE compte_id = %s AND compte_mt5 = %s", (cid, cpt), all=True) or []
+            mv = db.run("SELECT t, montant AS v FROM oeil_mouvements WHERE compte_id = %s AND compte_mt5 = %s", (cid, cpt), all=True) or []
+            evts = [(float(r["t"]), float(r["v"] or 0)) for r in tous + mv if r["t"]]
+
+            def solde_a(ts):   # solde juste avant ts = solde actuel - tout ce qui est arrivé depuis
+                return solde_now - sum(v for t_, v in evts if t_ >= ts)
+    out = {}
+    for k, c in cases.items():
+        gm = sum(c["g"]) / len(c["g"]) if c["g"] else 0.0
+        pm = -sum(c["p"]) / len(c["p"]) if c["p"] else 0.0
+        s0 = None
+        if solde_a:
+            debut = datetime.strptime(k + ("-01" if vue == "annee" else ""), "%Y-%m-%d").replace(tzinfo=tz).timestamp()
+            s0 = solde_a(debut)
+            if not s0 or s0 <= 0:   # compte approvisionné en cours de période : solde juste avant le 1er trade de la case
+                s0 = solde_a(c["t0"])
+        out[k] = {"net": round(c["net"], 2), "n": c["n"], "gagnants": len(c["g"]), "rr": round(gm / pm, 2) if pm else None,
+                  "pct": round(c["net"] / s0 * 100, 2) if s0 and s0 > 0 else None}
+    return jsonify({"vue": vue, "cases": out, "pct_dispo": solde_a is not None})
 
 
 @app.get("/api/trades.csv")
@@ -430,16 +494,20 @@ def export_csv():
     from zoneinfo import ZoneInfo
     tz = ZoneInfo("Europe/Paris")
     source = request.args.get("source", "")
-    T = _trades_filtre(compte_courant()["id"], source, min(max(float(request.args.get("jours", 3650) or 3650), 1), 3650))
+    T = _trades_filtre(compte_courant()["id"], source, min(max(float(request.args.get("jours", 3650) or 3650), 1), 3650),
+                       request.args.get("symbole", "").strip(), request.args.get("res", ""))
     f = io.StringIO()
     w = csv.writer(f, delimiter=";")
-    w.writerow(["bot", "ticket", "compte", "marche", "sens", "lot", "ouverture", "fermeture", "prix_entree", "prix_sortie", "resultat", "devise"])
+    w.writerow(["bot", "ticket", "compte", "marche", "sens", "lot", "ouverture", "fermeture", "prix_entree", "prix_sortie",
+                "brut", "commission", "swap", "resultat_net", "devise"])
     nom = {"apex": "APEX", "allstar": "ALL STAR", "principal": "Sonic", "manuel": "Bot manuel"}
     for t in T:
         w.writerow([nom.get(t["source"], t["source"]), t["ticket"], t["compte_mt5"], t["symbole"], t["sens"], str(t["volume"]).replace(".", ","),
                     datetime.fromtimestamp(t["ouverture_t"], tz).strftime("%d/%m/%Y %H:%M:%S") if t["ouverture_t"] else "",
                     datetime.fromtimestamp(t["fermeture_t"], tz).strftime("%d/%m/%Y %H:%M:%S"),
-                    str(t["prix_ouv"]).replace(".", ","), str(t["prix_ferm"]).replace(".", ","), str(t["net"]).replace(".", ","), t["devise"]])
+                    str(t["prix_ouv"]).replace(".", ","), str(t["prix_ferm"]).replace(".", ","),
+                    *[("" if t.get(c) is None else str(t[c]).replace(".", ",")) for c in ("brut", "commission", "swap")],
+                    str(t["net"]).replace(".", ","), t["devise"]])
     from flask import Response
     return Response("﻿" + f.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=oeil-du-trader-trades{'-' + source if source else ''}.csv"})
