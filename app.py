@@ -280,6 +280,10 @@ def recevoir_etat():
                        "donnees": json.dumps(bilan, ensure_ascii=False), "maj": maintenant})
         n += 1
     db.run("UPDATE oeil_cles SET vu = %s WHERE id = %s", (maintenant, k["id"]))
+    try:
+        notif.verifier_risque(k["compte_id"], etats={s_: d_ for s_, d_ in (corps.get("sources") or {}).items() if isinstance(d_, dict)})
+    except Exception:  # noqa: BLE001
+        pass
     return jsonify({"ok": True, "sources": n})
 
 
@@ -302,6 +306,10 @@ def recevoir_trades():
                   "commentaire": str(t.get("commentaire") or "")[:40]})
     for i in range(0, len(L), 400):
         db.upsert_many("oeil_trades", ("compte_id", "source", "ticket"), L[i:i + 400])
+    try:
+        notif.verifier_risque(k["compte_id"], sources_trades={t["source"] for t in L})
+    except Exception:  # noqa: BLE001
+        pass
     return jsonify({"ok": True, "trades": len(L)})
 
 
@@ -357,6 +365,84 @@ def liste_trades():
     rows = db.run(sql + " ORDER BY fermeture_t DESC LIMIT 500", tuple(par), all=True) or []
     return jsonify({"stats": stats, "trades": [{k2: r[k2] for k2 in ("source", "ticket", "symbole", "sens", "volume", "ouverture_t", "fermeture_t",
                                                                      "prix_ouv", "prix_ferm", "net", "devise")} for r in rows]})
+
+
+@app.get("/api/alertes")
+@connecte
+def alertes_lire():
+    return jsonify(notif.reglages_alertes(compte_courant()["id"]))
+
+
+@app.post("/api/alertes")
+@connecte
+def alertes_ecrire():
+    anti_csrf()
+    return jsonify(notif.enregistrer_alertes(compte_courant()["id"], request.get_json(silent=True) or {}))
+
+
+def _trades_filtre(cid, source, jours):
+    sql, par = "SELECT * FROM oeil_trades WHERE compte_id = %s AND fermeture_t >= %s", [cid, time.time() - jours * 86400]
+    if source in SOURCES:
+        sql += " AND source = %s"; par.append(source)
+    return db.run(sql + " ORDER BY fermeture_t", tuple(par), all=True) or []
+
+
+@app.get("/api/stats")
+@connecte
+def statistiques():
+    """23/11 : statistiques d'un bot (ou de tous) sur la période : profit factor, creux, séries, marchés, heures, calendrier."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Europe/Paris")
+    source = request.args.get("source", "")
+    jours = min(max(float(request.args.get("jours", 30) or 30), 1), 3650)
+    T = _trades_filtre(compte_courant()["id"], source, jours)
+    nets = [float(t["net"] or 0) for t in T]
+    gains, pertes = [x for x in nets if x > 0], [x for x in nets if x < 0]
+    cum = sommet = creux = 0.0
+    serie = pire_serie = 0
+    for x in nets:
+        cum += x; sommet = max(sommet, cum); creux = max(creux, sommet - cum)
+        serie = serie + 1 if x < 0 else 0; pire_serie = max(pire_serie, serie)
+    marches, heures, jours_net = {}, {h: [0, 0.0] for h in range(24)}, {}
+    for t in T:
+        m = marches.setdefault(t["symbole"], [0, 0.0, 0]); m[0] += 1; m[1] += float(t["net"] or 0); m[2] += (t["net"] or 0) > 0
+        d = datetime.fromtimestamp(t["ouverture_t"] or t["fermeture_t"], tz)
+        heures[d.hour][0] += 1; heures[d.hour][1] += float(t["net"] or 0)
+        j = datetime.fromtimestamp(t["fermeture_t"], tz).strftime("%Y-%m-%d")
+        jn = jours_net.setdefault(j, [0, 0.0]); jn[0] += 1; jn[1] += float(t["net"] or 0)
+    r2 = lambda v: round(v, 2)   # noqa: E731
+    return jsonify({
+        "n": len(T), "net": r2(sum(nets)), "gagnants": len(gains), "taux": round(len(gains) / len(T) * 100, 1) if T else 0,
+        "profit_factor": round(sum(gains) / -sum(pertes), 2) if pertes else None, "gain_moyen": r2(sum(gains) / len(gains)) if gains else 0,
+        "perte_moyenne": r2(sum(pertes) / len(pertes)) if pertes else 0, "esperance": r2(sum(nets) / len(nets)) if nets else 0,
+        "meilleur": r2(max(nets)) if nets else 0, "pire": r2(min(nets)) if nets else 0, "creux": r2(creux), "pire_serie": pire_serie,
+        "marches": sorted(({"symbole": k2, "n": v[0], "net": r2(v[1]), "taux": round(v[2] / v[0] * 100)} for k2, v in marches.items()), key=lambda x: -x["net"]),
+        "heures": [{"h": h, "n": v[0], "net": r2(v[1])} for h, v in heures.items()],
+        "jours": {k2: {"n": v[0], "net": r2(v[1])} for k2, v in jours_net.items()}})
+
+
+@app.get("/api/trades.csv")
+@connecte
+def export_csv():
+    """23/11 : tous les trades fermés de la période en CSV (séparateur ; pour Excel en français)."""
+    import csv
+    import io
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Europe/Paris")
+    source = request.args.get("source", "")
+    T = _trades_filtre(compte_courant()["id"], source, min(max(float(request.args.get("jours", 3650) or 3650), 1), 3650))
+    f = io.StringIO()
+    w = csv.writer(f, delimiter=";")
+    w.writerow(["bot", "ticket", "compte", "marche", "sens", "lot", "ouverture", "fermeture", "prix_entree", "prix_sortie", "resultat", "devise"])
+    nom = {"apex": "APEX", "allstar": "ALL STAR", "principal": "Sonic", "manuel": "Bot manuel"}
+    for t in T:
+        w.writerow([nom.get(t["source"], t["source"]), t["ticket"], t["compte_mt5"], t["symbole"], t["sens"], str(t["volume"]).replace(".", ","),
+                    datetime.fromtimestamp(t["ouverture_t"], tz).strftime("%d/%m/%Y %H:%M:%S") if t["ouverture_t"] else "",
+                    datetime.fromtimestamp(t["fermeture_t"], tz).strftime("%d/%m/%Y %H:%M:%S"),
+                    str(t["prix_ouv"]).replace(".", ","), str(t["prix_ferm"]).replace(".", ","), str(t["net"]).replace(".", ","), t["devise"]])
+    from flask import Response
+    return Response("﻿" + f.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=oeil-du-trader-trades{'-' + source if source else ''}.csv"})
 
 
 @app.get("/api/historique")

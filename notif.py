@@ -211,3 +211,87 @@ def lancer_surveillance():
                     pass
             time.sleep(60)
     threading.Thread(target=boucle, daemon=True).start()
+
+
+# ------------------------------------------------------------------ 23/11 : alertes de risque (réglées par l'utilisateur)
+def _lire(cle: str, defaut):
+    r = db.run("SELECT valeur FROM oeil_reglages WHERE cle = %s", (cle,), one=True)
+    try:
+        return json.loads(r["valeur"]) if r else defaut
+    except ValueError:
+        return defaut
+
+
+def _ecrire(cle: str, val):
+    db.upsert("oeil_reglages", ("cle",), {"cle": cle, "valeur": json.dumps(val, ensure_ascii=False)})
+
+
+def reglages_alertes(cid: int) -> dict:
+    return _lire(f"alertes_{cid}", {})
+
+
+def enregistrer_alertes(cid: int, d: dict) -> dict:
+    propre = {}
+    for src in NOMS:
+        x = d.get(src) or {}
+        r = {}
+        for k in ("perte_jour", "equite_min"):
+            try:
+                v = float(str(x.get(k, "")).replace(",", ".")) if str(x.get(k, "")).strip() else None
+            except ValueError:
+                v = None
+            if v is not None and v > 0:
+                r[k] = round(v, 2)
+        try:
+            n = int(x.get("serie") or 0)
+        except ValueError:
+            n = 0
+        if 2 <= n <= 50:
+            r["serie"] = n
+        if r:
+            propre[src] = r
+    _ecrire(f"alertes_{cid}", propre)
+    return propre
+
+
+def _jour_paris() -> tuple[str, float]:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    m = datetime.now(ZoneInfo("Europe/Paris"))
+    return m.strftime("%Y-%m-%d"), m.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+
+def verifier_risque(cid: int, etats: dict | None = None, sources_trades: set | None = None):
+    """Vérifie les seuils choisis par l'utilisateur ; chaque alerte ne part qu'une fois (par jour, par série, par passage du seuil)."""
+    cfg = reglages_alertes(cid)
+    if not cfg:
+        return
+    jour, debut = _jour_paris()
+    deja = _lire(f"risque_{cid}", {})
+    if deja.get("jour") != jour:
+        deja = {"jour": jour, "perte": [], "serie": deja.get("serie", {}), "eq": deja.get("eq", {})}
+    change = False
+    for src, c in cfg.items():
+        nom = NOMS.get(src, src)
+        if etats and src in etats and "equite_min" in c and isinstance(etats[src].get("equite"), (int, float)):
+            sous = etats[src]["equite"] < c["equite_min"]
+            if sous and not deja["eq"].get(src):
+                envoyer_fond(cid, f"🛑 {nom} : équité sous {c['equite_min']:g}", f"Équité actuelle {eur(etats[src]['equite']).lstrip('+')}. Vérifie le bot.", f"eq-{src}")
+            if sous != bool(deja["eq"].get(src)) and (sous or etats[src]["equite"] > c["equite_min"] * 1.005):
+                deja["eq"][src] = sous; change = True
+        if sources_trades and src in sources_trades:
+            if "perte_jour" in c and src not in deja["perte"]:
+                r = db.run("SELECT SUM(net) AS net FROM oeil_trades WHERE compte_id = %s AND source = %s AND fermeture_t >= %s", (cid, src, debut), one=True)
+                net = float(r["net"] or 0) if r else 0.0
+                if net <= -c["perte_jour"]:
+                    envoyer_fond(cid, f"⚠️ {nom} : perte du jour {eur(net)}", f"Ton seuil de −{c['perte_jour']:g} € est atteint. Pense à arrêter le bot si besoin.", f"perte-{src}")
+                    deja["perte"].append(src); change = True
+            if "serie" in c:
+                L = db.run("SELECT ticket, net FROM oeil_trades WHERE compte_id = %s AND source = %s ORDER BY fermeture_t DESC LIMIT %s",
+                           (cid, src, c["serie"]), all=True) or []
+                if len(L) == c["serie"] and all((t["net"] or 0) < 0 for t in L) and deja["serie"].get(src) != L[0]["ticket"]:
+                    tot = sum(t["net"] or 0 for t in L)
+                    envoyer_fond(cid, f"📉 {nom} : {c['serie']} pertes d'affilée", f"Total {eur(tot)} sur les {c['serie']} derniers trades.", f"serie-{src}")
+                    deja["serie"][src] = L[0]["ticket"]; change = True
+    if change or deja.get("jour") != _lire(f"risque_{cid}", {}).get("jour"):
+        _ecrire(f"risque_{cid}", deja)

@@ -105,12 +105,36 @@
             <span style="flex:1"></span>
             <select id="hBot" class="hsel"><option value="">Tous les bots</option><option value="apex">APEX</option><option value="principal">Sonic</option><option value="allstar">ALL STAR</option><option value="manuel">Bot manuel</option></select>
             <select id="hJours" class="hsel"><option value="1">24 h</option><option value="7" selected>7 jours</option><option value="30">30 jours</option><option value="3650">Tout</option></select></div>
+          <div class="addpc" style="padding:0 16px;margin:10px 0 0"><button class="btn sec mini" onclick="exporterCsv()">⬇ Exporter en CSV (Excel)</button></div>
           <div class="tscroll"><table class="ptable"><thead><tr><th>Fermé le</th><th>Bot</th><th>Marché</th><th>Sens</th><th>Lot</th><th>Entrée</th><th>Sortie</th><th>Durée</th><th>Résultat</th></tr></thead><tbody id="hTrades"></tbody></table></div>
           <div class="note" id="hNote" style="padding:8px 16px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Statistiques <small class="muted" id="stTitre" style="font-weight:600"></small></div>
+          <div class="card-body">
+            <div class="st-kpis" id="stKpis"></div>
+            <div class="st-2">
+              <div><div class="st-h">Par marché</div><div class="tscroll"><table class="ptable st-t"><thead><tr><th>Marché</th><th>Trades</th><th>Gagnants</th><th>Résultat</th></tr></thead><tbody id="stMarches"></tbody></table></div></div>
+              <div><div class="st-h">Par heure d'ouverture (Paris)</div><svg id="stHeures" class="st-heures" viewBox="0 0 480 170" preserveAspectRatio="none"></svg><div class="note" id="stHeuresNote"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendrier des gains
+            <span style="flex:1"></span><button class="btn sec mini" onclick="calMois(-1)">◀</button><b id="calTitre" style="min-width:130px;text-align:center"></b><button class="btn sec mini" onclick="calMois(1)">▶</button></div>
+          <div class="card-body"><div class="cal" id="cal"></div><div class="note" id="calNote" style="margin-top:8px"></div></div>
         </div>
       </section>
 
       <section class="page" id="page-pc">
+        <div class="card">
+          <div class="card-title"><span style="font-size:20px">🛡</span>Alertes de risque</div>
+          <div class="card-body">
+            <p class="note">Une notification sur ton téléphone quand un seuil est franchi (une seule fois par jour pour la perte du jour). Laisse vide pour ne pas surveiller.</p>
+          </div>
+          <div class="tscroll"><table class="ptable al-t"><thead><tr><th>Bot</th><th>Perte du jour max (€)</th><th>Équité minimum</th><th>Pertes d'affilée</th></tr></thead><tbody id="alTable"></tbody></table></div>
+          <div class="card-body"><div class="addpc" style="margin:0"><button class="btn" onclick="alertesEnregistrer()">Enregistrer les alertes</button><span class="note" id="alNote"></span></div></div>
+        </div>
         <div class="card">
           <div class="card-title"><span style="font-size:20px">🔔</span>Notifications sur ce téléphone</div>
           <div class="card-body">
@@ -157,7 +181,7 @@ function aller(page, bot) {
   document.querySelectorAll("nav button").forEach(o => o.classList.toggle("active", o.dataset.page === page && (o.dataset.bot || null) === (bot || null)));
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-" + page));
   botCourant = bot || null;
-  if (page === "histo") histo(); if (page === "pc") moi(); if (page === "bot" && dernier) pageBot(dernier);
+  if (page === "histo") histo(); if (page === "pc") { moi(); alertesLire(); } if (page === "bot" && dernier) pageBot(dernier);
   if (page === "bot") { eqData = null; courbe(true); }
   document.querySelector("main").scrollTop = 0;
 }
@@ -332,8 +356,76 @@ async function histo() {
     || `<tr><td colspan="9" class="vide">Aucun trade fermé sur cette période.</td></tr>`;
   const tot = d.trades.reduce((a, t) => a + (t.net || 0), 0);
   $("hNote").textContent = d.trades.length ? `${d.trades.length}${d.trades.length >= 500 ? " (les 500 derniers)" : ""} trades · total ${eur(tot)}` : "";
+  stats();
 }
 $("hBot").onchange = histo; $("hJours").onchange = histo;
+function exporterCsv() { location.href = `/api/trades.csv?source=${$("hBot").value}&jours=${$("hJours").value}`; }
+
+/* ---------- statistiques + calendrier (page Historique, mêmes filtres) ---------- */
+let calDecal = 0, calJours = {};
+async function stats() {
+  const src = $("hBot").value, j = $("hJours").value;
+  const [d, c] = await Promise.all([fetch(`/api/stats?source=${src}&jours=${j}`).then(r => r.json()), fetch(`/api/stats?source=${src}&jours=400`).then(r => r.json())]);
+  calJours = c.jours || {};
+  $("stTitre").textContent = `· ${src ? BOTS[src]?.nom : "tous les bots"} · ${$("hJours").selectedOptions[0].text}`;
+  const k = (lbl, v, c2) => `<div class="hc-kpi"><span>${lbl}</span><b class="${c2 || ""}">${v}</b></div>`;
+  $("stKpis").innerHTML = !d.n ? `<div class="vide">Aucun trade fermé sur cette période.</div>` :
+    k("Résultat", eur(d.net), cls(d.net)) + k("Trades", d.n) + k("Gagnants", d.taux + " %") +
+    k("Profit factor", d.profit_factor == null ? "—" : num(d.profit_factor), d.profit_factor >= 1 ? "pos" : "neg") +
+    k("Gain moyen", eur(d.gain_moyen), "pos") + k("Perte moyenne", eur(d.perte_moyenne), "neg") +
+    k("Par trade", eur(d.esperance), cls(d.esperance)) + k("Meilleur / pire", `${eur(d.meilleur)} / ${eur(d.pire)}`) +
+    k("Plus forte baisse", "−" + num(d.creux) + " €", "neg") + k("Pire série", d.pire_serie + " pertes");
+  $("stMarches").innerHTML = (d.marches || []).slice(0, 12).map(m => `<tr><td>${esc(m.symbole)}</td><td>${m.n}</td><td>${m.taux} %</td><td class="${cls(m.net)}">${eur(m.net)}</td></tr>`).join("")
+    || `<tr><td colspan="4" class="vide">—</td></tr>`;
+  const H = d.heures || [], mx = Math.max(1e-9, ...H.map(h => Math.abs(h.net))), W = 480, Hh = 170, mid = 80, bw = W / 24;
+  $("stHeures").innerHTML = `<line x1="0" x2="${W}" y1="${mid}" y2="${mid}" stroke="rgba(255,255,255,.18)"/>` + H.map(h => {
+    const hgt = Math.abs(h.net) / mx * (mid - 6), y = h.net >= 0 ? mid - hgt : mid;
+    return `<rect x="${h.h * bw + 2}" y="${y}" width="${bw - 4}" height="${Math.max(h.n ? 1 : 0, hgt)}" rx="2" fill="${h.net >= 0 ? "#6cb8ff" : "#ffab5c"}"><title>${h.h} h : ${eur(h.net)} · ${h.n} trades</title></rect>` +
+      (h.h % 3 === 0 ? `<text x="${h.h * bw + bw / 2}" y="${Hh - 4}" text-anchor="middle" class="eq-ax">${h.h}h</text>` : "");
+  }).join("");
+  const best = H.filter(h => h.n).sort((a, b) => b.net - a.net);
+  $("stHeuresNote").textContent = best.length ? `Meilleure heure : ${best[0].h} h (${eur(best[0].net)}) · pire : ${best[best.length - 1].h} h (${eur(best[best.length - 1].net)})` : "";
+  calendrier();
+}
+function calMois(d) { calDecal = Math.min(0, calDecal + d); calendrier(); }
+function calendrier() {
+  const now = new Date(), m = new Date(now.getFullYear(), now.getMonth() + calDecal, 1);
+  $("calTitre").textContent = m.toLocaleDateString("fr-FR", {month: "long", year: "numeric"});
+  const jours = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."];
+  let h = jours.map(j => `<div class="cal-h">${j}</div>`).join("");
+  const decal = (m.getDay() + 6) % 7, nb = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+  const valeurs = [];
+  for (let i = 1; i <= nb; i++) { const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`; if (calJours[k]) valeurs.push(Math.abs(calJours[k].net)); }
+  const mx = Math.max(1e-9, ...valeurs);
+  h += "<div></div>".repeat(decal);
+  let tot = 0, n = 0, pos = 0, neg = 0;
+  for (let i = 1; i <= nb; i++) {
+    const k = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`, v = calJours[k];
+    const aujourd = i === now.getDate() && calDecal === 0;
+    if (v) { tot += v.net; n += v.n; v.net >= 0 ? pos++ : neg++; }
+    const a = v ? (.18 + .62 * Math.min(1, Math.abs(v.net) / mx)).toFixed(2) : 0;
+    const fond = v ? (v.net >= 0 ? `rgba(76,141,255,${a})` : `rgba(255,154,60,${a})`) : "rgba(255,255,255,.03)";
+    h += `<div class="cal-j${aujourd ? " auj" : ""}" style="background:${fond}" title="${v ? v.n + " trades" : "aucun trade"}"><span>${i}</span>${v ? `<b>${(v.net >= 0 ? "+" : "−") + num(Math.abs(v.net), Math.abs(v.net) >= 100 ? 0 : 2)}</b>` : ""}</div>`;
+  }
+  $("cal").innerHTML = h;
+  $("calNote").innerHTML = n ? `Mois : <b class="${cls(tot)}">${eur(tot)}</b> · ${n} trades · ${pos} jour(s) gagnant(s), ${neg} perdant(s)` : "Aucun trade ce mois-ci.";
+}
+
+/* ---------- alertes de risque (page Mes PC) ---------- */
+async function alertesLire() {
+  const a = await (await fetch("/api/alertes")).json();
+  $("alTable").innerHTML = ORDRE.map(k => `<tr><td><svg class="pic"><use href="#${BOTS[k].pic}"/></svg> ${esc(BOTS[k].nom)}</td>
+    <td><input class="al-in" data-k="${k}" data-c="perte_jour" inputmode="decimal" placeholder="ex. 10" value="${a[k]?.perte_jour ?? ""}"></td>
+    <td><input class="al-in" data-k="${k}" data-c="equite_min" inputmode="decimal" placeholder="ex. 90" value="${a[k]?.equite_min ?? ""}"></td>
+    <td><input class="al-in" data-k="${k}" data-c="serie" inputmode="numeric" placeholder="ex. 4" value="${a[k]?.serie ?? ""}"></td></tr>`).join("");
+}
+async function alertesEnregistrer() {
+  const d = {};
+  document.querySelectorAll(".al-in").forEach(i => { (d[i.dataset.k] ||= {})[i.dataset.c] = i.value; });
+  const r = await fetch("/api/alertes", {method: "POST", headers: H, body: JSON.stringify(d)});
+  $("alNote").textContent = r.ok ? "✅ Alertes enregistrées." : "Erreur à l'enregistrement.";
+  alertesLire();
+}
 async function moi() {
   const m = await (await fetch("/api/moi")).json();
   $("qui").textContent = m.email;
