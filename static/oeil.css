@@ -98,7 +98,8 @@ nav button svg.pic { width: 22px; height: 22px; stroke: none !important; }
 .hcard.big { cursor: default; } .hcard.big:hover { transform: none; }
 
 /* ---------- mini graphique des positions, filtres de l'historique ---------- */
-.as-chart { display: block; width: 100%; height: 90px; margin-top: 8px; border-radius: 8px; background: rgba(0,0,0,.25); }
+/* 23/11 : proportions fixes (300 × 90) : sur une carte large, le graphique n'est plus étiré (bougies, texte et point déformés) */
+.as-chart { display: block; width: 100%; max-width: 480px; height: auto; aspect-ratio: 300 / 90; margin-top: 8px; border-radius: 8px; background: rgba(0,0,0,.25); }
 .hsel { background: rgba(0,0,0,.35); color: var(--text); border: 1px solid rgba(231,184,74,.25); border-radius: 8px; padding: 5px 8px;
         font: 600 12.5px "Segoe UI", system-ui, sans-serif; margin-left: 6px; }
 
