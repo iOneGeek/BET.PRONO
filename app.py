@@ -200,8 +200,8 @@ def sante():
     try:
         db.run("SELECT 1", one=True)
         return jsonify({"ok": True})
-    except Exception:  # noqa: BLE001
-        return jsonify({"ok": False}), 503
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"ok": False, "erreur": type(e).__name__}), 503
 
 
 # ------------------------------------------------------------------ clés des connecteurs

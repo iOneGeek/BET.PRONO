@@ -73,16 +73,41 @@ def _pg_pool():
     return _pool
 
 
+derniere_erreur = ""
+
+
+def reset_pool():
+    """Ferme le réservoir de connexions : le prochain appel en recrée un neuf."""
+    global _pool
+    with _lock:
+        p, _pool = _pool, None
+    if p is not None:
+        try:
+            p.close(timeout=2)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def run(sql: str, params: tuple = (), one=False, all=False):
     """Exécute une requête ; renvoie une ligne (dict), toutes les lignes, ou rien."""
     if USE_PG:
-        with _pg_pool().connection() as c:
-            cur = c.execute(sql, params)
-            if one:
-                return cur.fetchone()
-            if all:
-                return cur.fetchall()
-            return None
+        try:
+            with _pg_pool().connection() as c:
+                cur = c.execute(sql, params)
+                if one:
+                    return cur.fetchone()
+                if all:
+                    return cur.fetchall()
+                return None
+        except Exception as e:  # noqa: BLE001
+            # 23/11 (nuit) : le site renvoyait « erreur 500 » partout alors que Neon répondait : réservoir de connexions cassé.
+            # On garde la cause pour /sante et, si c'est un souci de connexion (pas une erreur SQL), on repart d'un réservoir neuf.
+            global derniere_erreur
+            derniere_erreur = type(e).__name__
+            import psycopg
+            if not isinstance(e, psycopg.errors.Error) or isinstance(e, psycopg.OperationalError):
+                reset_pool()
+            raise
     c = _sqlite()
     cur = c.execute(sql.replace("%s", "?"), params)
     c.commit()
