@@ -86,6 +86,12 @@
 
       <section class="page" id="page-bot">
         <div id="botCard"></div>
+        <div class="card oe-gcard" style="margin-top:14px" hidden id="grC">
+          <div class="card-title"><span class="oe-gold">▲▲</span><span id="grCT">XAUUSD — M15</span>
+            <span class="oe-gleg"><i style="background:#4c8dff"></i>EMA 50 <b id="grCE50">—</b><i style="background:#f5a524"></i>EMA 200 <b id="grCE200">—</b></span></div>
+          <svg class="oe-gsvg" id="grCSvg" preserveAspectRatio="none"></svg>
+        </div>
+
         <div class="card" style="margin-top:14px" id="diagCard" hidden>
           <div class="card-title"><span style="font-size:20px">🩺</span>Pourquoi ALL STAR ne trade pas ?<span style="flex:1"></span><small class="muted" id="diagSync" style="font-weight:600"></small></div>
           <div class="card-body"><div id="diagMain"></div><div class="st-h" style="margin-top:14px">Blocages depuis le dernier démarrage d'ALL STAR</div><div id="diagBloc"></div></div>
@@ -295,14 +301,16 @@ function carte(k, s, now) {
       ${s.solde != null ? ` · solde <b>${num(s.solde)}${s.devise === "USD" ? " $" : " €"}</b>` : ""}
       ${s.bilan_total ? ` · depuis le début <b class="${cls(s.bilan_total.net)}">${eur(s.bilan_total.net, s.devise)}</b>` : ""}</div>
     <div class="hc-kpis">
-      <div class="hc-kpi" title="${bj.trades != null ? `${bj.trades} trade(s) fermé(s) aujourd'hui · ${bj.gagnants ?? 0} gagnant(s)` : ""}"><span>Aujourd'hui${bj.trades != null ? ` · ${bj.trades} trade${bj.trades > 1 ? "s" : ""}` : ""}</span><b class="${cls(bj.net)}">${bj.net != null ? eur(bj.net, s.devise) : "—"}</b></div>
-      <div class="hc-kpi"><span>${s.equite != null ? "Équité" : "Trades du jour"}</span><b>${s.equite != null ? num(s.equite) + (s.devise === "USD" ? " $" : " €") : (bj.trades ?? "—")}</b></div>
-      <div class="hc-kpi"><span>En cours</span><b class="${P.length ? cls(latent) : ""}">${P.length ? eur(latent, s.devise) : "—"}</b></div>
+      <div class="hc-kpi ico-j" title="${bj.trades != null ? `${bj.trades} trade(s) fermé(s) aujourd'hui · ${bj.gagnants ?? 0} gagnant(s)` : ""}"><span>Aujourd'hui${bj.trades != null ? ` · ${bj.trades} trade${bj.trades > 1 ? "s" : ""}` : ""}</span><b class="${cls(bj.net)}">${bj.net != null ? eur(bj.net, s.devise) : "—"}</b></div>
+      <div class="hc-kpi ico-e"><span>${s.equite != null ? "Équité" : "Trades du jour"}</span><b>${s.equite != null ? num(s.equite) + (s.devise === "USD" ? " $" : " €") : (bj.trades ?? "—")}</b></div>
+      <div class="hc-kpi ico-p"><span>En cours</span><b class="${P.length ? cls(latent) : ""}">${P.length ? eur(latent, s.devise) : "—"}</b></div>
     </div>${trades(s)}`;
   if (s.radar && s.radar.score != null) {
     const ok = s.radar.score >= (s.radar.seuil || 70);
     h += `<div class="hc-radar"><span class="muted">Radar ${esc(s.radar.heure || "")}</span><span class="side ${s.radar.sens}">${esc(s.radar.sens || "")}</span>
       <span class="g"><i class="${ok ? "ok" : ""}" style="width:${s.radar.score}%"></i></span><b>${s.radar.score}</b><span class="verdict">${esc(s.radar.decision || "")}</span></div>`;
+    if ((s.criteres || []).length) h += `<div class="crit">${s.criteres.map(([lab, got, full]) => `<span class="${got >= full ? "ok" : got > 0 ? "half" : "no"}">${got >= full ? "✔" : got > 0 ? "◐" : "✖"} ${esc(lab)}</span>`).join("")}</div>`
+      + ((s.contre || []).length ? `<div class="note">⚠ ${esc(s.contre.join(" · "))}</div>` : "");
   }
   if (s.top && s.top.length) {
     const seuil = s.score_min || 90, big = k === botCourant;
@@ -402,6 +410,7 @@ function pageBot(d) {
   $("botPosTitle").textContent = "Positions ouvertes · " + (BOTS[botCourant]?.nom || botCourant);
   $("eqCard").hidden = s.equite == null;
   $("diagCard").hidden = botCourant !== "allstar";
+  grapheBot(s);
   if (botCourant === "allstar") diagnostic(s, d.t);
   const L = (s.positions || []).map(p => ({k: botCourant, dev: s.devise, ...p}));
   $("botPos").innerHTML = lignesPos(L) || `<div class="vide">Aucune position ouverte : ${esc(BOTS[botCourant]?.nom || "")} attend un signal.</div>`;
@@ -604,6 +613,45 @@ async function comparer() {
     lig("Profit factor", d => d.profit_factor == null ? "—" : `<b class="${d.profit_factor >= 1 ? "pos" : "neg"}">${num(d.profit_factor)}</b>`) +
     lig("Par trade", d => `<span class="${cls(d.esperance)}">${eur(d.esperance)}</span>`) + lig("Gain moyen", d => eur(d.gain_moyen)) +
     lig("Perte moyenne", d => eur(d.perte_moyenne)) + lig("Drawdown max", d => `<span class="neg">−${num(d.creux)} €</span>`) + lig("Pire série", d => d.pire_serie + " pertes");
+}
+
+/* 23/11 : graphique en bougies avec EMA 50 / EMA 200 (bougies M15 lues dans MT5, lecture seule). Commun au panneau et au site. */
+function oeEma(v, n) { const k = 2 / (n + 1), o = []; let e = null; for (const x of v) { e = e == null ? x : x * k + e * (1 - k); o.push(e); } return o; }
+function oeGraphe(svg, G, prix, nb = 96) {
+  const B0 = (G && G.bougies) || [];
+  if (B0.length < 20) { svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" fill="#9a958a" font-size="13">Graphique en attente des bougies MT5…</text>`; return null; }
+  const B = B0.map(b => b.slice());
+  if (prix) { const l = B[B.length - 1]; l[4] = prix; l[2] = Math.max(l[2], prix); l[3] = Math.min(l[3], prix); }   // bougie en cours au prix du direct
+  const C = B.map(b => b[4]), e50 = oeEma(C, 50), e200 = oeEma(C, 200);
+  const k0 = Math.max(0, B.length - nb), V = B.slice(k0), E50 = e50.slice(k0), E200 = B.length >= 200 ? e200.slice(k0) : null;
+  const W = svg.clientWidth || 800, H = svg.clientHeight || 300, ml = 8, mr = 70, mt = 10, mb = 24;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const vals = V.flatMap(b => [b[2], b[3]]).concat(E50, E200 || []);
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * .06 || 1; lo -= pad; hi += pad;
+  const cw = (W - ml - mr) / V.length, X = i => ml + i * cw + cw / 2, Y = v => mt + (hi - v) / (hi - lo) * (H - mt - mb);
+  const dg = hi > 100 ? 2 : 5, f = v => v.toLocaleString("fr-FR", {minimumFractionDigits: dg, maximumFractionDigits: dg});
+  let g = "";
+  for (let i = 0; i <= 5; i++) { const v = lo + (hi - lo) * i / 5, y = Y(v);
+    g += `<line x1="${ml}" x2="${W - mr}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.06)"/><text x="${W - mr + 6}" y="${y + 4}" fill="#9a958a" font-size="11">${f(v)}</text>`; }
+  V.forEach((b, i) => { if (i % 12 === 0) { const d = new Date(b[0] * 1000);
+    g += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" fill="#9a958a" font-size="11">${d.getHours() === 0 && d.getMinutes() === 0 ? d.toLocaleDateString("fr-FR", {day: "numeric", month: "short"}) : d.toLocaleTimeString("fr-FR", {hour: "2-digit", minute: "2-digit"})}</text>`; } });
+  g += V.map((b, i) => { const up = b[4] >= b[1], c = up ? "#3ccf7a" : "#e5484d", x = X(i), yo = Y(b[1]), yc = Y(b[4]);
+    return `<line x1="${x}" x2="${x}" y1="${Y(b[2])}" y2="${Y(b[3])}" stroke="${c}" stroke-width="1"/><rect x="${x - cw * .32}" y="${Math.min(yo, yc)}" width="${Math.max(1, cw * .64)}" height="${Math.max(1, Math.abs(yc - yo))}" fill="${c}" rx="1"/>`; }).join("");
+  const ligne = (E, col) => `<path d="${E.map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join("")}" fill="none" stroke="${col}" stroke-width="2"/>`;
+  g += ligne(E50, "#4c8dff") + (E200 ? ligne(E200, "#f5a524") : "");
+  const last = V[V.length - 1][4], yl = Y(last);
+  g += `<line x1="${ml}" x2="${W - mr}" y1="${yl}" y2="${yl}" stroke="#e7b84a" stroke-dasharray="3 4" opacity=".7"/>
+        <rect x="${W - mr + 2}" y="${yl - 10}" width="${mr - 4}" height="20" rx="4" fill="#e7b84a"/><text x="${W - mr + 6}" y="${yl + 4}" fill="#1a1408" font-size="11.5" font-weight="800">${f(last)}</text>`;
+  svg.innerHTML = g;
+  return {e50: e50[e50.length - 1], e200: B.length >= 200 ? e200[e200.length - 1] : null, f};
+}
+
+function grapheBot(s) {
+  const c = $("grC"); c.hidden = !(s && s.graph);
+  if (c.hidden) return;
+  $("grCT").textContent = `${s.graph.symbole} — ${s.graph.tf || "M15"}`;
+  const res = oeGraphe($("grCSvg"), s.graph, s.prix);
+  if (res) { $("grCE50").textContent = res.f(res.e50); $("grCE200").textContent = res.e200 == null ? "—" : res.f(res.e200); }
 }
 
 /* ---------- courbe d'équité (page de chaque bot) : périodes, zoom, repères des trades, drawdown ---------- */

@@ -328,3 +328,20 @@ svg.pic { width: 22px; height: 22px; flex: none; stroke: none !important; fill: 
   nav button[data-page="histo"], nav button[data-page="agenda"], nav button[data-page="comparer"], nav button[data-page="pc"] { display: none; }
   .hc-sync { display: none; }
 }
+
+.oe-gcard { margin: 0 0 12px; } .oe-gsvg { display: block; width: 100%; height: 300px; }
+.oe-gleg { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.oe-gleg i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; margin-left: 8px; } .oe-gleg b { color: #fff6dd; font-variant-numeric: tabular-nums; }
+@media (max-width: 620px) { .oe-gsvg { height: 220px; } .oe-gleg { font-size: 10.5px; } }
+
+.oe-gold { color: var(--gold); font-size: 12px; letter-spacing: -3px; margin-right: 4px; }
+/* tuiles à icônes (comme le panneau) */
+.hc-kpi.ico-j, .hc-kpi.ico-e, .hc-kpi.ico-p { padding-left: 46px !important; position: relative; background-repeat: no-repeat !important; background-position: 12px center !important; background-size: 24px !important; }
+.hc-kpi.ico-j { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e7b84a' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M5 20v-5M10 20V9M15 20v-8M20 20V5'/%3E%3C/svg%3E"); }
+.hc-kpi.ico-e { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e7b84a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v18M5 7h14M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z'/%3E%3C/svg%3E"); }
+.hc-kpi.ico-p { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e7b84a' stroke-width='1.8'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Ccircle cx='12' cy='12' r='1'/%3E%3C/svg%3E"); }
+@media (max-width: 620px) { .hc-kpi.ico-j, .hc-kpi.ico-e, .hc-kpi.ico-p { padding-left: 9px !important; background-image: none !important; } }
+/* radar en pastilles */
+.crit { display: flex; flex-wrap: wrap; gap: 6px; }
+.crit span { padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid; background: rgba(0,0,0,.3); }
+.crit .ok { color: #8fbff5; border-color: rgba(72,139,215,.5); } .crit .half { color: #ffd779; border-color: rgba(231,184,74,.5); } .crit .no { color: #ffc79a; border-color: rgba(255,148,60,.4); }
