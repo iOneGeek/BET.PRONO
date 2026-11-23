@@ -633,7 +633,7 @@ function oeGraphe(svg, G, prix, nb = 96) {
   let g = "";
   for (let i = 0; i <= 5; i++) { const v = lo + (hi - lo) * i / 5, y = Y(v);
     g += `<line x1="${ml}" x2="${W - mr}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.06)"/><text x="${W - mr + 6}" y="${y + 4}" fill="#9a958a" font-size="11">${f(v)}</text>`; }
-  V.forEach((b, i) => { if (i % 12 === 0) { const d = new Date(b[0] * 1000);
+  V.forEach((b, i) => { if (i % 12 === 6) { const d = new Date(b[0] * 1000);
     g += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" fill="#9a958a" font-size="11">${d.getHours() === 0 && d.getMinutes() === 0 ? d.toLocaleDateString("fr-FR", {day: "numeric", month: "short"}) : d.toLocaleTimeString("fr-FR", {hour: "2-digit", minute: "2-digit"})}</text>`; } });
   g += V.map((b, i) => { const up = b[4] >= b[1], c = up ? "#3ccf7a" : "#e5484d", x = X(i), yo = Y(b[1]), yc = Y(b[4]);
     return `<line x1="${x}" x2="${x}" y1="${Y(b[2])}" y2="${Y(b[3])}" stroke="${c}" stroke-width="1"/><rect x="${x - cw * .32}" y="${Math.min(yo, yc)}" width="${Math.max(1, cw * .64)}" height="${Math.max(1, Math.abs(yc - yo))}" fill="${c}" rx="1"/>`; }).join("");
