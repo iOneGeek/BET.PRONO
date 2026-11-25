@@ -45,6 +45,8 @@ if not SECRET_KEY:
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
+if SUR_RENDER and GOOGLE_REDIRECT_URI.startswith("http://"):   # 25/11 : l'adresse de retour Google doit être en https
+    print("ATTENTION : GOOGLE_REDIRECT_URI commence par http:// ; mets https:// dans les variables de Render", flush=True)
 AUTORISES = {e.strip().lower() for e in os.getenv("ALLOWED_EMAILS", "").split(",") if e.strip()}
 DEV_LOGIN = os.getenv("DEV_LOGIN") == "1" and not SUR_RENDER
 SOURCES = {"apex", "principal", "allstar", "manuel"}
@@ -55,6 +57,20 @@ app.config.update(SECRET_KEY=SECRET_KEY, SESSION_COOKIE_HTTPONLY=True, SESSION_C
                   SESSION_COOKIE_SECURE=SUR_RENDER, PERMANENT_SESSION_LIFETIME=30 * 86400, MAX_CONTENT_LENGTH=TAILLE_MAX)
 db.init()
 notif.init()
+
+
+# 25/11 : HTTPS partout. Render coupe le HTTPS devant l'application et lui transmet le protocole d'origine dans
+# X-Forwarded-Proto. Render redirige déjà http -> https ; ceci est une sécurité de plus si ce réglage changeait.
+@app.before_request
+def _https_obligatoire():
+    if not SUR_RENDER:
+        return None   # en local (essais) : pas de HTTPS
+    proto = request.headers.get("X-Forwarded-Proto", "https").split(",")[0].strip().lower()
+    if proto == "http":
+        url = "https://" + request.host + request.full_path.rstrip("?")
+        # 301 pour une simple lecture ; 308 pour un envoi (POST…), qui garde la méthode et le contenu
+        return redirect(url, code=301 if request.method in ("GET", "HEAD") else 308)
+    return None
 
 
 @app.before_request
@@ -103,6 +119,16 @@ def anti_csrf():
 @app.get("/connexion")
 def page_connexion():
     return send_from_directory(ICI / "static", "connexion.html")
+
+
+@app.get("/confidentialite")
+def page_confidentialite():   # publique : lisible sans être connecté (lien en pied de page)
+    return send_from_directory(ICI / "static", "confidentialite.html")
+
+
+@app.get("/conditions")
+def page_conditions():   # publique : conditions générales d'utilisation (lien en pied de page)
+    return send_from_directory(ICI / "static", "conditions.html")
 
 
 @app.get("/auth/info")
@@ -182,6 +208,16 @@ def deconnexion():
 @connecte
 def accueil():
     return send_from_directory(ICI / "static", "index.html")
+
+
+@app.get("/robots.txt")
+def robots():   # 25/11 : consignes aux moteurs de recherche (doit être à la racine du site)
+    return send_from_directory(ICI / "static", "robots.txt", mimetype="text/plain", max_age=86400)
+
+
+@app.get("/sitemap.xml")
+def plan_du_site():   # 25/11 : liste des pages publiques, annoncée dans robots.txt
+    return send_from_directory(ICI / "static", "sitemap.xml", mimetype="application/xml", max_age=86400)
 
 
 @app.get("/favicon.ico")
@@ -574,6 +610,8 @@ def entetes(resp):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["Referrer-Policy"] = "same-origin"
+    if SUR_RENDER:   # 25/11 : HSTS : le navigateur n'essaie plus jamais ce site en http pendant 1 an
+        resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.path.startswith("/api/"):
         resp.headers["Cache-Control"] = "no-store"
     return resp

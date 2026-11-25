@@ -1,7 +1,7 @@
 /* Œil du Trader en ligne — éléments communs : logo, pictos des bots, fond de bougies (comme le panneau PC). */
 document.body.insertAdjacentHTML("afterbegin", `
-<canvas id="bg"></canvas><div class="vignette"></div>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<canvas id="bg" aria-hidden="true"></canvas><div class="vignette" aria-hidden="true"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
   <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbe7a1"/><stop offset=".5" stop-color="#e5b04a"/><stop offset="1" stop-color="#9c6b1a"/></linearGradient>
   <linearGradient id="pgApex" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9a6"/><stop offset="1" stop-color="#b9821f"/></linearGradient>
   <linearGradient id="pgSonic" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#2563eb"/></linearGradient>

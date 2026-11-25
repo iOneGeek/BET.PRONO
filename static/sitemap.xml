@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pages publiques de l'Œil du Trader (lisibles sans connexion). La page d'accueil « / » n'y est pas :
+     elle demande d'être connecté et renvoie vers /connexion. À mettre à jour si une page publique est ajoutée. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://bet-prono.onrender.com/connexion</loc>
+    <lastmod>2026-11-25</lastmod>
+  </url>
+  <url>
+    <loc>https://bet-prono.onrender.com/conditions</loc>
+    <lastmod>2026-11-25</lastmod>
+  </url>
+  <url>
+    <loc>https://bet-prono.onrender.com/confidentialite</loc>
+    <lastmod>2026-11-25</lastmod>
+  </url>
+</urlset>

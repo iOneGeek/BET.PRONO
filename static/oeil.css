@@ -345,3 +345,50 @@ svg.pic { width: 22px; height: 22px; flex: none; stroke: none !important; fill: 
 .crit { display: flex; flex-wrap: wrap; gap: 6px; }
 .crit span { padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid; background: rgba(0,0,0,.3); }
 .crit .ok { color: #8fbff5; border-color: rgba(72,139,215,.5); } .crit .half { color: #ffd779; border-color: rgba(231,184,74,.5); } .crit .no { color: #ffc79a; border-color: rgba(255,148,60,.4); }
+
+/* 25/11 : pied de page (lien vers la politique de confidentialité) */
+.pied { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-top: 26px; padding: 14px 0 4px;
+        border-top: 1px solid rgba(231,184,74,.12); font-size: 12px; color: var(--muted); }
+.pied a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; } .pied a:hover { color: var(--gold); }
+.login-wrap .pied { border-top: 0; margin-top: 0; }
+
+/* 25/11 : consentement aux cookies (static/consentement.js). Accepter et Refuser : même style, même taille. */
+.pied button.ck-lien, .ck-lien { all: unset; cursor: pointer; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
+.ck-bandeau { position: fixed; z-index: 1000; left: 16px; right: 16px; bottom: 16px; max-width: 760px; margin: 0 auto;
+              display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 14px 16px; border-radius: 14px;
+              background: #15161b; border: 1px solid var(--line); box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.ck-bandeau p { flex: 1 1 320px; margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text); }
+.ck-btns { display: flex; gap: 10px; flex: 0 0 auto; }
+.ck-btn { all: unset; cursor: pointer; box-sizing: border-box; min-width: 120px; text-align: center; padding: 10px 18px; border-radius: 10px;
+          font: 700 14px "Segoe UI", system-ui, sans-serif; color: var(--text); background: #23252c; border: 1px solid rgba(231,184,74,.55); }
+.ck-btn:hover { background: #2c2f37; } .ck-btn:focus-visible, .ck-lien:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.ck-voile { position: fixed; inset: 0; z-index: 1001; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.6); }
+.ck-fenetre { width: 100%; max-width: 520px; max-height: 90vh; overflow: auto; padding: 20px 22px; border-radius: 14px;
+              background: #15161b; border: 1px solid var(--line); font-size: 14px; line-height: 1.55; color: var(--text); }
+.ck-fenetre h2 { margin: 0 0 10px; font-size: 19px; color: var(--gold-hi); white-space: normal; }
+.ck-fenetre ul { padding-left: 20px; margin: 4px 0 10px; } .ck-fenetre p { margin: 8px 0; }
+.ck-etat { color: var(--muted); }
+.ck-bas { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; font-size: 13px; }
+@media (max-width: 520px) { .ck-btns { width: 100%; } .ck-btn { flex: 1; min-width: 0; } }
+
+/* 25/11 : téléphone (375 px et moins de 620 px) — lisible sans zoomer et utilisable au doigt.
+   Textes : 12 px minimum (seuil de lisibilité mobile) ; champs de saisie : 16 px (sinon l'iPhone zoome au toucher).
+   Boutons, listes, champs, liens isolés : zone de toucher d'au moins 44 x 44 px (recommandation Apple / WCAG). */
+@media (max-width: 620px) {
+  .sub, nav button, nav button span, .court, .hc-kpi span, .hc-state, .side, .as-row .side, .mini, .as-st, .as-motif,
+  .as-sc small, .as-top-h small, .bfn span, .ag-h, .ag-c > span, .ag-c b, .oe-gleg, .cal-j b { font-size: 12px !important; }
+  .hc-kpi span { letter-spacing: 0; }
+  .ag-c b { white-space: nowrap; line-height: 1.15; }
+  .ag-c > span { top: 3px; left: 5px; }
+  nav button { min-height: 52px; }
+  .btn, .btn.mini, .btn.sec, .hsel, .al-in, input, select, textarea { min-height: 44px; }
+  .btn.mini { min-width: 44px; padding: 8px 14px; }
+  input, select, textarea, .hsel, .al-in { font-size: 16px; }
+  .seg button, .eq-per button { min-height: 44px; min-width: 44px; box-sizing: border-box; display: inline-flex;
+                                align-items: center; justify-content: center; padding: 6px 12px; }
+  .eq-per { gap: 6px; }
+  .note a, .st-h a, .card-body p a { display: inline-block; padding: 14px 2px; margin: -14px 0; }   /* lien dans une phrase : zone de toucher agrandie sans décaler le texte */
+  .pied { flex-direction: column; align-items: center; gap: 0; }
+  .pied a, .pied button { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; }
+  nav { z-index: 60; }   /* au-dessus du voile du menu « Plus » (z-index 50) : « Plus » le referme, les onglets restent utilisables */
+}

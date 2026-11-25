@@ -5,10 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07080a">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Œil du Trader</title>
+<title>Tableau de bord de tes robots de trading · Œil du Trader</title>
+<meta name="description" content="Suis en direct tes robots de trading MetaTrader 5 : positions, résultats du jour, courbe d&#x27;équité, historique et alertes, sur ordinateur ou téléphone.">
+<!-- 25/11 : aperçu des liens partagés (Open Graph pour Facebook, WhatsApp, LinkedIn… ; Twitter Card pour X) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Œil du Trader">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:url" content="https://bet-prono.onrender.com/">
+<meta property="og:title" content="Tableau de bord de tes robots de trading · Œil du Trader">
+<meta property="og:description" content="Suis en direct tes robots de trading MetaTrader 5 : positions, résultats du jour, courbe d&#x27;équité, historique et alertes, sur ordinateur ou téléphone.">
+<meta property="og:image" content="https://bet-prono.onrender.com/static/apercu.png">
+<meta property="og:image:secure_url" content="https://bet-prono.onrender.com/static/apercu.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Logo de l&#x27;Œil du Trader : un œil doré avec un graphique en barres, et le texte « Tes robots de trading MetaTrader 5, suivis en direct »">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Tableau de bord de tes robots de trading · Œil du Trader">
+<meta name="twitter:description" content="Suis en direct tes robots de trading MetaTrader 5 : positions, résultats du jour, courbe d&#x27;équité, historique et alertes, sur ordinateur ou téléphone.">
+<meta name="twitter:image" content="https://bet-prono.onrender.com/static/apercu.png">
+<meta name="twitter:image:alt" content="Logo de l&#x27;Œil du Trader : un œil doré avec un graphique en barres, et le texte « Tes robots de trading MetaTrader 5, suivis en direct »">
 <link rel="stylesheet" href="/static/oeil.css">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" href="/static/favicon.png">
+<!-- 25/11 : icônes tirées du logo. Onglet : SVG (navigateurs récents) ou ICO 16/32/48 ; iPhone : 180 px ; Android : manifeste -->
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/favicon.png" type="image/png" sizes="96x96">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/static/manifest.json">
 <meta name="apple-mobile-web-app-title" content="Œil du Trader">
@@ -16,9 +37,10 @@
 </head>
 <body>
 <script src="/static/oeil.js"></script>
+<script src="/static/consentement.js" defer></script>
 <div class="app">
   <header>
-    <svg class="logo" viewBox="0 0 220 130"><use href="#logo"/></svg>
+    <svg class="logo" viewBox="0 0 220 130" aria-hidden="true" focusable="false"><use href="#logo"/></svg>
     <div class="sep"></div>
     <div class="titles">
       <h1>Œil du Trader</h1>
@@ -38,44 +60,44 @@
   <div class="layout">
     <nav>
       <button class="active" data-page="home">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
         <span><span class="long">Tableau de bord</span><span class="court" style="display:none">Accueil</span></span><i class="nav-dot" id="navDot"></i></button>
       <button data-page="bot" data-bot="apex" class="reel-on" hidden>
-        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><use href="#pic-apex"/></svg>
+        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pic-apex"/></svg>
         <span>APEX<b class="reel-tag">€ RÉEL</b></span><i class="nav-dot" data-dot="apex"></i></button>
       <button data-page="bot" data-bot="principal" hidden>
-        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><use href="#pic-sonic"/></svg>
+        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pic-sonic"/></svg>
         <span>Sonic</span><i class="nav-dot" data-dot="principal"></i></button>
       <button data-page="bot" data-bot="allstar" hidden>
-        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><use href="#pic-star"/></svg>
+        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pic-star"/></svg>
         <span>ALL STAR</span><i class="nav-dot" data-dot="allstar"></i></button>
       <button data-page="bot" data-bot="manuel" hidden>
-        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><use href="#pic-man"/></svg>
+        <svg class="pic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pic-man"/></svg>
         <span>Manuel</span><i class="nav-dot" data-dot="manuel"></i></button>
       <button data-page="positions">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>
         <span>Positions</span></button>
       <button data-page="histo">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
         <span><span class="long">Historique</span><span class="court" style="display:none">Histo.</span></span></button>
       <button data-page="agenda">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
         <span>Agenda</span></button>
       <button data-page="comparer">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
         <span>Comparer</span></button>
       <button data-page="pc">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
         <span>Mes PC</span></button>
-      <button class="plus-btn" onclick="plusMenu()" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+      <button class="plus-btn" onclick="plusMenu()" type="button" aria-expanded="false" aria-controls="plusMenu">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
         <span>Plus</span></button>
       <div id="navSums"></div>
       <div class="nav-news" id="navNews" hidden>
         <div class="ns-title"><span class="nn-ic">📅</span>Agenda</div>
         <div id="newsBody"></div>
       </div>
-      <svg class="ghost" viewBox="0 0 220 130"><use href="#logo"/></svg>
+      <svg class="ghost" viewBox="0 0 220 130" aria-hidden="true" focusable="false"><use href="#logo"/></svg>
     </nav>
 
     <main>
@@ -89,7 +111,7 @@
         <div class="card oe-gcard" style="margin-top:14px" hidden id="grC">
           <div class="card-title"><span class="oe-gold">▲▲</span><span id="grCT">XAUUSD — M15</span>
             <span class="oe-gleg"><i style="background:#4c8dff"></i>EMA 50 <b id="grCE50">—</b><i style="background:#f5a524"></i>EMA 200 <b id="grCE200">—</b></span></div>
-          <svg class="oe-gsvg" id="grCSvg" preserveAspectRatio="none"></svg>
+          <svg class="oe-gsvg" id="grCSvg" preserveAspectRatio="none" role="img" aria-label="Graphique en bougies M15 avec les moyennes EMA 50 et EMA 200"></svg>
         </div>
 
         <div class="card" style="margin-top:14px" id="diagCard" hidden>
@@ -97,18 +119,18 @@
           <div class="card-body"><div id="diagMain"></div><div class="st-h" style="margin-top:14px">Blocages depuis le dernier démarrage d'ALL STAR</div><div id="diagBloc"></div></div>
         </div>
         <div class="card" style="margin-top:14px" id="perfCard">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Performance
+          <div class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Performance
             <span style="flex:1"></span><select id="perfJours" class="hsel"><option value="1">Aujourd'hui</option><option value="7">7 jours</option><option value="30">30 jours</option><option value="3650" selected>Depuis le début</option></select></div>
           <div class="card-body"><div class="st-kpis" id="perfKpis"></div><div class="perf-bfn" id="perfBfn"></div></div>
         </div>
         <div class="card" style="margin-top:14px" id="eqCard">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>
+          <div class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>
             Courbe d'équité<span style="flex:1"></span>
             <span class="eq-per" id="eqPer"><button data-h="24">24 h</button><button data-h="168" class="on">7 j</button><button data-h="720">30 j</button><button data-h="87600">Tout</button></span></div>
           <div class="card-body">
             <div class="eq-head"><span id="eqVar"></span><span class="eq-leg"><i class="l-eq"></i>Équité <i class="l-so"></i>Solde <i class="l-dd"></i>Drawdown <i class="l-tr"></i>Trades
               <button class="btn sec mini" id="eqReset" onclick="eqToutVoir()" hidden>↺ Tout voir</button></span></div>
-            <div class="eq-wrap"><svg id="eqSvg" class="eq-svg" preserveAspectRatio="none"></svg><div class="eq-tip" id="eqTip" hidden></div></div>
+            <div class="eq-wrap"><svg id="eqSvg" class="eq-svg" preserveAspectRatio="none" role="img" aria-label="Courbe d'équité, de solde et de drawdown du bot sur la période choisie" aria-describedby="eqVar eqNote"></svg><div class="eq-tip" id="eqTip" hidden></div></div>
             <p class="note" id="eqNote"></p>
           </div>
         </div>
@@ -120,18 +142,18 @@
 
       <section class="page" id="page-positions">
         <div class="card">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>Positions ouvertes · tous les bots</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>Positions ouvertes · tous les bots</div>
           <div class="tscroll" id="posTable"></div>
         </div>
       </section>
 
       <section class="page" id="page-histo">
         <div class="card">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>Bilan par bot <small class="muted" style="font-weight:600">· trades fermés, lus dans MT5</small></div>
+          <div class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><path d="M5 20v-6M12 20V8M19 20V4"/></svg>Bilan par bot <small class="muted" style="font-weight:600">· trades fermés, lus dans MT5</small></div>
           <div class="tscroll"><table class="ptable"><thead><tr><th>Bot</th><th>Aujourd'hui</th><th>7 jours</th><th>30 jours</th><th>Depuis le début</th></tr></thead><tbody id="hStats"></tbody></table></div>
         </div>
         <div class="card">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Trades fermés
+          <div class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Trades fermés
             <span style="flex:1"></span>
             <select id="hBot" class="hsel"><option value="">Tous les bots</option><option value="apex">APEX</option><option value="principal">Sonic</option><option value="allstar">ALL STAR</option><option value="manuel">Bot manuel</option></select>
             <input id="hSym" class="hsel" placeholder="Symbole" style="width:96px">
@@ -142,12 +164,12 @@
           <div class="note" id="hNote" style="padding:8px 16px"></div>
         </div>
         <div class="card">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Statistiques <small class="muted" id="stTitre" style="font-weight:600"></small></div>
+          <div class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Statistiques <small class="muted" id="stTitre" style="font-weight:600"></small></div>
           <div class="card-body">
             <div class="st-kpis" id="stKpis"></div>
             <div class="st-2">
               <div><div class="st-h">Par marché</div><div class="tscroll"><table class="ptable st-t"><thead><tr><th>Marché</th><th>Trades</th><th>Gagnants</th><th>Résultat</th></tr></thead><tbody id="stMarches"></tbody></table></div></div>
-              <div><div class="st-h">Par heure d'ouverture (Paris)</div><svg id="stHeures" class="st-heures" viewBox="0 0 480 170" preserveAspectRatio="none"></svg><div class="note" id="stHeuresNote"></div></div>
+              <div><div class="st-h">Par heure d'ouverture (Paris)</div><svg id="stHeures" class="st-heures" viewBox="0 0 480 170" preserveAspectRatio="none" role="img" aria-label="Résultat net des trades selon leur heure d'ouverture" aria-describedby="stHeuresNote"></svg><div class="note" id="stHeuresNote"></div></div>
             </div>
           </div>
         </div>
@@ -156,7 +178,7 @@
 
       <section class="page" id="page-agenda">
         <div class="card">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda des gains <small class="muted" id="agTitre" style="font-weight:600"></small>
+          <div class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda des gains <small class="muted" id="agTitre" style="font-weight:600"></small>
             <span style="flex:1"></span>
             <select id="agBot" class="hsel"><option value="apex" selected>APEX (réel)</option><option value="principal">Sonic (démo)</option><option value="allstar">ALL STAR (démo)</option><option value="manuel">Bot manuel (démo)</option></select>
           </div>
@@ -174,7 +196,7 @@
 
       <section class="page" id="page-comparer">
         <div class="card">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Comparer les bots <span style="flex:1"></span>
+          <div class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Comparer les bots <span style="flex:1"></span>
             <select id="cmpJours" class="hsel"><option value="1">Aujourd'hui</option><option value="7">7 jours</option><option value="30" selected>30 jours</option><option value="90">90 jours</option><option value="3650">Tout</option></select></div>
           <div class="card-body"><p class="note">Même période pour tous. <b>APEX tourne sur un compte réel</b>, les autres sur des comptes démo : leurs historiques ne sont jamais additionnés.</p></div>
           <div class="tscroll"><table class="ptable cmp-t"><thead id="cmpHead"></thead><tbody id="cmpBody"></tbody></table></div>
@@ -203,7 +225,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Mes PC connectés</div>
+          <div class="card-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Mes PC connectés</div>
           <div class="card-body">
             <p class="note">Chaque PC où tournent tes bots envoie son état au site avec une clé personnelle. La clé ne s'affiche qu'une fois :
               colle-la dans <code>config.env</code> de ton PC (<code>EN_LIGNE_CLE=…</code>). Ne la partage avec personne.</p>
@@ -213,6 +235,7 @@
           <div class="tscroll"><table class="ptable"><thead><tr><th>PC</th><th>Clé</th><th>Créée</th><th>Dernier envoi</th><th></th></tr></thead><tbody id="cles"></tbody></table></div>
         </div>
       </section>
+      <footer class="pied"><span>© Œil du Trader</span><a href="/conditions">Conditions générales</a><a href="/confidentialite">Politique de confidentialité</a><a href="#" data-cookies role="button">Gérer les cookies</a></footer>
     </main>
   </div>
 </div>
@@ -243,7 +266,14 @@ function aller(page, bot) {
   document.querySelector("main").scrollTop = 0;
 }
 document.querySelectorAll("nav button[data-page]").forEach(b => b.onclick = () => aller(b.dataset.page, b.dataset.bot));
-function plusMenu() { $("plusMenu").hidden = !$("plusMenu").hidden; }
+function plusMenu(ouvrir) {   // 25/11 : ouvert/fermé annoncé aux lecteurs d'écran ; Échap et les onglets le referment
+  const m = $("plusMenu"), b = document.querySelector("nav .plus-btn");
+  m.hidden = ouvrir === undefined ? !m.hidden : !ouvrir;
+  if (b) b.setAttribute("aria-expanded", String(!m.hidden));
+  if (!m.hidden) { const p = m.querySelector("button"); if (p) p.focus(); }
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("plusMenu").hidden) plusMenu(false); });
+document.addEventListener("click", e => { const t = e.target.closest && e.target.closest("nav button[data-page]"); if (t && !$("plusMenu").hidden) plusMenu(false); });
 async function sortir() { await fetch("/auth/sortie", {method: "POST", headers: H}); location.href = "/connexion"; }
 
 function voyant(s, now) {
@@ -281,7 +311,7 @@ function miniChart(p, W = 300, H = 90) {
   if (p.sl) g += ligne(+p.sl, "#ff5c5c", "2 2", "SL");
   const yp = Math.max(4, Math.min(H - 4, y(+p.prix))), xp = (b.length - 0.5) * cw;
   g += `<circle cx="${xp}" cy="${yp}" r="3.2" fill="#fff" stroke="${p.profit >= 0 ? "#6cb8ff" : "#ffab5c"}" stroke-width="2"/>`;
-  return `<svg class="as-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Graphique ${esc(p.symbole)}">${g}</svg>`;
+  return `<svg class="as-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Mini graphique de ${esc(p.symbole)} : dernières bougies et prix d'entrée de la position">${g}</svg>`;
 }
 function trades(s) {
   const P = s.positions || [];
@@ -295,7 +325,7 @@ function carte(k, s, now) {
   const b = BOTS[k] || {pic: "pic-sonic", nom: s.nom || k}, [v, etat, info] = voyant(s, now), bj = s.bilan_jour || {};
   const P = s.positions || [], latent = P.reduce((a, p) => a + (p.profit || 0), 0);
   let h = `<div class="card hcard${s.reel ? " reel" : ""}" onclick="aller('bot','${k}')" title="Ouvrir la page du bot">
-    <div class="hc-top"><span class="hc-name"><svg class="pic"><use href="#${b.pic}"/></svg>${esc(b.nom)}</span>
+    <div class="hc-top"><span class="hc-name"><svg class="pic" aria-hidden="true" focusable="false"><use href="#${b.pic}"/></svg>${esc(b.nom)}</span>
       <i class="sdot ${v}" title="${esc(info)}"></i><span class="hc-sync" title="Dernière synchronisation de ce bot">⟳ ${s.maj ? new Date(s.maj * 1000).toLocaleTimeString("fr-FR") : "—"}</span><span class="hc-state">${etat}</span></div>
     <div class="hc-sub">${s.compte ? `Compte ${esc(s.compte)} · ${s.reel ? "réel" : "démo"} · ` : ""}${esc(s.strategie || (k === "allstar" ? "mode " + (s.mode || "—") + (s.risque_eur ? " · " + s.risque_eur + " € de risque" : "") : ""))}
       ${s.solde != null ? ` · solde <b>${num(s.solde)}${s.devise === "USD" ? " $" : " €"}</b>` : ""}
@@ -373,7 +403,7 @@ function gauche(d) {
     const n = (s.positions || []).length;
     const ligne = (lbl, val) => val == null ? "" : `<div class="ns-row"><span>${lbl}</span><b>${val}</b></div>`;
     return `<div class="nav-sum${s.reel ? " reel" : ""}" onclick="aller('bot','${k}')" title="Ouvrir la page du bot">
-      <div class="ns-title"><svg class="pic"><use href="#${BOTS[k].pic}"/></svg>${esc(BOTS[k].nom)}${s.reel ? `<b class="reel-tag">€ RÉEL</b>` : `<small class="ns-tag">bot</small>`}<i class="sdot ${v}"></i></div>
+      <div class="ns-title"><svg class="pic" aria-hidden="true" focusable="false"><use href="#${BOTS[k].pic}"/></svg>${esc(BOTS[k].nom)}${s.reel ? `<b class="reel-tag">€ RÉEL</b>` : `<small class="ns-tag">bot</small>`}<i class="sdot ${v}"></i></div>
       <div class="ns-day"><span>Aujourd'hui</span><b class="${cls(bj.net)}">${bj.net != null ? (bj.net >= 0 ? "+" : "−") + num(Math.abs(bj.net)) + dev : "—"}</b></div>
       ${ligne("Solde", s.solde != null ? num(s.solde) + dev : null)}${ligne("Équité", s.equite != null ? num(s.equite) + dev : null)}
       ${ligne("Positions", `${n}${s.max_positions ? " / " + s.max_positions : ""}`)}</div>`;
@@ -398,7 +428,7 @@ function gauche(d) {
 }
 function lignesPos(L) {
   return L.length ? `<table class="ptable"><thead><tr><th>Bot</th><th>Marché</th><th>Sens</th><th>Lot</th><th>Prix</th><th>SL</th><th>TP</th><th>Résultat</th></tr></thead><tbody>` +
-    L.map(p => `<tr><td><svg class="pic"><use href="#${BOTS[p.k]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[p.k]?.nom || p.k)}</td><td>${esc(p.symbole)}</td>
+    L.map(p => `<tr><td><svg class="pic" aria-hidden="true" focusable="false"><use href="#${BOTS[p.k]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[p.k]?.nom || p.k)}</td><td>${esc(p.symbole)}</td>
       <td>${p.sens ? `<span class="mini ${p.sens === "SELL" ? "sell" : ""}">${p.sens}</span>` : "—"}</td><td>${p.volume ?? "—"}</td><td>${p.prix ?? "—"}</td>
       <td>${p.sl || "—"}</td><td>${p.tp || "—"}</td><td class="${cls(p.profit)}">${eur(p.profit, p.dev)}</td></tr>`).join("") + `</tbody></table>` : "";
 }
@@ -419,7 +449,7 @@ function tablePositions(d) {
   const L = [];
   for (const k of ORDRE) for (const p of (d.sources[k]?.positions || [])) L.push({k, dev: d.sources[k].devise, ...p});
   $("posTable").innerHTML = L.length ? `<table class="ptable"><thead><tr><th>Bot</th><th>Marché</th><th>Sens</th><th>Lot</th><th>Prix</th><th>SL</th><th>TP</th><th>Résultat</th></tr></thead><tbody>` +
-    L.map(p => `<tr><td><svg class="pic"><use href="#${BOTS[p.k]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[p.k]?.nom || p.k)}</td><td>${esc(p.symbole)}</td>
+    L.map(p => `<tr><td><svg class="pic" aria-hidden="true" focusable="false"><use href="#${BOTS[p.k]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[p.k]?.nom || p.k)}</td><td>${esc(p.symbole)}</td>
       <td>${p.sens ? `<span class="mini ${p.sens === "SELL" ? "sell" : ""}">${p.sens}</span>` : "—"}</td><td>${p.volume ?? "—"}</td><td>${p.prix ?? "—"}</td>
       <td>${p.sl || "—"}</td><td>${p.tp || "—"}</td><td class="${cls(p.profit)}">${eur(p.profit, p.dev)}</td></tr>`).join("") + `</tbody></table>`
     : `<div class="vide">Aucune position ouverte sur tes bots.</div>`;
@@ -445,12 +475,12 @@ async function rafraichir() {
 async function histo() {
   const d = await (await fetch(`/api/trades?source=${$("hBot").value}&jours=${$("hJours").value}&symbole=${encodeURIComponent($("hSym").value.trim())}&res=${$("hRes").value}`)).json();
   const cell = x => x ? `<b class="${cls(x.net)}">${eur(x.net, x.devise)}</b><div class="note">${x.n} trades · ${x.n ? Math.round(x.gagnants / x.n * 100) : 0} % gagnants</div>` : `<span class="muted">—</span>`;
-  $("hStats").innerHTML = ORDRE.filter(k => d.stats[k]).map(k => `<tr><td><svg class="pic"><use href="#${BOTS[k].pic}"/></svg> ${esc(BOTS[k].nom)}</td>
+  $("hStats").innerHTML = ORDRE.filter(k => d.stats[k]).map(k => `<tr><td><svg class="pic" aria-hidden="true" focusable="false"><use href="#${BOTS[k].pic}"/></svg> ${esc(BOTS[k].nom)}</td>
     <td>${cell(d.stats[k].jour)}</td><td>${cell(d.stats[k].semaine)}</td><td>${cell(d.stats[k].mois)}</td><td>${cell(d.stats[k].tout)}</td></tr>`).join("")
     || `<tr><td colspan="5" class="vide">Pas encore de trades reçus : le connecteur les envoie dans la minute qui suit son démarrage.</td></tr>`;
   const dur = s => s < 3600 ? Math.round(s / 60) + " min" : s < 86400 ? (s / 3600).toFixed(1).replace(".", ",") + " h" : (s / 86400).toFixed(1).replace(".", ",") + " j";
   $("hTrades").innerHTML = d.trades.map(t => `<tr><td>${new Date(t.fermeture_t * 1000).toLocaleString("fr-FR", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"})}</td>
-    <td><svg class="pic"><use href="#${BOTS[t.source]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[t.source]?.nom || t.source)}</td><td>${esc(t.symbole)}</td>
+    <td><svg class="pic" aria-hidden="true" focusable="false"><use href="#${BOTS[t.source]?.pic || "pic-sonic"}"/></svg> ${esc(BOTS[t.source]?.nom || t.source)}</td><td>${esc(t.symbole)}</td>
     <td><span class="mini ${t.sens === "SELL" ? "sell" : ""}">${esc(t.sens)}</span></td><td>${t.volume}</td><td>${+Number(t.prix_ouv).toFixed(5)}</td><td>${+Number(t.prix_ferm).toFixed(5)}</td>
     <td>${dur(t.fermeture_t - t.ouverture_t)}</td><td>${t.brut == null ? "—" : eur(t.brut, t.devise)}</td><td class="muted">${t.commission == null ? "—" : eur(t.commission, t.devise)}</td>
     <td class="muted">${t.swap == null ? "—" : eur(t.swap, t.devise)}</td><td class="${cls(t.net)}"><b>${eur(t.net, t.devise)}</b></td></tr>`).join("")
@@ -489,7 +519,7 @@ async function stats() {
 /* ---------- alertes de risque (page Mes PC) ---------- */
 async function alertesLire() {
   const a = await (await fetch("/api/alertes")).json();
-  $("alTable").innerHTML = ORDRE.map(k => `<tr><td><svg class="pic"><use href="#${BOTS[k].pic}"/></svg> ${esc(BOTS[k].nom)}</td>
+  $("alTable").innerHTML = ORDRE.map(k => `<tr><td><svg class="pic" aria-hidden="true" focusable="false"><use href="#${BOTS[k].pic}"/></svg> ${esc(BOTS[k].nom)}</td>
     <td><input class="al-in" data-k="${k}" data-c="perte_jour" inputmode="decimal" placeholder="ex. 10" value="${a[k]?.perte_jour ?? ""}"></td>
     <td><input class="al-in" data-k="${k}" data-c="equite_min" inputmode="decimal" placeholder="ex. 90" value="${a[k]?.equite_min ?? ""}"></td>
     <td><input class="al-in" data-k="${k}" data-c="serie" inputmode="numeric" placeholder="ex. 4" value="${a[k]?.serie ?? ""}"></td></tr>`).join("");
@@ -565,7 +595,9 @@ function agCase(c, titre) {
   const pct = c.pct == null ? "" : `<div class="ag-p">${c.pct >= 0 ? "▲" : "▼"} ${num(Math.abs(c.pct))} %</div>`;
   const rr = c.rr == null ? "" : `<div class="ag-rr">${num(c.rr)} R:R</div>`;
   const prin = agMode === "pct" ? (v == null ? "—" : (v >= 0 ? "+" : "−") + num(Math.abs(v)) + " %") : agMode === "rr" ? (v == null ? "—" : num(v) + " R:R") : eur(c.net);
-  return `<div class="ag-c ${ton}" title="${c.n} trade(s) · ${c.gagnants} gagnant(s)">${titre ? `<span>${titre}</span>` : ""}<b>${prin}</b>
+  const signe = x => x >= 0 ? "+" : "−", entier = x => Math.round(Math.abs(x)).toLocaleString("fr-FR");
+  const prinCourt = agMode === "pct" ? (v == null ? "—" : signe(v) + entier(v) + "%") : agMode === "rr" ? (v == null ? "—" : num(v)) : signe(c.net) + entier(c.net);
+  return `<div class="ag-c ${ton}" title="${eur(c.net)} · ${c.n} trade(s) · ${c.gagnants} gagnant(s)">${titre ? `<span>${titre}</span>` : ""}<b><span class="long">${prin}</span><span class="court" style="display:none">${prinCourt}</span></b>
     ${agMode === "net" ? pct + rr : agMode === "pct" ? `<div class="ag-p">${eur(c.net)}</div>` + rr : `<div class="ag-p">${eur(c.net)}</div>` + pct}<small>${c.n} trade${c.n > 1 ? "s" : ""}</small></div>`;
 }
 function agDessin() {
@@ -605,7 +637,7 @@ async function comparer() {
   const j = $("cmpJours").value, ks = ORDRE.filter(k => dernier?.sources?.[k] || true);
   const R = await Promise.all(ks.map(k => fetch(`/api/stats?source=${k}&jours=${j}`).then(r => r.json())));
   const col = ks.map((k, i) => ({k, d: R[i], reel: k === "apex"})).filter(c => c.d.n);
-  $("cmpHead").innerHTML = `<tr><th>Statistique</th>${col.map(c => `<th><svg class="pic"><use href="#${BOTS[c.k].pic}"/></svg> ${esc(BOTS[c.k].nom)}<div class="note">${c.reel ? "€ compte réel" : "compte démo"}</div></th>`).join("")}</tr>`;
+  $("cmpHead").innerHTML = `<tr><th>Statistique</th>${col.map(c => `<th><svg class="pic" aria-hidden="true" focusable="false"><use href="#${BOTS[c.k].pic}"/></svg> ${esc(BOTS[c.k].nom)}<div class="note">${c.reel ? "€ compte réel" : "compte démo"}</div></th>`).join("")}</tr>`;
   const lig = (lbl, f) => `<tr><td class="muted">${lbl}</td>${col.map(c => `<td>${f(c.d)}</td>`).join("")}</tr>`;
   $("cmpBody").innerHTML = !col.length ? `<tr><td class="vide">Aucun trade sur cette période.</td></tr>` :
     lig("Résultat net", d => `<b class="${cls(d.net)}">${eur(d.net)}</b>`) + lig("Bénéfice brut", d => d.brut == null ? "—" : eur(d.brut)) +
@@ -650,6 +682,7 @@ function grapheBot(s) {
   const c = $("grC"); c.hidden = !(s && s.graph);
   if (c.hidden) return;
   $("grCT").textContent = `${s.graph.symbole} — ${s.graph.tf || "M15"}`;
+  $("grCSvg").setAttribute("aria-label", `Graphique en bougies ${s.graph.tf || "M15"} de ${s.graph.symbole} avec les moyennes EMA 50 et EMA 200`);
   const res = oeGraphe($("grCSvg"), s.graph, s.prix);
   if (res) { $("grCE50").textContent = res.f(res.e50); $("grCE200").textContent = res.e200 == null ? "—" : res.f(res.e200); }
 }

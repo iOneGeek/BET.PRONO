@@ -4,10 +4,31 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07080a">
-<title>Œil du Trader — Connexion</title>
+<title>Connexion · Œil du Trader, suivi de robots de trading</title>
+<meta name="description" content="Connecte-toi avec Google pour suivre tes robots de trading MetaTrader 5 en lecture seule : positions, résultats et alertes. Accès sur invitation.">
+<!-- 25/11 : aperçu des liens partagés (Open Graph pour Facebook, WhatsApp, LinkedIn… ; Twitter Card pour X) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Œil du Trader">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:url" content="https://bet-prono.onrender.com/connexion">
+<meta property="og:title" content="Connexion · Œil du Trader, suivi de robots de trading">
+<meta property="og:description" content="Connecte-toi avec Google pour suivre tes robots de trading MetaTrader 5 en lecture seule : positions, résultats et alertes. Accès sur invitation.">
+<meta property="og:image" content="https://bet-prono.onrender.com/static/apercu.png">
+<meta property="og:image:secure_url" content="https://bet-prono.onrender.com/static/apercu.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Logo de l&#x27;Œil du Trader : un œil doré avec un graphique en barres, et le texte « Tes robots de trading MetaTrader 5, suivis en direct »">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Connexion · Œil du Trader, suivi de robots de trading">
+<meta name="twitter:description" content="Connecte-toi avec Google pour suivre tes robots de trading MetaTrader 5 en lecture seule : positions, résultats et alertes. Accès sur invitation.">
+<meta name="twitter:image" content="https://bet-prono.onrender.com/static/apercu.png">
+<meta name="twitter:image:alt" content="Logo de l&#x27;Œil du Trader : un œil doré avec un graphique en barres, et le texte « Tes robots de trading MetaTrader 5, suivis en direct »">
 <link rel="stylesheet" href="/static/oeil.css">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" href="/static/favicon.png">
+<!-- 25/11 : icônes tirées du logo. Onglet : SVG (navigateurs récents) ou ICO 16/32/48 ; iPhone : 180 px ; Android : manifeste -->
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/favicon.png" type="image/png" sizes="96x96">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/static/manifest.json">
 <meta name="apple-mobile-web-app-title" content="Œil du Trader">
@@ -15,13 +36,14 @@
 </head>
 <body>
 <script src="/static/oeil.js"></script>
+<script src="/static/consentement.js" defer></script>
 <div class="login-wrap">
   <main class="card login-box">
-    <svg class="logo" viewBox="0 0 220 130"><use href="#logo"/></svg>
+    <svg class="logo" viewBox="0 0 220 130" aria-hidden="true" focusable="false"><use href="#logo"/></svg>
     <h1>Œil du Trader</h1>
     <p class="note">Tes bots, partout. Lecture seule : aucun ordre ne part d'ici.</p>
     <a class="btn gbtn" id="btnGoogle" href="/auth/google" hidden>
-      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#1a1408" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.2l7.8 6.1C12.3 13.6 17.6 9.5 24 9.5zm22.5 15c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5zM10.4 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.8-6.1zM24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.4 0-11.7-4.1-13.6-9.8l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#1a1408" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.2l7.8 6.1C12.3 13.6 17.6 9.5 24 9.5zm22.5 15c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5zM10.4 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.8-6.1zM24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.4 0-11.7-4.1-13.6-9.8l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
       Se connecter avec Google</a>
     <form id="dev" hidden>
       <p class="note small">Mode essai local (sans Google)</p>
@@ -30,6 +52,7 @@
     </form>
     <p class="err" id="err"></p>
   </main>
+  <footer class="pied"><a href="/conditions">Conditions générales</a><a href="/confidentialite">Politique de confidentialité</a><a href="#" data-cookies role="button">Gérer les cookies</a></footer>
 </div>
 <script>
 const msgs = {etat: "Session expirée, recommence.", code: "Connexion annulée.", google: "Google ne répond pas, réessaie.",

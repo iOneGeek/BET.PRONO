@@ -6,7 +6,26 @@
   "background_color": "#07080a",
   "theme_color": "#07080a",
   "icons": [
-    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
-    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}
-  ]
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "/",
+  "lang": "fr",
+  "description": "Suis en direct tes robots de trading MetaTrader 5 : positions, résultats, courbe d'équité et alertes."
 }

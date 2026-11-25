@@ -1,0 +1,12 @@
+# Œil du Trader — consignes pour les robots des moteurs de recherche.
+# Les pages publiques, les feuilles de style, les scripts et les images restent accessibles (sinon les moteurs
+# ne peuvent pas afficher les pages correctement). Seules les adresses techniques, sans intérêt pour une recherche,
+# sont exclues : elles demandent d'être connecté ou ne renvoient pas de page.
+
+# Tout ce qui n'est pas listé ici est autorisé (pas de « Allow: / » : certains robots appliquent la 1re règle trouvée).
+User-agent: *
+Disallow: /api/
+Disallow: /auth/
+Disallow: /sante
+
+Sitemap: https://bet-prono.onrender.com/sitemap.xml
