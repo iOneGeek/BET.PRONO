@@ -605,6 +605,16 @@ def notif_essai():
     return jsonify({"ok": n > 0, "envois": n})
 
 
+@app.errorhandler(404)
+def introuvable(_e):
+    """26/11 : adresse inconnue -> page 404 du site (code 404 conservé) ; pour l'API, une réponse JSON."""
+    if request.path.startswith("/api/"):
+        return jsonify({"erreur": "adresse inconnue"}), 404
+    resp = send_from_directory(ICI / "static", "404.html")
+    resp.status_code = 404
+    return resp
+
+
 @app.after_request
 def entetes(resp):
     resp.headers["X-Content-Type-Options"] = "nosniff"

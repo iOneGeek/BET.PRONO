@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
+<title>Page introuvable · Œil du Trader</title>
+<meta name="description" content="Cette page de l'Œil du Trader n'existe pas ou plus. Retrouve l'accueil, la connexion et les pages d'information du site.">
+<!-- page d'erreur : à ne pas faire apparaître dans les moteurs de recherche -->
+<meta name="robots" content="noindex">
+<!-- 26/11 : page servie pour toute adresse inconnue (code 404). Tous les liens sont absolus (« /… ») :
+     elle peut s'afficher à n'importe quelle profondeur d'adresse, par exemple /a/b/c. -->
+<link rel="stylesheet" href="/static/oeil.css">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/favicon.png" type="image/png" sizes="96x96">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/static/manifest.json">
+<style>
+  html, body { overflow: auto; height: auto; min-height: 100%; }
+  .e4-boite { max-width: 460px; }
+  .e4-code { margin: 6px 0 0; font: 800 13px "Segoe UI", system-ui, sans-serif; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+  .e4-boite h1 { white-space: normal; font-size: 28px; margin: 6px 0 10px; }
+  .e4-boite p { margin: 0 auto 18px; max-width: 34ch; font-size: 15px; line-height: 1.55; color: var(--text); }
+  .e4-accueil { width: 100%; min-height: 46px; font-size: 15px; }
+  .e4-liens { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 8px; }
+  .e4-liens a { display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 10px;
+                background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); text-decoration: none; font-weight: 600; }
+  .e4-liens a:hover { background: rgba(231,184,74,.1); border-color: rgba(231,184,74,.35); }
+  .e4-liens a:focus-visible, .e4-accueil:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<script src="/static/oeil.js"></script>
+<script src="/static/consentement.js" defer></script>
+<div class="login-wrap">
+  <main class="card login-box e4-boite">
+    <svg class="logo" viewBox="0 0 220 130" role="img" aria-label="Œil du Trader"><use href="#logo"/></svg>
+    <p class="e4-code">Erreur 404</p>
+    <h1>Page introuvable</h1>
+    <p>Cette adresse n'existe pas ou plus. Le lien est peut-être incomplet ou mal recopié.</p>
+    <a class="btn e4-accueil" href="/">Aller à l'accueil</a>
+    <div role="navigation" aria-label="Pages principales">   <!-- pas de <nav> : la feuille du site en fait la barre du bas sur téléphone -->
+      <ul class="e4-liens">
+        <li><a href="/connexion">Connexion</a></li>
+        <li><a href="/conditions">Conditions générales</a></li>
+        <li><a href="/confidentialite">Politique de confidentialité</a></li>
+      </ul>
+    </div>
+  </main>
+  <footer class="pied"><a href="/conditions">Conditions générales</a><a href="/confidentialite">Politique de confidentialité</a><a href="#" data-cookies role="button">Gérer les cookies</a></footer>
+</div>
+</body>
+</html>
