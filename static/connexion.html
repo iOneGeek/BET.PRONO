@@ -47,7 +47,7 @@
       Se connecter avec Google</a>
     <form id="dev" hidden>
       <p class="note small">Mode essai local (sans Google)</p>
-      <input id="devEmail" type="email" placeholder="ton e-mail" required>
+      <label class="piege" aria-hidden="true">Site web (laisser vide)<input type="text" id="piegeDev" name="site_web" tabindex="-1" autocomplete="off" value=""></label><input id="devEmail" type="email" placeholder="ton e-mail" required>
       <button class="btn" type="submit">Entrer</button>
     </form>
     <p class="err" id="err"></p>
@@ -67,8 +67,8 @@ fetch("/auth/info").then(r => r.json()).then(i => {
 document.getElementById("dev").addEventListener("submit", async ev => {
   ev.preventDefault();
   const r = await fetch("/auth/dev", {method: "POST", headers: {"Content-Type": "application/json", "X-Oeil": "1"},
-    body: JSON.stringify({email: document.getElementById("devEmail").value})});
-  if (r.ok) location.href = "/"; else document.getElementById("err").textContent = "Refusé.";
+    body: JSON.stringify({email: document.getElementById("devEmail").value, site_web: document.getElementById("piegeDev").value})});
+  if (r.ok) location.href = "/"; else document.getElementById("err").textContent = (await r.json().catch(() => ({}))).erreur || "Refusé.";
 });
 </script>
 </body>

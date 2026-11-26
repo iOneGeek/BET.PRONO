@@ -210,7 +210,7 @@
             <p class="note">Une notification sur ton téléphone quand un seuil est franchi (une seule fois par jour pour la perte du jour). Laisse vide pour ne pas surveiller.</p>
           </div>
           <div class="tscroll"><table class="ptable al-t"><thead><tr><th>Bot</th><th>Perte du jour max (€)</th><th>Équité minimum</th><th>Pertes d'affilée</th></tr></thead><tbody id="alTable"></tbody></table></div>
-          <div class="card-body"><div class="addpc" style="margin:0"><button class="btn" onclick="alertesEnregistrer()">Enregistrer les alertes</button><span class="note" id="alNote"></span></div></div>
+          <div class="card-body"><div class="addpc" style="margin:0"><label class="piege" aria-hidden="true">Site web (laisser vide)<input type="text" id="piegeAlertes" name="site_web" tabindex="-1" autocomplete="off" value=""></label><button class="btn" onclick="alertesEnregistrer()">Enregistrer les alertes</button><span class="note" id="alNote"></span></div></div>
         </div>
         <div class="card">
           <div class="card-title"><span style="font-size:20px">🔔</span>Notifications sur ce téléphone</div>
@@ -229,7 +229,7 @@
           <div class="card-body">
             <p class="note">Chaque PC où tournent tes bots envoie son état au site avec une clé personnelle. La clé ne s'affiche qu'une fois :
               colle-la dans <code>config.env</code> de ton PC (<code>EN_LIGNE_CLE=…</code>). Ne la partage avec personne.</p>
-            <div class="addpc"><input id="nomPc" placeholder="Nom du PC (ex. PC maison)" maxlength="40"><button class="btn" onclick="nouvelleCle()">+ Créer une clé</button></div>
+            <div class="addpc"><label class="piege" aria-hidden="true">Site web (laisser vide)<input type="text" id="piegePc" name="site_web" tabindex="-1" autocomplete="off" value=""></label><input id="nomPc" placeholder="Nom du PC (ex. PC maison)" maxlength="40"><button class="btn" onclick="nouvelleCle()">+ Créer une clé</button></div>
             <div id="nouvelle"></div>
           </div>
           <div class="tscroll"><table class="ptable"><thead><tr><th>PC</th><th>Clé</th><th>Créée</th><th>Dernier envoi</th><th></th></tr></thead><tbody id="cles"></tbody></table></div>
@@ -527,8 +527,9 @@ async function alertesLire() {
 async function alertesEnregistrer() {
   const d = {};
   document.querySelectorAll(".al-in").forEach(i => { (d[i.dataset.k] ||= {})[i.dataset.c] = i.value; });
+  d.site_web = $("piegeAlertes").value;   // champ piège (vide pour une personne)
   const r = await fetch("/api/alertes", {method: "POST", headers: H, body: JSON.stringify(d)});
-  $("alNote").textContent = r.ok ? "✅ Alertes enregistrées." : "Erreur à l'enregistrement.";
+  $("alNote").textContent = r.ok ? "✅ Alertes enregistrées." : ((await r.json().catch(() => ({}))).erreur || "Erreur à l'enregistrement.");
   alertesLire();
 }
 async function moi() {
@@ -538,14 +539,14 @@ async function moi() {
     <td><button class="btn sec mini" onclick="suppr(${c.id})">Supprimer</button></td></tr>`).join("") || `<tr><td colspan="5" class="vide">Aucune clé.</td></tr>`;
 }
 async function nouvelleCle() {
-  const r = await fetch("/api/cles", {method: "POST", headers: H, body: JSON.stringify({nom: $("nomPc").value || "Mon PC"})});
+  const r = await fetch("/api/cles", {method: "POST", headers: H, body: JSON.stringify({nom: $("nomPc").value || "Mon PC", site_web: $("piegePc").value})});
   const d = await r.json();
   if (!r.ok) return alert(d.erreur || "Erreur");
   $("nouvelle").innerHTML = `<p class="note">Clé pour <b>${esc(d.nom)}</b> : copie-la maintenant, elle ne sera plus jamais affichée.</p>
     <div class="cle">${esc(d.cle)}</div><p class="note">Dans <code>config.env</code> de ce PC :<br><code>EN_LIGNE_URL=${esc(location.origin)}</code><br><code>EN_LIGNE_CLE=</code>(la clé ci-dessus)</p>`;
   moi();
 }
-async function suppr(id) { if (confirm("Supprimer cette clé ? Le PC qui l'utilise ne pourra plus envoyer.")) { await fetch("/api/cles/" + id, {method: "DELETE", headers: H}); moi(); } }
+async function suppr(id) { if (confirm("Supprimer cette clé ? Le PC qui l'utilise ne pourra plus envoyer.")) { const r = await fetch("/api/cles/" + id, {method: "DELETE", headers: H}); if (!r.ok) alert((await r.json().catch(() => ({}))).erreur || "Suppression refusée."); moi(); } }
 
 /* ---------- performance d'un bot (page du bot) : net, brut, frais, ratios ---------- */
 async function perf() {
@@ -790,13 +791,14 @@ async function notifActiver() {
     const sub = await swReg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: b64u(info.cle)});
     const appareil = iOS ? "iPhone" : (navigator.userAgentData?.platform || "ordinateur");
     const r = await fetch("/api/notif/abonner", {method: "POST", headers: H, body: JSON.stringify({abonnement: sub.toJSON(), appareil})});
-    if (!r.ok) alert("Activation refusée par le site.");
+    if (!r.ok) alert((await r.json().catch(() => ({}))).erreur || "Activation refusée par le site.");
     await notifEssai(true);
   } catch (err) { alert("Impossible d'activer : " + err.message); }
   notifEtat();
 }
 async function notifEssai(silencieux) {
-  const d = await (await fetch("/api/notif/essai", {method: "POST", headers: H})).json();
+  const r = await fetch("/api/notif/essai", {method: "POST", headers: H}), d = await r.json().catch(() => ({}));
+  if (!silencieux && r.status === 429) return alert(d.erreur);
   if (!silencieux && !d.ok) alert("Aucune notification envoyée : désactive puis réactive les notifications.");
 }
 async function notifDesactiver() {

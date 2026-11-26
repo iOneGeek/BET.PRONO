@@ -352,6 +352,9 @@ svg.pic { width: 22px; height: 22px; flex: none; stroke: none !important; fill: 
 .pied a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; } .pied a:hover { color: var(--gold); }
 .login-wrap .pied { border-top: 0; margin-top: 0; }
 
+/* 26/11 : champ piège anti-robots (invisible pour une personne ; un robot qui remplit tous les champs le remplit) */
+.piege { position: absolute !important; left: -10000px !important; top: auto !important; width: 1px !important; height: 1px !important; overflow: hidden !important; }
+
 /* 25/11 : consentement aux cookies (static/consentement.js). Accepter et Refuser : même style, même taille. */
 .pied button.ck-lien, .ck-lien { all: unset; cursor: pointer; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
 .ck-bandeau { position: fixed; z-index: 1000; left: 16px; right: 16px; bottom: 16px; max-width: 760px; margin: 0 auto;

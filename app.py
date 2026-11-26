@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import secrets
+import threading
 import time
 from datetime import datetime, timezone
 from functools import wraps
@@ -110,6 +111,73 @@ def ouvrir_session(email: str, nom: str):
     session["compte_id"] = c["id"]
 
 
+# ------------------------------------------------------------------ anti-robots (26/11)
+# 1) Limite du nombre d'envois : compteur en mémoire par compte connecté (sinon par adresse IP), sur une fenêtre glissante.
+#    Le site tourne avec UN seul processus (gunicorn.conf.py : workers = 1) : un compteur en mémoire suffit.
+#    Au-delà de la limite : réponse 429 « Trop d'envois » avec le délai d'attente (en-tête Retry-After).
+# 2) Champ piège « site_web » : invisible pour une personne, mais un robot qui remplit tous les champs le remplit.
+#    S'il arrive rempli, l'envoi est refusé sans rien enregistrer.
+_COMPTEURS: dict = {}
+_VERROU_COMPTEURS = threading.Lock()
+
+
+def ip_client() -> str:
+    """Sur Render, la vraie adresse du visiteur est la 1re de X-Forwarded-For (ajoutée par Render)."""
+    xff = request.headers.get("X-Forwarded-For", "")
+    return (xff.split(",")[0].strip() if SUR_RENDER and xff else request.remote_addr) or "?"
+
+
+def attente_avant_envoi(nom: str, maxi: int, fenetre_s: int, qui: str | None = None, compter: bool = True) -> int:
+    """0 si l'envoi est permis (et compté si compter=True) ; sinon le nombre de secondes à attendre."""
+    cle, maintenant = (nom, qui or ip_client()), time.time()
+    with _VERROU_COMPTEURS:
+        L = [t for t in _COMPTEURS.get(cle, ()) if maintenant - t < fenetre_s]
+        if len(L) >= maxi:
+            _COMPTEURS[cle] = L
+            return int(fenetre_s - (maintenant - L[0])) + 1
+        if compter:
+            L.append(maintenant)
+        _COMPTEURS[cle] = L
+        if len(_COMPTEURS) > 20000:   # ménage : on oublie les compteurs vides
+            for k in [k for k, v in _COMPTEURS.items() if not v]:
+                del _COMPTEURS[k]
+    return 0
+
+
+def reponse_trop_d_envois(attente: int):
+    minutes = max(1, round(attente / 60))
+    r = jsonify({"erreur": f"Trop d'envois en peu de temps : réessaie dans {minutes} minute{'s' if minutes > 1 else ''}."})
+    r.status_code = 429
+    r.headers["Retry-After"] = str(attente)
+    return r
+
+
+def limite(nom: str, maxi: int, fenetre_s: int):
+    """Décorateur : au plus « maxi » envois par « fenetre_s » secondes, par compte connecté (sinon par adresse IP)."""
+    def deco(f):
+        @wraps(f)
+        def g(*a, **k):
+            cid = session.get("compte_id")
+            attente = attente_avant_envoi(nom, maxi, fenetre_s, f"compte:{cid}" if cid else None)
+            if attente:
+                print(f"anti-robots : limite « {nom} » atteinte ({'compte ' + str(cid) if cid else ip_client()})", flush=True)
+                if request.path.startswith(("/api/", "/auth/dev")):
+                    return reponse_trop_d_envois(attente)
+                return "Trop de tentatives : réessaie dans quelques minutes.", 429, {"Retry-After": str(attente)}
+            return f(*a, **k)
+        return g
+    return deco
+
+
+def piege_rempli(d) -> bool:
+    """Retire le champ piège des données reçues ; True s'il était rempli (= robot)."""
+    v = d.pop("site_web", "") if isinstance(d, dict) else ""
+    if str(v or "").strip():
+        print(f"anti-robots : champ piège rempli sur {request.path} ({ip_client()})", flush=True)
+        return True
+    return False
+
+
 def anti_csrf():
     """Les actions du navigateur envoient du JSON avec un en-tête maison : un autre site ne peut pas les forger."""
     if request.headers.get("X-Oeil") != "1":
@@ -137,6 +205,7 @@ def auth_info():
 
 
 @app.get("/auth/google")
+@limite("connexion_google", 20, 600)
 def google_debut():
     if not GOOGLE_CLIENT_ID:
         return "Connexion Google non configurée.", 503
@@ -149,6 +218,7 @@ def google_debut():
 
 @app.get("/auth/google/callback")
 @app.get("/api/auth/google/callback")   # ancienne adresse de BET.PRONO : la console Google n'a pas besoin d'être modifiée
+@limite("retour_google", 20, 600)
 def google_retour():
     if not request.args.get("state") or request.args.get("state") != session.pop("oauth_etat", None):
         return redirect("/connexion?erreur=etat")
@@ -185,11 +255,15 @@ def google_retour():
 
 
 @app.post("/auth/dev")
+@limite("connexion_essai", 10, 600)
 def connexion_dev():
     if not DEV_LOGIN:
         abort(404)
     anti_csrf()
-    email = ((request.get_json(silent=True) or {}).get("email") or "").strip().lower()
+    d = request.get_json(silent=True) or {}
+    if piege_rempli(d):
+        return jsonify({"erreur": "Envoi refusé."}), 400
+    email = (d.get("email") or "").strip().lower()
     if "@" not in email:
         return jsonify({"erreur": "e-mail invalide"}), 400
     ouvrir_session(email, email.split("@")[0])
@@ -256,10 +330,14 @@ def moi():
 
 @app.post("/api/cles")
 @connecte
+@limite("creation_cle", 10, 3600)
 def creer_cle():
     anti_csrf()
     c = compte_courant()
-    nom = ((request.get_json(silent=True) or {}).get("nom") or "Mon PC").strip()[:40]
+    d = request.get_json(silent=True) or {}
+    if piege_rempli(d):
+        return jsonify({"erreur": "Envoi refusé."}), 400
+    nom = (d.get("nom") or "Mon PC").strip()[:40]
     n = db.run("SELECT COUNT(*) AS n FROM oeil_cles WHERE compte_id = %s AND revoquee = 0", (c["id"],), one=True)["n"]
     if n >= 5:
         return jsonify({"erreur": "5 clés au maximum : supprime d'abord une ancienne clé."}), 400
@@ -271,6 +349,7 @@ def creer_cle():
 
 @app.delete("/api/cles/<int:cid>")
 @connecte
+@limite("suppression_cle", 30, 3600)
 def revoquer_cle(cid):
     anti_csrf()
     db.run("UPDATE oeil_cles SET revoquee = 1 WHERE id = %s AND compte_id = %s", (cid, compte_courant()["id"]))
@@ -280,12 +359,19 @@ def revoquer_cle(cid):
 # ------------------------------------------------------------------ connecteur (PC -> site)
 @app.post("/api/connecteur/etat")
 def recevoir_etat():
+    # 26/11 : au plus 20 clés fausses / 10 min par adresse IP (empêche d'essayer des clés au hasard),
+    # et au plus 600 envois / 10 min par adresse IP (un PC normal en fait environ 130)
+    attente = attente_avant_envoi("connecteur_echec", 20, 600, compter=False) or attente_avant_envoi("connecteur", 600, 600)
+    if attente:
+        return reponse_trop_d_envois(attente)
     entete = request.headers.get("Authorization", "")
     if not entete.startswith("Bearer oeil_"):
+        attente_avant_envoi("connecteur_echec", 20, 600)
         return jsonify({"erreur": "clé manquante"}), 401
     k = db.run("SELECT id, compte_id FROM oeil_cles WHERE empreinte = %s AND revoquee = 0",
                (empreinte(entete[7:].strip()),), one=True)
     if not k:
+        attente_avant_envoi("connecteur_echec", 20, 600)
         return jsonify({"erreur": "clé inconnue ou supprimée"}), 401
     corps = request.get_json(silent=True) or {}
     maintenant = time.time()
@@ -326,10 +412,16 @@ def recevoir_etat():
 @app.post("/api/connecteur/trades")
 def recevoir_trades():
     """22/11 : trades fermés lus dans MT5 par le connecteur (par lots), gardés pour l'historique et le bilan du soir."""
+    # 26/11 : au plus 20 clés fausses / 10 min par adresse IP (empêche d'essayer des clés au hasard),
+    # et au plus 600 envois / 10 min par adresse IP (un PC normal en fait environ 130)
+    attente = attente_avant_envoi("connecteur_echec", 20, 600, compter=False) or attente_avant_envoi("connecteur", 600, 600)
+    if attente:
+        return reponse_trop_d_envois(attente)
     entete = request.headers.get("Authorization", "")
     k = db.run("SELECT id, compte_id FROM oeil_cles WHERE empreinte = %s AND revoquee = 0",
                (empreinte(entete[7:].strip()),), one=True) if entete.startswith("Bearer oeil_") else None
     if not k:
+        attente_avant_envoi("connecteur_echec", 20, 600)
         return jsonify({"erreur": "clé inconnue"}), 401
     L = []
     for t in (request.get_json(silent=True) or {}).get("trades") or []:
@@ -414,9 +506,13 @@ def alertes_lire():
 
 @app.post("/api/alertes")
 @connecte
+@limite("alertes", 30, 600)
 def alertes_ecrire():
     anti_csrf()
-    return jsonify(notif.enregistrer_alertes(compte_courant()["id"], request.get_json(silent=True) or {}))
+    d = request.get_json(silent=True) or {}
+    if piege_rempli(d):
+        return jsonify({"erreur": "Envoi refusé."}), 400
+    return jsonify(notif.enregistrer_alertes(compte_courant()["id"], d))
 
 
 def _trades_filtre(cid, source, jours, symbole="", res=""):
@@ -579,6 +675,7 @@ def notif_info():
 
 @app.post("/api/notif/abonner")
 @connecte
+@limite("notif_abonnement", 20, 3600)
 def notif_abonner():
     anti_csrf()
     d = request.get_json(silent=True) or {}
@@ -591,6 +688,7 @@ def notif_abonner():
 
 @app.post("/api/notif/desabonner")
 @connecte
+@limite("notif_desabonnement", 20, 3600)
 def notif_desabonner():
     anti_csrf()
     notif.desabonner(compte_courant()["id"], (request.get_json(silent=True) or {}).get("endpoint") or "")
@@ -599,6 +697,7 @@ def notif_desabonner():
 
 @app.post("/api/notif/essai")
 @connecte
+@limite("notif_essai", 5, 600)
 def notif_essai():
     anti_csrf()
     n = notif.envoyer(compte_courant()["id"], "👁 Œil du Trader", "Les notifications marchent ! Tu seras prévenu à chaque trade et si ton PC passe hors ligne.", "essai")
